@@ -25,7 +25,10 @@ const defaultOptions: StaffDecisionOptions = {
   minGrandSideRatio: 0.2,
 };
 
-const sortedBy = <T>(values: readonly T[], compare: (a: T, b: T) => number): readonly T[] => {
+const sortedBy = <T>(
+  values: readonly T[],
+  compare: (a: T, b: T) => number,
+): readonly T[] => {
   const result: T[] = [];
   for (const value of values) {
     let inserted = false;
@@ -61,9 +64,12 @@ export const decideStaffSystem = (
   options?: Partial<StaffDecisionOptions>,
 ): StaffDecision => {
   const config: StaffDecisionOptions = { ...defaultOptions, ...options };
-  const pitches = notes.map((note) => note.pitch).filter((pitch) => Number.isFinite(pitch));
+  const pitches = notes
+    .map((note) => note.pitch)
+    .filter((pitch) => Number.isFinite(pitch));
   const total = pitches.length;
-  if (total === 0) return { system: "single-treble", splitPoint: config.splitPoint };
+  if (total === 0)
+    return { system: "single-treble", splitPoint: config.splitPoint };
   let min = Infinity;
   let max = -Infinity;
   let bassCount = 0;
@@ -75,8 +81,10 @@ export const decideStaffSystem = (
   const trebleCount = total - bassCount;
   const bassRatio = bassCount / total;
   const trebleRatio = trebleCount / total;
-  if (bassRatio >= config.bassRatioForBass) return { system: "single-bass", splitPoint: config.splitPoint };
-  if (trebleRatio >= config.trebleRatioForTreble) return { system: "single-treble", splitPoint: config.splitPoint };
+  if (bassRatio >= config.bassRatioForBass)
+    return { system: "single-bass", splitPoint: config.splitPoint };
+  if (trebleRatio >= config.trebleRatioForTreble)
+    return { system: "single-treble", splitPoint: config.splitPoint };
   const range = max - min;
   const grandCandidate =
     range >= config.minGrandRange &&
@@ -85,6 +93,7 @@ export const decideStaffSystem = (
     trebleRatio >= config.minGrandSideRatio;
   if (grandCandidate) return { system: "grand", splitPoint: config.splitPoint };
   const median = medianPitch(pitches, config.splitPoint);
-  const system: StaffSystem = median < config.splitPoint ? "single-bass" : "single-treble";
+  const system: StaffSystem =
+    median < config.splitPoint ? "single-bass" : "single-treble";
   return { system, splitPoint: config.splitPoint };
 };

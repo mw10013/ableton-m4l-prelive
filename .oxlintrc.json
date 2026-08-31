@@ -3,7 +3,12 @@
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "jsx-a11y"],
   "settings": {
     "react": {
-      "linkComponents": [{ "name": "Link", "attribute": "to" }]
+      "linkComponents": [
+        {
+          "name": "Link",
+          "attribute": "to"
+        }
+      ]
     }
   },
   "categories": {
@@ -20,9 +25,7 @@
     "dist/",
     "refs/",
     "node_modules/",
-    "src/routeTree.gen.ts",
-    "src/components/ui/",
-    "src/hooks/use-mobile.ts"
+    "src/routeTree.gen.ts"
   ],
   "rules": {
     "no-unused-vars": [

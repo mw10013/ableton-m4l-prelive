@@ -43,20 +43,22 @@ export const ClipWithNotes = Schema.Struct({
 The clip name is already displayed after reading:
 
 ```tsx
-{clipInfo && (
-  <span className="ml-auto text-sm text-muted-foreground">
-    {clipInfo.name} ({clipInfo.length} beats)
-  </span>
-)}
+{
+  clipInfo && (
+    <span className="ml-auto text-sm text-muted-foreground">
+      {clipInfo.name} ({clipInfo.length} beats)
+    </span>
+  );
+}
 ```
 
 ## What's Available in liveql
 
 From the GraphQL schema (`refs/liveql/liveql-n4m.js:125-138`):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `Clip.name` | `String!` | Clip name in Ableton |
+| Field       | Type      | Description                                                    |
+| ----------- | --------- | -------------------------------------------------------------- |
+| `Clip.name` | `String!` | Clip name in Ableton                                           |
 | `Clip.path` | `String!` | LOM canonical path, e.g. `live_set tracks 0 clip_slots 3 clip` |
 
 The `path` string encodes the track index and clip slot index, and is the canonical reference to the clip in the Live Object Model.

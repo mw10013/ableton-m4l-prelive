@@ -2,6 +2,8 @@ import type { Note } from "@/lib/Domain";
 
 import { useEffect, useState } from "react";
 
+import { Card } from "@astryxdesign/core/Card";
+import { HStack } from "@astryxdesign/core/Stack";
 import { useMutation } from "@tanstack/react-query";
 
 import { renderLilyPondSvg } from "@/routes/api/score/-lilypond";
@@ -32,11 +34,10 @@ export function ScoreDisplay({ notes, renderToken }: ScoreDisplayProps) {
   if (notes.length === 0) return null;
 
   return (
-    <div className="mt-4">
-      <div
-        className="overflow-x-auto rounded border bg-background p-4"
-        dangerouslySetInnerHTML={{ __html: lilypondSvg ?? "" }}
-      />
-    </div>
+    <Card padding={4}>
+      <HStack isScrollable>
+        <div dangerouslySetInnerHTML={{ __html: lilypondSvg ?? "" }} />
+      </HStack>
+    </Card>
   );
 }

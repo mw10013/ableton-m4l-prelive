@@ -2,6 +2,8 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import type { ReactNode } from "react";
 
+import { Theme } from "@astryxdesign/core/theme";
+import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -23,7 +25,12 @@ export const Route = createRootRouteWithContext<{
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "prelive" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      ...(import.meta.env.DEV
+        ? [{ rel: "stylesheet", href: "/virtual:stylex.css" }]
+        : []),
+    ],
   }),
   shellComponent: RootDocument,
   errorComponent: DefaultCatchBoundary,
@@ -37,12 +44,14 @@ function RootComponent() {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" data-theme="dark">
       <head>
         <HeadContent />
       </head>
-      <body className="bg-background font-sans text-foreground antialiased">
-        {children}
+      <body>
+        <Theme theme={neutralTheme} mode="dark">
+          {children}
+        </Theme>
         <Scripts />
       </body>
     </html>

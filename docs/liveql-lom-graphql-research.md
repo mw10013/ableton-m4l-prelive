@@ -109,14 +109,14 @@ Everything is traversed from `live_set`. One query fetches the entire object tre
 
 ### Types
 
-| Type       | Key Fields                                                                                                                                                                        | Notes                              |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `Song`     | `id`, `path`, `is_playing`, `view`, `tracks`, `track(index)`                                                                                                                      | Root object                        |
-| `SongView` | `id`, `path`, `selected_track`, `detail_clip`                                                                                                                                     | UI selection state                 |
-| `Track`    | `id`, `path`, `name`, `has_midi_input`, `clip_slots`, `clip_slot(index)`                                                                                                          | Session tracks only                |
-| `ClipSlot` | `id`, `path`, `has_clip`, `clip`                                                                                                                                                  | Session grid cell                  |
-| `Clip`     | `id`, `path`, `name`, `length`, `looping`, `is_midi_clip`, `is_arrangement_clip`, `start_time`, `end_time`, `signature_numerator`, `signature_denominator`, `notes`               | `notes` is a synthetic field       |
-| `Note`     | `note_id`, `pitch`, `start_time`, `duration`, `velocity`, `mute`, `probability`, `velocity_deviation`, `release_velocity`                                                         | Data dict, not LOM object          |
+| Type       | Key Fields                                                                                                                                                          | Notes                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `Song`     | `id`, `path`, `is_playing`, `view`, `tracks`, `track(index)`                                                                                                        | Root object                  |
+| `SongView` | `id`, `path`, `selected_track`, `detail_clip`                                                                                                                       | UI selection state           |
+| `Track`    | `id`, `path`, `name`, `has_midi_input`, `clip_slots`, `clip_slot(index)`                                                                                            | Session tracks only          |
+| `ClipSlot` | `id`, `path`, `has_clip`, `clip`                                                                                                                                    | Session grid cell            |
+| `Clip`     | `id`, `path`, `name`, `length`, `looping`, `is_midi_clip`, `is_arrangement_clip`, `start_time`, `end_time`, `signature_numerator`, `signature_denominator`, `notes` | `notes` is a synthetic field |
+| `Note`     | `note_id`, `pitch`, `start_time`, `duration`, `velocity`, `mute`, `probability`, `velocity_deviation`, `release_velocity`                                           | Data dict, not LOM object    |
 
 ### Mutations
 
@@ -318,25 +318,25 @@ mutation {
 
 ## Gap Analysis — What liveql Doesn't Cover
 
-| Missing                       | Impact                                     | LOM Source                         |
-| ----------------------------- | ------------------------------------------ | ---------------------------------- |
-| `Song.tempo`                  | Can't read/set BPM                         | `live_set tempo` (get/set/observe) |
-| `Song.current_song_time`      | Can't show/set playhead position           | `live_set current_song_time`       |
-| `Song.scenes`                 | Can't trigger scenes                       | `live_set scenes`                  |
-| `Song.master_track`           | Can't access master                        | `live_set master_track`            |
-| `Song.return_tracks`          | Can't access returns                       | `live_set return_tracks`           |
-| `Track.arm`, `mute`, `solo`   | Can't toggle track state                   | Track properties                   |
-| `Track.devices`               | Can't see device chain                     | Track child list                   |
-| `Track.mixer_device`          | Can't control volume/pan                   | Track child                        |
-| `Track.arrangement_clips`     | Can't access arrangement clips             | Track child list (Live 11+)        |
-| `Track.color`                 | Can't display track colors                 | Track property                     |
-| `ClipSlot.fire`, `stop`       | Can't fire empty slots or stop             | ClipSlot functions                 |
-| `ClipSlot.create_clip`        | Can't create clips programmatically        | ClipSlot function                  |
-| `Clip.is_playing`             | Can't show playback state per clip         | Clip property (observe)            |
-| `Clip.loop_start`, `loop_end` | Can't control loop boundaries              | Clip properties                    |
-| `Clip.color`                  | Can't display clip colors                  | Clip property                      |
-| `Clip.quantize`               | Can't quantize notes                       | Clip function                      |
-| `Clip.duplicate_loop`         | Can't duplicate loop                       | Clip function                      |
+| Missing                       | Impact                              | LOM Source                         |
+| ----------------------------- | ----------------------------------- | ---------------------------------- |
+| `Song.tempo`                  | Can't read/set BPM                  | `live_set tempo` (get/set/observe) |
+| `Song.current_song_time`      | Can't show/set playhead position    | `live_set current_song_time`       |
+| `Song.scenes`                 | Can't trigger scenes                | `live_set scenes`                  |
+| `Song.master_track`           | Can't access master                 | `live_set master_track`            |
+| `Song.return_tracks`          | Can't access returns                | `live_set return_tracks`           |
+| `Track.arm`, `mute`, `solo`   | Can't toggle track state            | Track properties                   |
+| `Track.devices`               | Can't see device chain              | Track child list                   |
+| `Track.mixer_device`          | Can't control volume/pan            | Track child                        |
+| `Track.arrangement_clips`     | Can't access arrangement clips      | Track child list (Live 11+)        |
+| `Track.color`                 | Can't display track colors          | Track property                     |
+| `ClipSlot.fire`, `stop`       | Can't fire empty slots or stop      | ClipSlot functions                 |
+| `ClipSlot.create_clip`        | Can't create clips programmatically | ClipSlot function                  |
+| `Clip.is_playing`             | Can't show playback state per clip  | Clip property (observe)            |
+| `Clip.loop_start`, `loop_end` | Can't control loop boundaries       | Clip properties                    |
+| `Clip.color`                  | Can't display clip colors           | Clip property                      |
+| `Clip.quantize`               | Can't quantize notes                | Clip function                      |
+| `Clip.duplicate_loop`         | Can't duplicate loop                | Clip function                      |
 
 ### Critical for a note editor
 

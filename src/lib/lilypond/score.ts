@@ -98,7 +98,8 @@ const splitRestDuration = (
     const beatIndex = Math.floor((cursor + epsilon) / beatLength);
     const nextBeat = roundToGrid((beatIndex + 1) * beatLength, gridSize);
     const untilNextBeat = roundToGrid(nextBeat - cursor, gridSize);
-    const segment = untilNextBeat > epsilon ? Math.min(remaining, untilNextBeat) : remaining;
+    const segment =
+      untilNextBeat > epsilon ? Math.min(remaining, untilNextBeat) : remaining;
     parts.push(segment);
     cursor = roundToGrid(cursor + segment, gridSize);
     remaining = roundToGrid(remaining - segment, gridSize);
@@ -119,7 +120,10 @@ const buildEvents = (
   notes: readonly Note[],
   gridSize: number,
 ): readonly Event[] => {
-  const grouped = new Map<string, { start: number; duration: number; pitches: number[] }>();
+  const grouped = new Map<
+    string,
+    { start: number; duration: number; pitches: number[] }
+  >();
   for (const note of notes) {
     const start = roundToGrid(note.start_time, gridSize);
     const duration = roundToGrid(note.duration, gridSize);
@@ -186,7 +190,8 @@ const tokensForRestDuration = (
 ): readonly string[] => {
   const segments = splitRestDuration(start, duration, beatLength, gridSize);
   const tokens: string[] = [];
-  for (const segment of segments) tokens.push(...tokensForDuration(segment, []));
+  for (const segment of segments)
+    tokens.push(...tokensForDuration(segment, []));
   return tokens;
 };
 
@@ -201,13 +206,17 @@ const voiceToTokens = (
   for (const event of events) {
     if (event.start > cursor + epsilon) {
       const restDuration = event.start - cursor;
-      tokens.push(...tokensForRestDuration(cursor, restDuration, beatLength, gridSize));
+      tokens.push(
+        ...tokensForRestDuration(cursor, restDuration, beatLength, gridSize),
+      );
     }
     tokens.push(...tokensForDuration(event.duration, event.pitches));
     cursor = event.start + event.duration;
   }
   if (cursor + epsilon < totalEnd) {
-    tokens.push(...tokensForRestDuration(cursor, totalEnd - cursor, beatLength, gridSize));
+    tokens.push(
+      ...tokensForRestDuration(cursor, totalEnd - cursor, beatLength, gridSize),
+    );
   }
   return tokens;
 };
@@ -231,7 +240,9 @@ export const notesToLilyPond = (
   );
   const voices = assignVoices(events);
   const voiceTokens = voices.map((voice) =>
-    voiceToTokens(voice.events, roundedEnd, beatLength, config.gridSize).join(" "),
+    voiceToTokens(voice.events, roundedEnd, beatLength, config.gridSize).join(
+      " ",
+    ),
   );
   const voiceCommands = [
     String.raw`\voiceOne`,
@@ -239,7 +250,9 @@ export const notesToLilyPond = (
     String.raw`\voiceThree`,
     String.raw`\voiceFour`,
   ];
-  const staffDecision = decideStaffSystem(notes, { splitPoint: config.splitPoint });
+  const staffDecision = decideStaffSystem(notes, {
+    splitPoint: config.splitPoint,
+  });
   const autoChangePitch = pitchToLily(staffDecision.splitPoint);
   const voiceBlocks = voiceTokens.map((line, index) => {
     const command = voiceCommands[index] ?? String.raw`\voiceOne`;

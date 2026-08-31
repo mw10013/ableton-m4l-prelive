@@ -65,7 +65,8 @@ const defaultQuantizationConfig: QuantizationConfig = {
 const roundToGrid = (value: number, grid: number): number =>
   Math.round(value / grid) * grid;
 
-const normalize = (value: number, grid: number): number => roundToGrid(value, grid);
+const normalize = (value: number, grid: number): number =>
+  roundToGrid(value, grid);
 
 const isClose = (value: number, target: number, tolerance: number): boolean =>
   Math.abs(value - target) <= tolerance;
@@ -104,7 +105,11 @@ const quantizeStart = (value: number, config: QuantizationConfig): number => {
     const snapped = snapToGrid(value, grid, config.startStrongTolerance);
     if (snapped !== undefined) return snapped;
   }
-  const baseSnap = snapToGrid(value, config.startGrid, config.startGridTolerance);
+  const baseSnap = snapToGrid(
+    value,
+    config.startGrid,
+    config.startGridTolerance,
+  );
   return baseSnap ?? roundToGrid(value, config.startGrid);
 };
 
@@ -131,13 +136,15 @@ const selectDuration = (
     }
   }
   if (preferredValue !== undefined) return preferredValue;
-  const tolerance = rawDuration >= config.durationLongThreshold
-    ? config.durationToleranceLong
-    : config.durationToleranceShort;
+  const tolerance =
+    rawDuration >= config.durationLongThreshold
+      ? config.durationToleranceLong
+      : config.durationToleranceShort;
   let bestValue: number | undefined;
   let bestDiff = Number.POSITIVE_INFINITY;
   for (const candidate of config.durationAllowed) {
-    const dottedBlocked = config.dottedValues.includes(candidate) &&
+    const dottedBlocked =
+      config.dottedValues.includes(candidate) &&
       !allowDotted(start, candidate, config);
     if (!dottedBlocked) {
       const diff = Math.abs(rawDuration - candidate);
@@ -158,14 +165,22 @@ const quantizeDuration = (
 ): number => {
   const selected = selectDuration(rawDuration, start, config);
   const endPre = start + selected;
-  const endSnapped = snapToGrid(endPre, config.endGrid, config.endGridTolerance) ?? endPre;
-  const endStrong = nextStart === undefined
-    ? (snapToGrid(endSnapped, config.endStrongGrid, config.endStrongTolerance) ?? endSnapped)
-    : endSnapped;
-  const endClamped = config.clampToNextOnset && nextStart !== undefined &&
-      isClose(endStrong, nextStart, config.endClampTolerance)
-    ? nextStart
-    : endStrong;
+  const endSnapped =
+    snapToGrid(endPre, config.endGrid, config.endGridTolerance) ?? endPre;
+  const endStrong =
+    nextStart === undefined
+      ? (snapToGrid(
+          endSnapped,
+          config.endStrongGrid,
+          config.endStrongTolerance,
+        ) ?? endSnapped)
+      : endSnapped;
+  const endClamped =
+    config.clampToNextOnset &&
+    nextStart !== undefined &&
+    isClose(endStrong, nextStart, config.endClampTolerance)
+      ? nextStart
+      : endStrong;
   const duration = Math.max(endClamped - start, config.durationGrid);
   return normalize(duration, config.normalizeGrid);
 };
@@ -173,8 +188,13 @@ const quantizeDuration = (
 export const quantizeNotes = Effect.fn("LilyPondQuantizer.quantizeNotes")(
   (notes: readonly Note[], options?: Partial<QuantizationConfig>) =>
     Effect.sync(() => {
-      const config: QuantizationConfig = { ...defaultQuantizationConfig, ...options };
-      const starts = notes.map((note) => quantizeStart(note.start_time, config));
+      const config: QuantizationConfig = {
+        ...defaultQuantizationConfig,
+        ...options,
+      };
+      const starts = notes.map((note) =>
+        quantizeStart(note.start_time, config),
+      );
       const uniqueStarts = sortedUnique(starts);
       const nextStartMap = new Map<number, number | undefined>(
         uniqueStarts.map((start, index) => [start, uniqueStarts[index + 1]]),
@@ -184,8 +204,17 @@ export const quantizeNotes = Effect.fn("LilyPondQuantizer.quantizeNotes")(
         const nextStart = nextStartMap.get(start);
         const rawEnd = note.start_time + note.duration;
         const rawDuration = Math.max(rawEnd - start, config.durationGrid);
-        const duration = quantizeDuration(rawDuration, start, nextStart, config);
-        return { ...note, start_time: normalize(start, config.normalizeGrid), duration };
+        const duration = quantizeDuration(
+          rawDuration,
+          start,
+          nextStart,
+          config,
+        );
+        return {
+          ...note,
+          start_time: normalize(start, config.normalizeGrid),
+          duration,
+        };
       });
     }),
 );

@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "printWidth": 80,
-  "ignorePatterns": ["src/components/ui/*.tsx", "src/routeTree.gen.ts"],
+  "ignorePatterns": ["src/routeTree.gen.ts"],
   "sortImports": {
     "groups": [
       "type-builtin",
@@ -20,9 +20,5 @@
         "elementNamePattern": ["react", "react-**"]
       }
     ]
-  },
-  "sortTailwindcss": {
-    "stylesheet": "./src/styles.css",
-    "functions": ["tw", "twMerge", "twJoin", "cva", "cn"]
   }
 }
