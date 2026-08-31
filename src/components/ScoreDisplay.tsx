@@ -2,7 +2,6 @@ import type { Note } from "@/lib/Domain";
 
 import { useEffect, useState } from "react";
 
-import { Card } from "@astryxdesign/core/Card";
 import { HStack } from "@astryxdesign/core/Stack";
 import { useMutation } from "@tanstack/react-query";
 
@@ -34,10 +33,8 @@ export function ScoreDisplay({ notes, renderToken }: ScoreDisplayProps) {
   if (notes.length === 0) return null;
 
   return (
-    <Card padding={4}>
-      <HStack isScrollable>
-        <div dangerouslySetInnerHTML={{ __html: lilypondSvg ?? "" }} />
-      </HStack>
-    </Card>
+    <HStack isScrollable>
+      <div dangerouslySetInnerHTML={{ __html: lilypondSvg ?? "" }} />
+    </HStack>
   );
 }

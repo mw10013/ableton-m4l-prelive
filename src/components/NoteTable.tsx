@@ -1,19 +1,96 @@
 import type { TableColumn } from "@astryxdesign/core/Table";
 
+import type { Note } from "@/lib/Domain";
+
+import { useCallback, useState } from "react";
+
+import { Button } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
-import { Icon } from "@astryxdesign/core/Icon";
-import { IconButton } from "@astryxdesign/core/IconButton";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
-import { pixel, Table } from "@astryxdesign/core/Table";
+import {
+  pixel,
+  proportional,
+  Table,
+  useTableRowIndex,
+  useTableSelection,
+  useTableSelectionState,
+} from "@astryxdesign/core/Table";
+import { Text } from "@astryxdesign/core/Text";
 
-import { type Note } from "@/lib/Domain";
+export type EditableField = "pitch" | "start_time" | "duration" | "velocity";
 
-interface NoteTableProps {
-  notes: Note[];
-  onUpdate: (rowIndex: number, columnId: string, value: unknown) => void;
-  onDelete: (rowIndex: number) => void;
-}
+export const MIN_DURATION = 1 / 128;
+
+const NOTE_NAMES = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+] as const;
+
+export const noteName = (pitch: number) =>
+  `${NOTE_NAMES[pitch % 12]}${String(Math.floor(pitch / 12) - 2)}`;
+
+const trimmed = (value: number) => String(Number(value.toFixed(3)));
+
+const meterUnits = (numerator: number, denominator: number) => ({
+  quartersPerBar: (numerator * 4) / denominator,
+  quartersPerBeat: 4 / denominator,
+});
+
+export const positionLabel = (
+  beats: number,
+  numerator: number,
+  denominator: number,
+) => {
+  const { quartersPerBar, quartersPerBeat } = meterUnits(
+    numerator,
+    denominator,
+  );
+  const bar = Math.floor(beats / quartersPerBar);
+  const rem = beats - bar * quartersPerBar;
+  const beat = Math.floor(rem / quartersPerBeat);
+  const sixteenth = (rem - beat * quartersPerBeat) * 4;
+  return `${String(bar + 1)}.${String(beat + 1)}.${trimmed(sixteenth + 1)}`;
+};
+
+export const lengthLabel = (
+  beats: number,
+  numerator: number,
+  denominator: number,
+) => {
+  const { quartersPerBar, quartersPerBeat } = meterUnits(
+    numerator,
+    denominator,
+  );
+  const bar = Math.floor(beats / quartersPerBar);
+  const rem = beats - bar * quartersPerBar;
+  const beat = Math.floor(rem / quartersPerBeat);
+  const sixteenth = (rem - beat * quartersPerBeat) * 4;
+  return `${String(bar)}.${String(beat)}.${trimmed(sixteenth)}`;
+};
+
+const extrasLabel = ({
+  probability,
+  velocity_deviation,
+  release_velocity,
+}: Note) =>
+  [
+    probability === 1 ? undefined : `p ${trimmed(probability)}`,
+    velocity_deviation === 0 ? undefined : `dev ${trimmed(velocity_deviation)}`,
+    release_velocity === 64 ? undefined : `rel ${trimmed(release_velocity)}`,
+  ]
+    .filter((part) => part !== undefined)
+    .join(" · ");
 
 interface NoteRow extends Record<string, unknown> {
   note_id: number;
@@ -22,16 +99,112 @@ interface NoteRow extends Record<string, unknown> {
   duration: number;
   velocity: number;
   mute: boolean;
-  rowIndex: number;
+  probability: number;
+  velocity_deviation: number;
+  release_velocity: number;
 }
 
-export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
+function NoteNumberCell({
+  label,
+  value,
+  min,
+  max,
+  step,
+  isIntegerOnly,
+  format,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max?: number;
+  step: number;
+  isIntegerOnly?: boolean;
+  format: (value: number) => string;
+  onCommit: (value: number) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [pending, setPending] = useState<number | undefined>();
+  const close = () => {
+    setIsEditing(false);
+    setPending(undefined);
+  };
+  const commit = () => {
+    if (pending !== undefined && pending !== value) onCommit(pending);
+    close();
+  };
+  return isEditing ? (
+    <NumberInput
+      label={label}
+      isLabelHidden
+      size="sm"
+      width="100%"
+      value={pending ?? value}
+      min={min}
+      max={max}
+      step={step}
+      isIntegerOnly={isIntegerOnly}
+      hasAutoFocus
+      onChange={setPending}
+      onEnter={commit}
+      onBlur={commit}
+      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Escape") close();
+      }}
+    />
+  ) : (
+    <Button
+      variant="ghost"
+      size="sm"
+      label={format(value)}
+      tooltip={label}
+      onClick={() => {
+        setIsEditing(true);
+      }}
+    />
+  );
+}
+
+interface NoteTableProps {
+  notes: readonly Note[];
+  signatureNumerator: number;
+  signatureDenominator: number;
+  selectedKeys: Set<string>;
+  setSelectedKeys: React.Dispatch<React.SetStateAction<Set<string>>>;
+  onCommitField: (noteId: number, field: EditableField, value: number) => void;
+  onToggleMute: (noteId: number, mute: boolean) => void;
+}
+
+export function NoteTable({
+  notes,
+  signatureNumerator,
+  signatureDenominator,
+  selectedKeys,
+  setSelectedKeys,
+  onCommitField,
+  onToggleMute,
+}: NoteTableProps) {
+  const rows = notes.map((note): NoteRow => ({ ...note }));
+  const getRowKey = useCallback((row: NoteRow) => String(row.note_id), []);
+  const rowIndexPlugin = useTableRowIndex<NoteRow>({ data: rows, getRowKey });
+  const { selectionConfig } = useTableSelectionState<NoteRow>({
+    data: rows,
+    idKey: getRowKey,
+    selectedKeys,
+    setSelectedKeys,
+  });
+  const selectionPlugin = useTableSelection<NoteRow>({
+    ...selectionConfig,
+    getRowLabel: (row) =>
+      `note ${noteName(row.pitch)} at ${positionLabel(row.start_time, signatureNumerator, signatureDenominator)}`,
+  });
+
   if (notes.length === 0) {
     return (
       <EmptyState
         isCompact
-        title="No notes loaded"
-        description="Read a clip from Live to edit its notes."
+        title="No notes"
+        description="This clip has no notes yet — add one from the toolbar."
       />
     );
   }
@@ -43,30 +216,30 @@ export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
     max,
     step,
     isIntegerOnly,
+    format,
   }: {
-    key: "pitch" | "start_time" | "duration" | "velocity";
+    key: EditableField;
     header: string;
-    min?: number;
+    min: number;
     max?: number;
-    step?: number;
+    step: number;
     isIntegerOnly?: boolean;
+    format: (value: number) => string;
   }): TableColumn<NoteRow> => ({
     key,
     header,
-    width: pixel(104),
-    align: "end",
+    width: pixel(112),
     renderCell: (row) => (
-      <NumberInput
-        label={header}
-        isLabelHidden
-        size="sm"
+      <NoteNumberCell
+        label={`${header} of note ${noteName(row.pitch)} at ${positionLabel(row.start_time, signatureNumerator, signatureDenominator)}`}
         value={row[key]}
         min={min}
         max={max}
         step={step}
         isIntegerOnly={isIntegerOnly}
-        onChange={(value) => {
-          onUpdate(row.rowIndex, key, value);
+        format={format}
+        onCommit={(value) => {
+          onCommitField(row.note_id, key, value);
         }}
       />
     ),
@@ -74,26 +247,46 @@ export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
 
   return (
     <Table
-      data={notes.map((note, rowIndex): NoteRow => ({ ...note, rowIndex }))}
-      idKey="note_id"
+      data={rows}
+      idKey={getRowKey}
       density="compact"
+      dividers="rows"
+      hasHover
+      plugins={{ rowIndex: rowIndexPlugin, selection: selectionPlugin }}
       columns={[
-        { key: "note_id", header: "ID", width: pixel(64), align: "end" },
         numberColumn({
           key: "pitch",
           header: "Pitch",
           min: 0,
           max: 127,
+          step: 1,
           isIntegerOnly: true,
+          format: noteName,
         }),
-        numberColumn({ key: "start_time", header: "Start", step: 0.25 }),
-        numberColumn({ key: "duration", header: "Dur", step: 0.25 }),
+        numberColumn({
+          key: "start_time",
+          header: "Start",
+          min: 0,
+          step: 0.25,
+          format: (value) =>
+            positionLabel(value, signatureNumerator, signatureDenominator),
+        }),
+        numberColumn({
+          key: "duration",
+          header: "Duration",
+          min: MIN_DURATION,
+          step: 0.25,
+          format: (value) =>
+            lengthLabel(value, signatureNumerator, signatureDenominator),
+        }),
         numberColumn({
           key: "velocity",
-          header: "Vel",
+          header: "Velocity",
           min: 0,
           max: 127,
+          step: 1,
           isIntegerOnly: true,
+          format: trimmed,
         }),
         {
           key: "mute",
@@ -102,33 +295,28 @@ export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
           align: "center",
           renderCell: (row) => (
             <CheckboxInput
-              label="Mute"
+              label={`Mute note ${noteName(row.pitch)}`}
               isLabelHidden
               size="sm"
               value={row.mute}
               onChange={(checked) => {
-                onUpdate(row.rowIndex, "mute", checked);
+                onToggleMute(row.note_id, checked);
               }}
             />
           ),
         },
         {
-          key: "actions",
-          header: "",
-          width: pixel(48),
-          align: "center",
-          resizable: false,
-          renderCell: (row) => (
-            <IconButton
-              label="Delete note"
-              variant="ghost"
-              size="sm"
-              icon={<Icon icon="close" color="inherit" />}
-              onClick={() => {
-                onDelete(row.rowIndex);
-              }}
-            />
-          ),
+          key: "extras",
+          header: "More",
+          width: proportional(1),
+          renderCell: (row) => {
+            const label = extrasLabel(row);
+            return label === "" ? null : (
+              <Text type="supporting" color="secondary" hasTabularNumbers>
+                {label}
+              </Text>
+            );
+          },
         },
       ]}
     />
