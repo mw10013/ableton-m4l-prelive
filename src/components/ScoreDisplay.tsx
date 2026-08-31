@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { HStack } from "@astryxdesign/core/Stack";
 import { useMutation } from "@tanstack/react-query";
 
-import { renderLilyPondSvg } from "@/routes/api/score/-lilypond";
+import { renderLilyPondSvg } from "@/lib/lilypond/renderServerFn";
 
 interface ScoreDisplayProps {
   notes: readonly Note[];
