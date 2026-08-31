@@ -50,9 +50,6 @@ importers:
       lucide-react:
         specifier: 0.562.0
         version: 0.562.0(react@19.2.4)
-      midi-writer-js:
-        specifier: 3.2.1
-        version: 3.2.1
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -65,9 +62,6 @@ importers:
       tw-animate-css:
         specifier: 1.4.0
         version: 1.4.0
-      vexflow:
-        specifier: 5.0.0
-        version: 5.0.0
     devDependencies:
       '@tailwindcss/vite':
         specifier: 4.1.18
@@ -1363,15 +1357,6 @@ packages:
     engines: {node: '>=20.19'}
     hasBin: true
 
-  '@tonaljs/midi@4.10.2':
-    resolution: {integrity: sha512-MPamXhEwPL7L1udLfYMm3Ft8mLYtHr62Zi2w5zYHM2P7YwIvNoiX0+dvAN5is1Wvq4iVRa8AjFHerjOW/SZhGg==}
-
-  '@tonaljs/pitch-note@6.1.0':
-    resolution: {integrity: sha512-A4OSLo8DjM38u73862LnDmL4YInDDRBmg0fojXcvu4cyU3oOlqndyeHOra1OVoH/WW46uNIxNs1wJDZNPWL5KQ==}
-
-  '@tonaljs/pitch@5.0.2':
-    resolution: {integrity: sha512-mxaXJPPe+LIJdjzpZEl8I8Wx3dEvlzkBbsr2Ltwc2dTAdnErAZ5R0TxVq2egF27lMvQN2QPQPWI9iDPPdVUmrg==}
-
   '@ts-morph/common@0.27.0':
     resolution: {integrity: sha512-Wf29UqxWDpc+i61k3oIOzcUfQt79PIT9y/MWfAGlrkjg6lBC1hwDECLXPVJAhWjiGbfBCxZd65F/LIZF3+jeJQ==}
 
@@ -1878,6 +1863,7 @@ packages:
   eslint@9.39.4:
     resolution: {integrity: sha512-XoMjdBOwe/esVgEvLmNsD3IRHkm7fbKIUGvrleloJXUZgDHig2IPWNniv+GwjyJXzuNqVjlr5+4yVUZjycJwfQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -2468,9 +2454,6 @@ packages:
   micromatch@4.0.8:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
-
-  midi-writer-js@3.2.1:
-    resolution: {integrity: sha512-mILW/zthDiinxd/fsVfCe0XWef0hHQzS+fukjS3W+gwBG3ljur241u7CsEC5T+9cOwIPVZCgw37pjKiKb7LJ1g==}
 
   mime-db@1.54.0:
     resolution: {integrity: sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ==}
@@ -3148,9 +3131,6 @@ packages:
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
-
-  vexflow@5.0.0:
-    resolution: {integrity: sha512-rjB7TV4ygKE5Fl3W5OlG+0dHv22CFufUJdMG6oNgvcn0zp34u+sOboZsadQXnF1O3tZ3myXThaUIaLkJlpNM2Q==}
 
   vite-tsconfig-paths@6.1.1:
     resolution: {integrity: sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg==}
@@ -4406,16 +4386,6 @@ snapshots:
 
   '@tanstack/virtual-file-routes@1.161.7': {}
 
-  '@tonaljs/midi@4.10.2':
-    dependencies:
-      '@tonaljs/pitch-note': 6.1.0
-
-  '@tonaljs/pitch-note@6.1.0':
-    dependencies:
-      '@tonaljs/pitch': 5.0.2
-
-  '@tonaljs/pitch@5.0.2': {}
-
   '@ts-morph/common@0.27.0':
     dependencies:
       fast-glob: 3.3.3
@@ -5507,10 +5477,6 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.1
 
-  midi-writer-js@3.2.1:
-    dependencies:
-      '@tonaljs/midi': 4.10.2
-
   mime-db@1.54.0: {}
 
   mime-types@3.0.2:
@@ -6237,8 +6203,6 @@ snapshots:
   validate-npm-package-name@7.0.2: {}
 
   vary@1.1.2: {}
-
-  vexflow@5.0.0: {}
 
   vite-tsconfig-paths@6.1.1(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.3)):
     dependencies:

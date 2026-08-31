@@ -2,7 +2,7 @@
 
 Date: 2026-03-27
 
-Goal: improve score readability by quantizing performance note lists before LilyPond/VexFlow notation.
+Goal: improve score readability by quantizing performance note lists before LilyPond notation.
 
 ---
 
@@ -12,9 +12,9 @@ The note list is performance data, but we currently notate it too literally. Tha
 
 ---
 
-## Current pipeline evidence (LilyPond + VexFlow)
+## Current pipeline evidence (LilyPond)
 
-We render both LilyPond (server-side) and VexFlow (client-side). Both paths share the same quantizer.
+We render the score with LilyPond server-side.
 
 LilyPond rendering uses quantizeNotes, then runs lilypond:
 
@@ -27,21 +27,10 @@ ChildProcess.make("lilypond", ["-dbackend=svg", "-o", outputBase, tmpLy]);
 
 `src/lib/lilypond/renderer.ts`
 
-VexFlow uses the same quantizer before building the render plan:
-
-```
-const quantized = yield* quantizeNotes(notes, config.quantization);
-const events = buildEvents(quantized, config.gridSize);
-```
-
-`src/lib/vexflow/score.ts`
-
-The UI renders both outputs side-by-side (LilyPond via server fn, VexFlow via client render):
+The UI requests the SVG through a server fn:
 
 ```
 const response = await renderLilyPondSvg({ data: { notes: noteData } });
-...
-const plan = Effect.runSync(buildVexFlowPlan(notes, { timeSignature: [_timeSigNum, _timeSigDen] }));
 ```
 
 `src/components/ScoreDisplay.tsx`
@@ -65,7 +54,7 @@ const splitDuration = (beats) => {
 
 `src/lib/lilypond/score.ts`
 
-Both renderers also apply a grid-based grouping step when building events:
+A grid-based grouping step also runs when building events:
 
 ```
 const start = roundToGrid(note.start_time, gridSize);
@@ -73,13 +62,6 @@ const duration = roundToGrid(note.duration, gridSize);
 ```
 
 `src/lib/lilypond/score.ts`
-
-```
-const start = roundToGrid(note.start_time, gridSize);
-const duration = roundToGrid(note.duration, gridSize);
-```
-
-`src/lib/vexflow/score.ts`
 
 ---
 
@@ -179,7 +161,7 @@ const endClamped = config.clampToNextOnset && nextStart !== undefined &&
 - Rests are split at beat boundaries to preserve the pulse in notation.
 - Example (4/4): rest from 0.25 to 1.25 becomes 8. + 16 rather than a single 4.
 - Beat length is derived from the time signature denominator (4 / denominator).
-- Implemented in both renderers during rest tokenization.
+- Implemented during rest tokenization in `src/lib/lilypond/score.ts`.
 
 ---
 
@@ -204,5 +186,5 @@ const endClamped = config.clampToNextOnset && nextStart !== undefined &&
 
 ## Suggested validation steps
 
-- Compare VexFlow and LilyPond outputs side-by-side in the ScoreDisplay panel.
+- Inspect the LilyPond output in the ScoreDisplay panel.
 - Tune tolerances in `src/lib/lilypond/quantizer.ts` and re-render to verify visual improvement.

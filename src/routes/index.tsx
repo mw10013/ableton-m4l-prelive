@@ -400,12 +400,7 @@ function RouteComponent() {
       )}
 
       {clipInfo && (
-        <ScoreDisplay
-          notes={notes}
-          timeSigNum={clipInfo.signatureNumerator}
-          timeSigDen={clipInfo.signatureDenominator}
-          renderToken={scoreRenderToken}
-        />
+        <ScoreDisplay notes={notes} renderToken={scoreRenderToken} />
       )}
     </div>
   );
