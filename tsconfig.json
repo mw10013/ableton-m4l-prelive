@@ -18,6 +18,6 @@
     },
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo"
   },
-  "include": ["src", "vite.config.ts"],
+  "include": ["src", "scripts", "vite.config.ts"],
   "exclude": ["node_modules"]
 }

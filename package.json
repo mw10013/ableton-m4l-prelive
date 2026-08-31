@@ -12,19 +12,10 @@
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "clean": "rm -rf node_modules .tanstack",
-    "refs:tan-form": "rm -rf refs/tan-form && mkdir -p refs/tan-form && curl -L https://github.com/TanStack/form/archive/refs/tags/@tanstack/react-form@1.28.5.tar.gz | tar -xz -C refs/tan-form --strip-components=1",
-    "refs:tan-router": "rm -rf refs/tan-router && mkdir -p refs/tan-router && curl -L https://github.com/TanStack/router/archive/refs/tags/release-2026-08-22-2258.tar.gz | tar -xz -C refs/tan-router --strip-components=1",
-    "refs:tan-query": "rm -rf refs/tan-query && mkdir -p refs/tan-query && curl -sL https://github.com/TanStack/query/archive/refs/tags/@tanstack/react-query@5.102.8.tar.gz | tar -xzC refs/tan-query --strip-components=1",
-    "refs:tan-start": "rm -rf refs/tan-start && mkdir -p refs/tan-start && curl -L https://github.com/TanStack/router/archive/refs/tags/release-2026-08-22-2258.tar.gz | tar -xz -C refs/tan-start --strip-components=1",
-    "refs:effect4": "rm -rf refs/effect4 && mkdir -p refs/effect4 && curl -L https://github.com/Effect-TS/effect/archive/refs/tags/effect@4.0.0-rc.112.tar.gz | tar -xz -C refs/effect4 --strip-components=1",
-    "refs:tan-table": "rm -rf refs/tan-table && mkdir -p refs/tan-table && curl -L https://github.com/TanStack/table/archive/refs/tags/@tanstack/react-table@9.2.4.tar.gz | tar -xz -C refs/tan-table --strip-components=1",
-    "refs:liveql": "rm -rf refs/liveql && mkdir -p refs/liveql && curl -L https://github.com/mw10013/ableton-live-liveql/archive/refs/heads/main.tar.gz | tar -xz -C refs/liveql --strip-components=1",
-    "refs:bang": "rm -rf refs/bang && mkdir -p refs/bang && gh api repos/MW10013/Bang/tarball/main | tar -xz -C refs/bang --strip-components=1",
-    "refs:tceas": "rm -rf refs/tceas && mkdir -p refs/tceas && curl -L https://github.com/mw10013/tanstack-cloudflare-effect-astryx-saas/archive/refs/heads/main.tar.gz | tar -xz -C refs/tceas --strip-components=1",
-    "refs:lilypond": "rm -rf refs/lilypond && mkdir -p refs/lilypond && curl -L https://github.com/lilypond/lilypond/archive/refs/heads/master.tar.gz | tar -xz -C refs/lilypond --strip-components=1",
-    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
-    "refs:astryx": "rm -rf refs/astryx && mkdir -p refs/astryx && curl -L https://github.com/facebook/astryx/archive/refs/tags/v0.3.0.tar.gz | tar -xz -C refs/astryx --strip-components=1",
-    "refs:stylex": "rm -rf refs/stylex && mkdir -p refs/stylex && curl -L https://github.com/facebook/stylex/archive/refs/heads/main.tar.gz | tar -xz -C refs/stylex --strip-components=1"
+    "refs": "node scripts/refs.ts",
+    "refs:all": "node scripts/refs.ts fetch --all",
+    "refs:check": "node scripts/refs.ts check",
+    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
   },
   "dependencies": {
     "@astryxdesign/core": "0.3.0",

@@ -23,10 +23,10 @@ Downloaded source code of libraries are in `refs/` for reference.
 - **TanStack Form**: `refs/tan-form/docs/` (Markdown files)
 - **TanStack Table**: `refs/tan-table/` (docs/, packages/)
 - **Astryx**: `refs/astryx/` (`facebook/astryx` v0.3.0 — component source in `packages/core/src/`, build plugin in `packages/build/`)
-- **StyleX**: `refs/stylex/` (`facebook/stylex` main — docs in `apps/docs/`)
+- **StyleX**: `refs/stylex/` (`facebook/stylex` v0.19.0 — docs in `apps/docs/`)
 - **liveql**: `refs/liveql/` — GraphQL API for Ableton Live via Max for Live
   - GraphQL schema defined as `typeDefs` template literal in `refs/liveql/liveql-n4m.js:92` (types: `Song`, `SongView`, `Track`, `ClipSlot`, `Clip`, `Note`, `NotesDictionary` + input types, single `Query.live_set`, mutations for playback/clips/notes)
-- **Effect v4 Docs**: `refs/effect4/ai-docs/src/`
+- **Effect Docs**: `refs/effect/ai-docs/src/` (Effect v4 release candidate)
 - **LilyPond**: `refs/lilypond/` — Music engraving program (master branch)
 
 ## Commands
@@ -37,6 +37,8 @@ pnpm typecheck          # TypeScript type checking (tsc -b)
 pnpm lint               # Run oxlint
 pnpm fmt                # Format with oxfmt
 pnpm fmt:check          # Check formatting without modifying
+pnpm refs:check         # Report refs/ that drifted from package.json pins
+pnpm refs fetch <name>  # Refetch a ref (see scripts/refs.ts; refs:all fetches all)
 pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this file)
 ```
 
