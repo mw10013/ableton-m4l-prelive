@@ -7,7 +7,7 @@ import { LilyPondRenderer } from "@/lib/lilypond/renderer";
 import { runtime } from "@/lib/runtime";
 
 export const renderLilyPondSvg = createServerFn({ method: "POST" })
-  .inputValidator((data: { notes: readonly Note[] }) => data)
+  .validator((data: { notes: readonly Note[] }) => data)
   .handler(async ({ data }) => {
     const result = await runtime.runPromise(
       Effect.gen(function* () {

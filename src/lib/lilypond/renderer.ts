@@ -3,22 +3,22 @@ import type { Note } from "@/lib/Domain";
 import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { Effect, FileSystem, Layer, Path, Schema, ServiceMap } from "effect";
+import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
 import { quantizeNotes } from "./quantizer";
 import { notesToLilyPond } from "./score";
 
-class LilyPondError extends Schema.TaggedErrorClass<LilyPondError>()(
+class LilyPondError extends Schema.TaggedError<LilyPondError>()(
   "LilyPondError",
   {
     message: Schema.String,
-    cause: Schema.Defect,
+    cause: Schema.Defect(),
   },
 ) {}
 
-export class LilyPondRenderer extends ServiceMap.Service<
+export class LilyPondRenderer extends Context.Service<
   LilyPondRenderer,
   {
     readonly renderToSvg: (

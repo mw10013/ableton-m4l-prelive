@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   type ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  metaHelper,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table";
 
 import { type Note as DomainNote } from "@/lib/Domain";
@@ -16,6 +18,16 @@ interface NoteTableProps {
   onUpdate: (rowIndex: number, columnId: string, value: unknown) => void;
   onDelete: (rowIndex: number) => void;
 }
+
+interface NoteTableMeta {
+  updateData?: (rowIndex: number, columnId: string, value: unknown) => void;
+}
+
+const features = tableFeatures({
+  columnSizingFeature,
+  columnVisibilityFeature,
+  tableMeta: metaHelper<NoteTableMeta>(),
+});
 
 function EditableCell({
   getValue,
@@ -91,7 +103,7 @@ function MuteCell({
   );
 }
 
-const columns: ColumnDef<Note>[] = [
+const columns: ColumnDef<typeof features, Note>[] = [
   { accessorKey: "note_id", header: "ID", size: 30 },
   { accessorKey: "pitch", header: "Pitch", size: 52, cell: EditableCell },
   { accessorKey: "start_time", header: "Start", size: 52, cell: EditableCell },
@@ -100,14 +112,15 @@ const columns: ColumnDef<Note>[] = [
   { accessorKey: "mute", header: "Mute", size: 40, cell: MuteCell },
 ];
 
-const deleteColumn: ColumnDef<Note> = {
+const deleteColumn: ColumnDef<typeof features, Note> = {
   id: "delete",
   header: "",
   size: 24,
 };
 
 export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: notes,
     columns: [
       ...columns,
@@ -126,7 +139,6 @@ export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
         ),
       },
     ],
-    getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => String(row.note_id),
     meta: { updateData: onUpdate },
   });
@@ -145,10 +157,7 @@ export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
                 className="px-1 pb-1 text-left text-xs font-medium text-muted-foreground"
                 style={{ width: header.getSize() }}
               >
-                {flexRender(
-                  header.column.columnDef.header,
-                  header.getContext(),
-                )}
+                <table.FlexRender header={header} />
               </th>
             ))}
           </tr>
@@ -159,7 +168,7 @@ export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
           <tr key={row.id} className="border-t border-border">
             {row.getVisibleCells().map((cell) => (
               <td key={cell.id} className="py-0.5">
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                <table.FlexRender cell={cell} />
               </td>
             ))}
           </tr>
@@ -177,10 +186,4 @@ export function NoteTable({ notes, onUpdate, onDelete }: NoteTableProps) {
       </tbody>
     </table>
   );
-}
-
-declare module "@tanstack/react-table" {
-  interface TableMeta<TData> {
-    updateData?: (rowIndex: number, columnId: string, value: unknown) => void;
-  }
 }

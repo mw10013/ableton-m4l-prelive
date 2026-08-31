@@ -61,7 +61,7 @@ export const readLiveSetOverview = createServerFn({ method: "GET" }).handler(
 );
 
 export const readClipBySlot = createServerFn({ method: "GET" })
-  .inputValidator((data: { trackIndex: number; slotIndex: number }) => data)
+  .validator((data: { trackIndex: number; slotIndex: number }) => data)
   .handler(async ({ data: { trackIndex, slotIndex } }) => {
     return gql(
       `query ($trackIndex: Int!, $slotIndex: Int!) {
@@ -97,7 +97,7 @@ export const readClipBySlot = createServerFn({ method: "GET" })
   });
 
 export const togglePlay = createServerFn({ method: "POST" })
-  .inputValidator((data: Record<string, never>) => data)
+  .validator((data: Record<string, never>) => data)
   .handler(async () => {
     const { live_set } = await gql(
       `{ live_set { id is_playing } }`,
@@ -133,7 +133,7 @@ export const togglePlay = createServerFn({ method: "POST" })
   });
 
 export const fireClip = createServerFn({ method: "POST" })
-  .inputValidator((data: { clipId: number }) => data)
+  .validator((data: { clipId: number }) => data)
   .handler(async ({ data: { clipId } }) => {
     await gql(
       `mutation($id: Int!) { clip_fire(id: $id) { id } }`,
@@ -150,7 +150,7 @@ interface WriteNotesInput {
 }
 
 export const writeNotes = createServerFn({ method: "POST" })
-  .inputValidator((data: WriteNotesInput) => data)
+  .validator((data: WriteNotesInput) => data)
   .handler(
     async ({ data: { clipId, newNotes, modifiedNotes, removedNoteIds } }) => {
       if (newNotes.length > 0) {
