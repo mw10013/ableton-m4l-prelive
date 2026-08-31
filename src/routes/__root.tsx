@@ -9,6 +9,7 @@ import {
   HeadContent,
   Outlet,
   Scripts,
+  useHydrated,
 } from "@tanstack/react-router";
 
 import { DefaultCatchBoundary } from "@/components/default-catch-boundary";
@@ -39,7 +40,12 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
-  return <Outlet />;
+  const hydrated = useHydrated();
+  return (
+    <div inert={!hydrated} data-app-hydrated={hydrated ? "true" : undefined}>
+      <Outlet />
+    </div>
+  );
 }
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {

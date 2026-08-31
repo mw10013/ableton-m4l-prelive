@@ -80,9 +80,17 @@ export const ClipWithNotes = Schema.Struct({
   notes: Schema.NullOr(Schema.Array(Note)),
 });
 
+export const WriteNotesInput = Schema.Struct({
+  clipId: Schema.Number,
+  newNotes: Schema.Array(NoteInput),
+  modifiedNotes: Schema.Array(NoteInput),
+  removedNoteIds: Schema.Array(Schema.Number),
+});
+
 export type Note = Schema.Schema.Type<typeof Note>;
 export type NoteInput = Schema.Schema.Type<typeof NoteInput>;
 export type ClipWithNotes = Schema.Schema.Type<typeof ClipWithNotes>;
+export type WriteNotesInput = Schema.Schema.Type<typeof WriteNotesInput>;
 
 export const SongOverview = Schema.Struct({
   ...Song.fields,

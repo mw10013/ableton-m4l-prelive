@@ -1,22 +1,26 @@
-import type { Note } from "@/lib/Domain";
-
 import { createServerFn } from "@tanstack/react-start";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
+import * as Domain from "@/lib/Domain";
 import { LilyPondRenderer } from "@/lib/lilypond/renderer";
-import { runtime } from "@/lib/runtime";
+import { runServerFn } from "@/lib/runtime";
 
 export const renderLilyPondSvg = createServerFn({ method: "POST" })
-  .validator((data: { notes: readonly Note[] }) => data)
+  .validator(
+    Schema.toStandardSchemaV1(
+      Schema.Struct({ notes: Schema.Array(Domain.Note) }),
+    ),
+  )
   .handler(async ({ data }) => {
-    const result = await runtime.runPromise(
+    const svg = await runServerFn(
       Effect.gen(function* () {
         const renderer = yield* LilyPondRenderer;
-        const svgBytes = yield* renderer.renderToSvg(data.notes);
-        return new TextDecoder().decode(svgBytes);
-      }).pipe(Effect.provide(LilyPondRenderer.layer)),
+        return new TextDecoder().decode(
+          yield* renderer.renderToSvg(data.notes),
+        );
+      }),
     );
-    return new Response(result, {
+    return new Response(svg, {
       headers: { "Content-Type": "image/svg+xml" },
     });
   });

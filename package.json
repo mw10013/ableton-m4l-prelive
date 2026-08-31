@@ -13,6 +13,7 @@
     "fmt:check": "oxfmt --check",
     "clean": "rm -rf node_modules .tanstack",
     "refs": "node scripts/refs.ts",
+    "liveql:schema": "node scripts/liveql-schema.ts",
     "refs:all": "node scripts/refs.ts fetch --all",
     "refs:check": "node scripts/refs.ts check",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
@@ -45,6 +46,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
+    "graphql": "16.14.2",
     "oxfmt": "0.38.0",
     "oxlint": "1.53.0",
     "oxlint-tsgolint": "^0.16.0",

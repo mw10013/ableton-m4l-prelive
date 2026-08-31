@@ -2,7 +2,7 @@ import type { TableColumn } from "@astryxdesign/core/Table";
 
 import type { ClipWithNotes, Note } from "@/lib/Domain";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -25,7 +25,12 @@ import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import * as stylex from "@stylexjs/stylex";
-import { useMutation } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 
@@ -42,7 +47,7 @@ import {
   readLiveSetOverview,
   togglePlay,
   writeNotes,
-} from "@/lib/liveql";
+} from "@/lib/serverFns";
 
 interface ClipInfo {
   id: number;
@@ -53,10 +58,14 @@ interface ClipInfo {
   signatureDenominator: number;
 }
 
-interface SelectedSlot {
-  trackIndex: number;
-  slotIndex: number;
-  clipId: number;
+type ClipSource =
+  | { kind: "detail" }
+  | { kind: "slot"; trackIndex: number; slotIndex: number };
+
+interface ClipReadResult {
+  clip: ClipWithNotes | null;
+  trackName: string | null;
+  liveSelectedClipId: number | null;
 }
 
 type LiveSetOverview = Awaited<
@@ -97,16 +106,61 @@ const clampField = (field: EditableField, value: number): number => {
   }
 };
 
+const sameSource = (a: ClipSource, b: ClipSource) =>
+  a.kind === "detail"
+    ? b.kind === "detail"
+    : b.kind === "slot" &&
+      a.trackIndex === b.trackIndex &&
+      a.slotIndex === b.slotIndex;
+
+const overviewQueryOptions = queryOptions({
+  queryKey: ["liveSetOverview"],
+  queryFn: () => readLiveSetOverview(),
+  retry: false,
+  refetchOnWindowFocus: false,
+});
+
+const clipQueryOptions = (source: ClipSource) =>
+  queryOptions({
+    queryKey: ["clip", source],
+    queryFn: async (): Promise<ClipReadResult> => {
+      if (source.kind === "detail") {
+        const data = await readClip();
+        return {
+          clip: data.live_set.view.detail_clip,
+          trackName: data.live_set.view.selected_track?.name ?? null,
+          liveSelectedClipId: data.live_set.view.detail_clip?.id ?? null,
+        };
+      }
+      const data = await readClipBySlot({
+        data: { trackIndex: source.trackIndex, slotIndex: source.slotIndex },
+      });
+      return {
+        clip: data.live_set.track?.clip_slot?.clip ?? null,
+        trackName: data.live_set.track?.name ?? null,
+        liveSelectedClipId: null,
+      };
+    },
+    retry: false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
 export const Route = createFileRoute("/")({
+  loader: ({ context: { queryClient } }) =>
+    queryClient.query(overviewQueryOptions).catch(() => null),
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  const [overview, setOverview] = useState<LiveSetOverview | null>(null);
-  const [liveSelectedClipId, setLiveSelectedClipId] = useState<number | null>(
-    null,
-  );
-  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const queryClient = useQueryClient();
+  const overviewQuery = useQuery(overviewQueryOptions);
+  const [clipSource, setClipSource] = useState<ClipSource | null>(null);
+  const clipQuery = useQuery({
+    ...clipQueryOptions(clipSource ?? { kind: "detail" }),
+    enabled: clipSource !== null,
+  });
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(true);
   const [baseline, setBaseline] = useState<Note[]>([]);
   const [draft, setDraft] = useState<Note[] | null>(null);
@@ -124,80 +178,72 @@ function RouteComponent() {
 
   const notes = draft ?? baseline;
 
-  const applyClip = ({
-    clip,
-    trackName,
-  }: {
-    clip: ClipWithNotes;
-    trackName: string | null;
-  }) => {
-    setTrackName(trackName);
-    setClipInfo({
-      id: clip.id,
-      name: clip.name,
-      path: clip.path,
-      length: clip.length,
-      signatureNumerator: clip.signature_numerator,
-      signatureDenominator: clip.signature_denominator,
-    });
-    setBaseline(byMusicalOrder(clip.notes ?? []));
-    setDraft(null);
-    setModifiedNoteIds(new Set());
-    setDeletedNoteIds(new Set());
-    setSelectedKeys(new Set());
-    setIsNavigatorOpen(false);
-    setScoreRenderToken((prev) => prev + 1);
+  const overview = overviewQuery.data?.live_set ?? null;
+  const liveSelectedClipId =
+    clipSource?.kind === "detail" &&
+    clipQuery.dataUpdatedAt > overviewQuery.dataUpdatedAt
+      ? (clipQuery.data?.liveSelectedClipId ?? null)
+      : (overview?.view.detail_clip?.id ?? null);
+
+  const applyClip = useCallback(
+    ({
+      clip,
+      trackName,
+    }: {
+      clip: ClipWithNotes;
+      trackName: string | null;
+    }) => {
+      setTrackName(trackName);
+      setClipInfo({
+        id: clip.id,
+        name: clip.name,
+        path: clip.path,
+        length: clip.length,
+        signatureNumerator: clip.signature_numerator,
+        signatureDenominator: clip.signature_denominator,
+      });
+      setBaseline(byMusicalOrder(clip.notes ?? []));
+      setDraft(null);
+      setModifiedNoteIds(new Set());
+      setDeletedNoteIds(new Set());
+      setSelectedKeys(new Set());
+      setIsNavigatorOpen(false);
+      setScoreRenderToken((prev) => prev + 1);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const result = clipQuery.data;
+    if (result === undefined || result.clip === null) return;
+    applyClip({ clip: result.clip, trackName: result.trackName });
+  }, [clipQuery.data, applyClip]);
+
+  const selectClipSource = (next: ClipSource) => {
+    if (clipSource !== null && sameSource(clipSource, next)) {
+      void queryClient.invalidateQueries({
+        queryKey: clipQueryOptions(next).queryKey,
+      });
+      return;
+    }
+    setClipSource(next);
   };
 
-  const overviewMutation = useMutation({
-    mutationFn: () => readLiveSetOverview(),
-    onSuccess: (data) => {
-      setOverview(data.live_set);
-      setLiveSelectedClipId(data.live_set.view.detail_clip?.id ?? null);
-    },
-  });
-
-  const readMutation = useMutation({
-    mutationFn: () => readClip(),
-    onSuccess: (data) => {
-      const detailClip = data.live_set.view.detail_clip;
-      setLiveSelectedClipId(detailClip?.id ?? null);
-      if (!detailClip) return;
-      applyClip({
-        clip: detailClip,
-        trackName: data.live_set.view.selected_track?.name ?? null,
-      });
-    },
-  });
-
-  const readBySlotMutation = useMutation({
-    mutationFn: readClipBySlot,
-    onSuccess: (data) => {
-      const track = data.live_set.track;
-      const clip = track?.clip_slot?.clip;
-      if (!track || !clip) return;
-      applyClip({ clip, trackName: track.name });
-    },
-  });
+  const refreshOverview = () => {
+    void queryClient.invalidateQueries({
+      queryKey: overviewQueryOptions.queryKey,
+    });
+  };
 
   const writeMutation = useMutation({
     mutationFn: writeNotes,
     onSuccess: () => {
-      if (selectedSlot) {
-        readBySlotMutation.mutate({
-          data: {
-            trackIndex: selectedSlot.trackIndex,
-            slotIndex: selectedSlot.slotIndex,
-          },
-        });
-        return;
-      }
-      readMutation.mutate();
+      void queryClient.invalidateQueries({ queryKey: ["clip"] });
     },
   });
 
   const { mutate: togglePlayMutate, isPending: isTogglePlayPending } =
-    useMutation({ mutationFn: togglePlay });
+    useMutation({ mutationFn: () => togglePlay() });
 
   const fireClipMutation = useMutation({ mutationFn: fireClip });
 
@@ -213,7 +259,7 @@ function RouteComponent() {
         return;
       event.preventDefault();
       if (!isTogglePlayPending) {
-        togglePlayMutate({ data: {} });
+        togglePlayMutate();
       }
     };
     window.addEventListener("keydown", handler);
@@ -366,28 +412,26 @@ function RouteComponent() {
           const clip = slot?.clip ?? null;
           if (!slot?.has_clip || clip === null) return null;
           const isAppSelected =
-            selectedSlot?.trackIndex === row.trackIndex &&
-            selectedSlot.slotIndex === slotIndex;
+            clipSource?.kind === "slot" &&
+            clipSource.trackIndex === row.trackIndex &&
+            clipSource.slotIndex === slotIndex;
           return (
             <ToggleButton
               size="sm"
               label={clip.name || "Clip"}
               tooltip={`${clip.name} (${clip.path})`}
               isPressed={isAppSelected}
-              isDisabled={readBySlotMutation.isPending}
+              isDisabled={clipQuery.isFetching}
               icon={
                 clip.id === liveSelectedClipId ? (
                   <Icon icon="check" color="inherit" />
                 ) : undefined
               }
               onPressedChange={() => {
-                setSelectedSlot({
+                selectClipSource({
+                  kind: "slot",
                   trackIndex: row.trackIndex,
                   slotIndex,
-                  clipId: clip.id,
-                });
-                readBySlotMutation.mutate({
-                  data: { trackIndex: row.trackIndex, slotIndex },
                 });
               }}
             >
@@ -400,10 +444,9 @@ function RouteComponent() {
   ];
 
   const navigatorError = [
-    { mutation: overviewMutation, title: "Refresh failed" },
-    { mutation: readMutation, title: "Read failed" },
-    { mutation: readBySlotMutation, title: "Read failed" },
-  ].find(({ mutation }) => mutation.isError);
+    { title: "Refresh failed", query: overviewQuery },
+    { title: "Read failed", query: clipQuery },
+  ].find(({ query }) => query.isError);
 
   const editorError = [
     { mutation: writeMutation, title: "Write failed" },
@@ -446,9 +489,9 @@ function RouteComponent() {
                     label="Read from Live"
                     variant="primary"
                     size="sm"
-                    isLoading={readMutation.isPending}
+                    isLoading={clipQuery.isFetching}
                     onClick={() => {
-                      readMutation.mutate();
+                      selectClipSource({ kind: "detail" });
                     }}
                   />
                   <IconButton
@@ -456,10 +499,8 @@ function RouteComponent() {
                     variant="ghost"
                     size="sm"
                     icon={<Icon icon={RefreshCw} color="inherit" />}
-                    isLoading={overviewMutation.isPending}
-                    onClick={() => {
-                      overviewMutation.mutate();
-                    }}
+                    isLoading={overviewQuery.isFetching}
+                    onClick={refreshOverview}
                   />
                 </>
               }
@@ -498,10 +539,8 @@ function RouteComponent() {
                       label="Refresh"
                       size="sm"
                       icon={<Icon icon={RefreshCw} color="inherit" />}
-                      isLoading={overviewMutation.isPending}
-                      onClick={() => {
-                        overviewMutation.mutate();
-                      }}
+                      isLoading={overviewQuery.isFetching}
+                      onClick={refreshOverview}
                     />
                   }
                 />
@@ -512,8 +551,8 @@ function RouteComponent() {
                 status="error"
                 title={navigatorError.title}
                 description={
-                  navigatorError.mutation.error instanceof Error
-                    ? navigatorError.mutation.error.message
+                  navigatorError.query.error instanceof Error
+                    ? navigatorError.query.error.message
                     : navigatorError.title
                 }
               />
