@@ -1,6 +1,6 @@
 import type { TableColumn } from "@astryxdesign/core/Table";
 
-import type { ClipWithNotes, Note } from "@/lib/Domain";
+import type { ClipWithNotes } from "@/lib/Domain";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -9,16 +9,10 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
-import { useHotkeys } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Section } from "@astryxdesign/core/Section";
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from "@astryxdesign/core/SegmentedControl";
 import { VStack } from "@astryxdesign/core/Stack";
-import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { pixel, Table } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
@@ -35,18 +29,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 
 import {
-  type EditableField,
-  MIN_DURATION,
-  NoteTable,
-} from "@/components/NoteTable";
-import { ScoreDisplay } from "@/components/ScoreDisplay";
+  NoteListEditor,
+  type NoteListEditorState,
+} from "@/components/NoteListEditor";
+import { ScorePanel } from "@/components/ScorePanel";
 import {
   fireClip,
   readClip,
   readClipBySlot,
   readLiveSetOverview,
   togglePlay,
-  writeNotes,
 } from "@/lib/serverFns";
 
 interface ClipInfo {
@@ -78,33 +70,11 @@ interface TrackRow extends Record<string, unknown> {
   clipSlots: LiveSetOverview["tracks"][number]["clip_slots"];
 }
 
-let nextTempId = -1;
-
 const xs = stylex.create({
   column: {
     marginInline: "auto",
   },
 });
-
-const byMusicalOrder = (notes: readonly Note[]) =>
-  notes.toSorted((a, b) => a.start_time - b.start_time || a.pitch - b.pitch);
-
-const clampField = (field: EditableField, value: number): number => {
-  switch (field) {
-    case "pitch": {
-      return Math.round(Math.min(127, Math.max(0, value)));
-    }
-    case "start_time": {
-      return Math.max(0, value);
-    }
-    case "duration": {
-      return Math.max(MIN_DURATION, value);
-    }
-    case "velocity": {
-      return Math.min(127, Math.max(0, value));
-    }
-  }
-};
 
 const sameSource = (a: ClipSource, b: ClipSource) =>
   a.kind === "detail"
@@ -162,21 +132,13 @@ function RouteComponent() {
     enabled: clipSource !== null,
   });
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(true);
-  const [baseline, setBaseline] = useState<Note[]>([]);
-  const [draft, setDraft] = useState<Note[] | null>(null);
   const [clipInfo, setClipInfo] = useState<ClipInfo | null>(null);
   const [trackName, setTrackName] = useState<string | null>(null);
-  const [modifiedNoteIds, setModifiedNoteIds] = useState<Set<number>>(
-    new Set(),
-  );
-  const [deletedNoteIds, setDeletedNoteIds] = useState<Set<number>>(new Set());
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [multiEditMode, setMultiEditMode] = useState<"relative" | "absolute">(
-    "relative",
-  );
-  const [scoreRenderToken, setScoreRenderToken] = useState(0);
-
-  const notes = draft ?? baseline;
+  const [editorRevision, setEditorRevision] = useState(0);
+  const [editorState, setEditorState] = useState<NoteListEditorState>({
+    notes: [],
+    hasDraft: false,
+  });
 
   const overview = overviewQuery.data?.live_set ?? null;
   const liveSelectedClipId =
@@ -202,13 +164,15 @@ function RouteComponent() {
         signatureNumerator: clip.signature_numerator,
         signatureDenominator: clip.signature_denominator,
       });
-      setBaseline(byMusicalOrder(clip.notes ?? []));
-      setDraft(null);
-      setModifiedNoteIds(new Set());
-      setDeletedNoteIds(new Set());
-      setSelectedKeys(new Set());
+      setEditorState({
+        notes:
+          clip.notes?.toSorted(
+            (a, b) => a.start_time - b.start_time || a.pitch - b.pitch,
+          ) ?? [],
+        hasDraft: false,
+      });
+      setEditorRevision((prev) => prev + 1);
       setIsNavigatorOpen(false);
-      setScoreRenderToken((prev) => prev + 1);
     },
     [],
   );
@@ -235,13 +199,6 @@ function RouteComponent() {
     });
   };
 
-  const writeMutation = useMutation({
-    mutationFn: writeNotes,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["clip"] });
-    },
-  });
-
   const { mutate: togglePlayMutate, isPending: isTogglePlayPending } =
     useMutation({ mutationFn: () => togglePlay() });
 
@@ -267,122 +224,6 @@ function RouteComponent() {
       window.removeEventListener("keydown", handler);
     };
   }, [isTogglePlayPending, togglePlayMutate]);
-
-  const markModified = (noteIds: readonly number[]) => {
-    const persisted = noteIds.filter((id) => id > 0);
-    if (persisted.length === 0) return;
-    setModifiedNoteIds((prev) => new Set([...prev, ...persisted]));
-  };
-
-  const commitField = (noteId: number, field: EditableField, next: number) => {
-    const current = notes.find((note) => note.note_id === noteId);
-    if (current === undefined) return;
-    const isGroupEdit =
-      selectedKeys.has(String(noteId)) && selectedKeys.size > 1;
-    const isTarget = (note: Note) =>
-      isGroupEdit
-        ? selectedKeys.has(String(note.note_id))
-        : note.note_id === noteId;
-    const apply = (note: Note): Note => ({
-      ...note,
-      [field]:
-        isGroupEdit && multiEditMode === "relative"
-          ? clampField(field, note[field] + next - current[field])
-          : clampField(field, next),
-    });
-    markModified(notes.filter(isTarget).map((note) => note.note_id));
-    setDraft(
-      byMusicalOrder(
-        notes.map((note) => (isTarget(note) ? apply(note) : note)),
-      ),
-    );
-  };
-
-  const toggleMute = (noteId: number, mute: boolean) => {
-    markModified([noteId]);
-    setDraft(
-      notes.map((note) => (note.note_id === noteId ? { ...note, mute } : note)),
-    );
-  };
-
-  const handleAddNote = () => {
-    const last = notes.at(-1);
-    setDraft(
-      byMusicalOrder([
-        ...notes,
-        {
-          note_id: nextTempId--,
-          pitch: last?.pitch ?? 60,
-          start_time: last === undefined ? 0 : last.start_time + last.duration,
-          duration: last?.duration ?? 1,
-          velocity: last?.velocity ?? 100,
-          mute: false,
-          probability: 1,
-          velocity_deviation: 0,
-          release_velocity: 64,
-        },
-      ]),
-    );
-  };
-
-  const deleteSelected = () => {
-    if (selectedKeys.size === 0) return;
-    const removed = notes.filter((note) =>
-      selectedKeys.has(String(note.note_id)),
-    );
-    setDeletedNoteIds(
-      (prev) =>
-        new Set([
-          ...prev,
-          ...removed.map((note) => note.note_id).filter((id) => id > 0),
-        ]),
-    );
-    setDraft(notes.filter((note) => !selectedKeys.has(String(note.note_id))));
-    setSelectedKeys(new Set());
-  };
-
-  const discardEdits = () => {
-    setDraft(null);
-    setModifiedNoteIds(new Set());
-    setDeletedNoteIds(new Set());
-    setSelectedKeys(new Set());
-  };
-
-  const handleWrite = () => {
-    if (!clipInfo) return;
-    writeMutation.mutate({
-      data: {
-        clipId: clipInfo.id,
-        newNotes: notes
-          .filter((n) => n.note_id < 0)
-          .map(({ note_id: _, ...rest }) => rest),
-        modifiedNotes: notes.filter(
-          (n) => modifiedNoteIds.has(n.note_id) && n.note_id > 0,
-        ),
-        removedNoteIds: [...deletedNoteIds],
-      },
-    });
-  };
-
-  useHotkeys([
-    {
-      keys: "mod+a",
-      onPress: () => {
-        setSelectedKeys(new Set(notes.map((note) => String(note.note_id))));
-      },
-      isDisabled: notes.length === 0,
-    },
-    {
-      keys: "backspace",
-      onPress: deleteSelected,
-      isDisabled: selectedKeys.size === 0,
-    },
-    {
-      keys: "delete",
-      onPress: deleteSelected,
-      isDisabled: selectedKeys.size === 0,
-    },
-  ]);
 
   const maxSlots =
     overview?.tracks.reduce(
@@ -447,13 +288,6 @@ function RouteComponent() {
     { title: "Refresh failed", query: overviewQuery },
     { title: "Read failed", query: clipQuery },
   ].find(({ query }) => query.isError);
-
-  const editorError = [
-    { mutation: writeMutation, title: "Write failed" },
-    { mutation: fireClipMutation, title: "Play clip failed" },
-  ].find(({ mutation }) => mutation.isError);
-
-  const hasDraft = draft !== null;
 
   return (
     <AppShell
@@ -588,7 +422,7 @@ function RouteComponent() {
                     <Button
                       label="Play Clip"
                       size="sm"
-                      isDisabled={notes.length === 0}
+                      isDisabled={editorState.notes.length === 0}
                       isLoading={fireClipMutation.isPending}
                       onClick={() => {
                         fireClipMutation.mutate({
@@ -599,79 +433,22 @@ function RouteComponent() {
                   </>
                 }
               />
-              <Toolbar
-                label="Note list actions"
-                size="sm"
-                startContent={
-                  <Text type="supporting" color="secondary">
-                    {notes.length} {notes.length === 1 ? "note" : "notes"}
-                    {hasDraft &&
-                      ` · ${String(modifiedNoteIds.size)} modified · ${String(deletedNoteIds.size)} deleted`}
-                  </Text>
-                }
-                endContent={
-                  <>
-                    <SegmentedControl
-                      label="Multi-edit mode"
-                      value={multiEditMode}
-                      onChange={(value) => {
-                        setMultiEditMode(
-                          value === "absolute" ? "absolute" : "relative",
-                        );
-                      }}
-                    >
-                      <SegmentedControlItem value="relative" label="Relative" />
-                      <SegmentedControlItem value="absolute" label="Absolute" />
-                    </SegmentedControl>
-                    <Button
-                      label="Add note"
-                      size="sm"
-                      onClick={handleAddNote}
-                    />
-                    <Button
-                      label={
-                        selectedKeys.size === 0
-                          ? "Delete selected"
-                          : `Delete ${String(selectedKeys.size)}`
-                      }
-                      size="sm"
-                      isDisabled={selectedKeys.size === 0}
-                      onClick={deleteSelected}
-                    />
-                    <Button
-                      label="Discard edits"
-                      size="sm"
-                      isDisabled={!hasDraft}
-                      onClick={discardEdits}
-                    />
-                    <Button
-                      label="Write to Live"
-                      variant="primary"
-                      size="sm"
-                      isDisabled={!hasDraft}
-                      isLoading={writeMutation.isPending}
-                      onClick={handleWrite}
-                    />
-                  </>
-                }
-              />
-              <NoteTable
-                notes={notes}
+              <NoteListEditor
+                key={editorRevision}
+                clipId={clipInfo.id}
+                initialNotes={editorState.notes}
                 signatureNumerator={clipInfo.signatureNumerator}
                 signatureDenominator={clipInfo.signatureDenominator}
-                selectedKeys={selectedKeys}
-                setSelectedKeys={setSelectedKeys}
-                onCommitField={commitField}
-                onToggleMute={toggleMute}
+                onStateChange={setEditorState}
               />
-              {editorError && (
+              {fireClipMutation.isError && (
                 <Banner
                   status="error"
-                  title={editorError.title}
+                  title="Play clip failed"
                   description={
-                    editorError.mutation.error instanceof Error
-                      ? editorError.mutation.error.message
-                      : editorError.title
+                    fireClipMutation.error instanceof Error
+                      ? fireClipMutation.error.message
+                      : "Play clip failed"
                   }
                 />
               )}
@@ -679,38 +456,8 @@ function RouteComponent() {
           </Section>
         )}
 
-        {clipInfo && notes.length > 0 && (
-          <Section paddingBlock={2}>
-            <VStack gap={2}>
-              <Toolbar
-                label="Score"
-                size="sm"
-                startContent={
-                  <>
-                    <Text type="label">Score</Text>
-                    {hasDraft && (
-                      <>
-                        <StatusDot variant="warning" label="Score is stale" />
-                        <Text type="supporting" color="secondary">
-                          Unsent edits — refresh to update
-                        </Text>
-                      </>
-                    )}
-                  </>
-                }
-                endContent={
-                  <Button
-                    label="Refresh score"
-                    size="sm"
-                    onClick={() => {
-                      setScoreRenderToken((prev) => prev + 1);
-                    }}
-                  />
-                }
-              />
-              <ScoreDisplay notes={notes} renderToken={scoreRenderToken} />
-            </VStack>
-          </Section>
+        {clipInfo && editorState.notes.length > 0 && (
+          <ScorePanel key={editorRevision} notes={editorState.notes} />
         )}
       </VStack>
     </AppShell>
