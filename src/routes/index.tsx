@@ -166,7 +166,7 @@ function RouteComponent() {
       });
       setEditorState({
         notes:
-          clip.notes?.toSorted(
+          clip.get_all_notes_extended?.notes.toSorted(
             (a, b) => a.start_time - b.start_time || a.pitch - b.pitch,
           ) ?? [],
         hasDraft: false,

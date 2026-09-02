@@ -1,4 +1,4 @@
-import type { Note } from "@/lib/Domain";
+import type { ClipWithNotes, Note } from "@/lib/Domain";
 
 import { useEffect, useEffectEvent, useState } from "react";
 
@@ -83,8 +83,12 @@ export function NoteListEditor({
 
   const writeMutation = useMutation({
     mutationFn: writeNotes,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["clip"] });
+    onSuccess: ({ clip }) => {
+      queryClient.setQueriesData<{ clip: ClipWithNotes | null }>(
+        { queryKey: ["clip"] },
+        (current) =>
+          current?.clip?.id === clip.id ? { ...current, clip } : current,
+      );
     },
   });
 

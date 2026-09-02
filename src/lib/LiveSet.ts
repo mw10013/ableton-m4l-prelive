@@ -3,6 +3,20 @@ import { Effect, Schema } from "effect";
 import * as Domain from "@/lib/Domain";
 import { LiveQL } from "@/lib/LiveQL";
 
+const ClipFields = `
+  id path type name color end_time is_arrangement_clip is_session_clip is_midi_clip
+  length looping loop_start loop_end start_marker end_marker position muted
+  signature_denominator signature_numerator start_time
+  view { id path type grid_quantization grid_is_triplet }
+`;
+
+const ClipWithNotesFields = `
+  ${ClipFields}
+  get_all_notes_extended {
+    notes { note_id pitch start_time duration velocity mute probability velocity_deviation release_velocity }
+  }
+`;
+
 const ReadClipData = Schema.Struct({
   live_set: Schema.Struct({
     view: Schema.Struct({
@@ -17,9 +31,7 @@ export const readClip = Effect.fn("LiveSet.readClip")(function* () {
   return yield* gqlDecode(
     ReadClipData,
     `{ live_set { view { selected_track { name } detail_clip {
-        id name path length is_midi_clip
-        signature_numerator signature_denominator
-        notes { note_id pitch start_time duration velocity mute probability velocity_deviation release_velocity }
+        ${ClipWithNotesFields}
       } } } }`,
   );
 });
@@ -46,8 +58,7 @@ export const readLiveSetOverview = Effect.fn("LiveSet.readLiveSetOverview")(
             id path
             selected_track { id path has_midi_input name }
             detail_clip {
-              id path end_time is_arrangement_clip is_midi_clip length looping name
-              signature_denominator signature_numerator start_time
+              ${ClipFields}
             }
           }
           tracks {
@@ -55,8 +66,7 @@ export const readLiveSetOverview = Effect.fn("LiveSet.readLiveSetOverview")(
             clip_slots {
               id path has_clip
               clip {
-                id path end_time is_arrangement_clip is_midi_clip length looping name
-                signature_denominator signature_numerator start_time
+                ${ClipFields}
               }
             }
           }
@@ -94,9 +104,7 @@ export const readClipBySlot = Effect.fn("LiveSet.readClipBySlot")(
           name
           clip_slot(index: $slotIndex) {
             clip {
-              id name path length is_midi_clip
-              signature_numerator signature_denominator
-              notes { note_id pitch start_time duration velocity mute probability velocity_deviation release_velocity }
+              ${ClipWithNotesFields}
             }
           }
         }
@@ -162,47 +170,39 @@ export const fireClip = Effect.fn("LiveSet.fireClip")(function* (input: {
   );
 });
 
-const AddNotesData = Schema.Struct({
-  clip_add_new_notes: Schema.Struct({ id: Schema.Number }),
+const WriteNotesData = Schema.Struct({
+  clip_write_notes: Schema.Struct({
+    clip: Schema.Struct({ id: Schema.Number }),
+    note_ids: Schema.Array(Schema.Number),
+  }),
 });
 
-const ModifyNotesData = Schema.Struct({
-  clip_apply_note_modifications: Schema.Struct({ id: Schema.Number }),
-});
-
-const RemoveNotesData = Schema.Struct({
-  clip_remove_notes_by_id: Schema.Struct({ id: Schema.Number }),
+const ClipByIdData = Schema.Struct({
+  clip: Domain.ClipWithNotes,
 });
 
 export const writeNotes = Effect.fn("LiveSet.writeNotes")(function* (
   input: Domain.WriteNotesInput,
 ) {
   const { gqlDecode } = yield* LiveQL;
-  if (input.newNotes.length > 0) {
-    yield* gqlDecode(
-      AddNotesData,
-      `mutation($id: Int!, $notes: NotesDictionaryInput!) {
-        clip_add_new_notes(id: $id, notes_dictionary: $notes) { id }
-      }`,
-      { id: input.clipId, notes: { notes: input.newNotes } },
-    );
-  }
-  if (input.modifiedNotes.length > 0) {
-    yield* gqlDecode(
-      ModifyNotesData,
-      `mutation($id: Int!, $notes: NotesDictionaryInput!) {
-        clip_apply_note_modifications(id: $id, notes_dictionary: $notes) { id }
-      }`,
-      { id: input.clipId, notes: { notes: input.modifiedNotes } },
-    );
-  }
-  if (input.removedNoteIds.length > 0) {
-    yield* gqlDecode(
-      RemoveNotesData,
-      `mutation($id: Int!, $ids: [Int!]!) {
-        clip_remove_notes_by_id(id: $id, ids: $ids) { id }
-      }`,
-      { id: input.clipId, ids: input.removedNoteIds },
-    );
-  }
+  const { clip_write_notes } = yield* gqlDecode(
+    WriteNotesData,
+    `mutation($id: Int!, $input: ClipWriteNotesInput!) {
+      clip_write_notes(id: $id, input: $input) { clip { id } note_ids }
+    }`,
+    {
+      id: input.clipId,
+      input: {
+        add_new_notes: input.newNotes,
+        apply_note_modifications: input.modifiedNotes,
+        remove_notes_by_id: input.removedNoteIds,
+      },
+    },
+  );
+  const { clip } = yield* gqlDecode(
+    ClipByIdData,
+    `query($id: Int!) { clip(id: $id) { ${ClipWithNotesFields} } }`,
+    { id: input.clipId },
+  );
+  return { clip, note_ids: clip_write_notes.note_ids };
 });

@@ -31,18 +31,36 @@ export const ClipSlot = Schema.Struct({
   has_clip: Schema.Boolean,
 });
 
+export const ClipView = Schema.Struct({
+  id: Schema.Number,
+  path: Schema.String,
+  type: Schema.String,
+  grid_quantization: Schema.Number,
+  grid_is_triplet: Schema.Boolean,
+});
+
 export const Clip = Schema.Struct({
   id: Schema.Number,
   path: Schema.String,
+  type: Schema.String,
+  color: Schema.Number,
   end_time: Schema.Number,
   is_arrangement_clip: Schema.Boolean,
+  is_session_clip: Schema.Boolean,
   is_midi_clip: Schema.Boolean,
   length: Schema.Number,
   looping: Schema.Boolean,
+  loop_start: Schema.Number,
+  loop_end: Schema.Number,
+  start_marker: Schema.Number,
+  end_marker: Schema.Number,
+  position: Schema.Number,
+  muted: Schema.Boolean,
   name: Schema.String,
   signature_denominator: Schema.Number,
   signature_numerator: Schema.Number,
   start_time: Schema.Number,
+  view: ClipView,
 });
 
 export const Note = Schema.Struct({
@@ -70,14 +88,10 @@ export const NoteInput = Schema.Struct({
 });
 
 export const ClipWithNotes = Schema.Struct({
-  id: Schema.Number,
-  name: Schema.String,
-  path: Schema.String,
-  length: Schema.Number,
-  is_midi_clip: Schema.Boolean,
-  signature_numerator: Schema.Number,
-  signature_denominator: Schema.Number,
-  notes: Schema.NullOr(Schema.Array(Note)),
+  ...Clip.fields,
+  get_all_notes_extended: Schema.NullOr(
+    Schema.Struct({ notes: Schema.Array(Note) }),
+  ),
 });
 
 export const WriteNotesInput = Schema.Struct({
