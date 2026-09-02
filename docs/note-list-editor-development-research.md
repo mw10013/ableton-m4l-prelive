@@ -12,20 +12,20 @@ redesign. It should make a selected set of notes into a useful musical operand.
 
 Recommended sequence:
 
-1. Make draft history and write reconciliation reliable.
-2. Add grid-aware **Duplicate**, clip-boundary extension, group mute/unmute, transpose, and time
-   nudge.
-3. Make probability, velocity deviation, and release velocity directly editable.
-4. Add vertical drag/scrub editing for numeric values.
-5. Add fixed velocity, fixed duration, legato, quantize, and velocity ramp operations.
-6. Add Find and Select by note properties.
-7. Add audition only if LiveQL gains a safe note-preview operation.
-8. Add copy/paste only after defining an insertion marker or explicit paste destination.
+1. Simplify the editor to one complete working note list and hard-replace Live's notes on Write.
+2. Add dialog-based **Duplicate...** with an editable destination.
+3. Add group mute/unmute, transpose, and time nudge.
+4. Make probability, velocity deviation, and release velocity directly editable.
+5. Add vertical drag/scrub editing for numeric values.
+6. Add fixed velocity, fixed duration, legato, quantize, and velocity ramp operations.
+7. Add Find and Select by note properties.
+8. Add audition only if LiveQL gains a safe note-preview operation.
+9. Add copy/paste only after defining an insertion marker or explicit paste destination.
 
-`Duplicate` is the best next selection operation. It requires no system clipboard. Duplicated notes
-can remain local draft notes and flow through the existing `clip_add_new_notes` mutation. Extending
-playback to include notes beyond the current clip boundary does require new LiveQL coverage for
-`loop_end` and `end_marker`; `Clip.length` itself is read-only.
+`Duplicate...` is the best next selection operation. It requires no system clipboard and follows the
+explicit-destination model of Logic's Event List instead of Live's unsnapped occupied-span behavior.
+The current implementation and hard-synchronization decisions are maintained in
+`docs/note-list-editor-reliability-and-duplicate-research.md`.
 
 ## Prior Research And Artifact
 
@@ -124,27 +124,26 @@ Relevant code:
 
 ### Reliability work before more destructive operations
 
-The editor has a draft, but not undo/redo. Discard resets the complete draft only. Every compared DAW
-treats note operations as undoable; Live describes note editing as non-destructive because Undo can
-restore the previous clip state (`editing-midi/index.md:115-117`). A small in-memory past/present/
-future history is more important than adding many destructive commands.
+The editor does not need local undo/redo. Live owns persisted history, and the current web operations
+do not justify maintaining a second history system. Reload from Live is the explicit way to abandon
+the local working list.
 
-Write handling also needs a defined success state. `writeNotes` can issue three sequential mutations
-for additions, modifications, and removals. This is not atomic: a later failure can leave Live partly
-updated. On success, the current component invalidates clip queries but keeps the old draft and
-temporary IDs mounted. Before adding transforms:
+Prelive should own one complete editable note array rather than a baseline, nullable draft, and
+change sets. Write is a last-writer-wins hard synchronization: replace Live's complete note set with
+the web list, then read it back. Live exposes no atomic replace-all operation, so LiveQL must compose
+add, enumerate, remove, and verify calls. Before adding transforms:
 
-- Disable repeated writes while pending.
-- After success, refetch and replace the baseline, clear history/selection/change sets, and remove
-  temporary IDs.
-- On partial failure, force a refetch and explain that Live may contain a partial write.
-- Consider one LiveQL mutation only if LiveQL eventually exposes an atomic replace-notes operation.
+- Delete all notes, then add the complete desired list; accept that an add failure can leave the clip
+  empty.
+- Disable every note-changing interaction while writing or recovering.
+- On success or recoverable failure, replace the one local list with the authoritative Live read.
+- If recovery fails, keep the editor locked and expose only Reload from Live.
+- Never retry an uncertain replacement payload automatically.
 
 Duplicate adds another cross-boundary concern. Live can store notes beyond the current start/end and
 loop markers: `get_all_notes_extended` deliberately returns them. They will not necessarily be heard
-when the clip plays. A write that adds such notes must also extend the appropriate playback boundary.
-Those operations are not atomic in the LOM, so a failure after one operation requires a refetch and a
-retryable partial-write state.
+when the clip plays. Session markers can be extended; Arrangement right-edge resizing is not exposed
+by the current LOM surface.
 
 ## What The DAWs Suggest For Note Selections
 
@@ -160,8 +159,8 @@ Source: `refs/live-manual/en/live-manual/12/editing-midi/index.md:111-113`.
 Digital Performer makes the same selection reusable across editors and operations. Its Event List
 supports contiguous and non-contiguous selection, and its Region commands operate on selected data.
 Cubase and Logic add property-based selection. The implication for Prelive is that transformations
-should be pure operations from `selected notes -> replacement draft`, not bespoke behavior embedded
-in table cells.
+should be pure operations from `selected notes -> next complete note list`, not bespoke behavior
+embedded in table cells.
 
 When no notes are selected, Prelive should disable selection operations. Live sometimes treats an
 empty selection as "whole clip", but that is hazardous in a list where the operation toolbar is next
@@ -205,65 +204,47 @@ transpose, quantize, fixed values, and legato can operate on selected rows now.
 - Logic: copied Event List events preserve all values and prompt for the first destination position;
   other copied events retain relative positions (`create-events-in-the-event-list...:26-37`).
 
-The manuals therefore do not justify the previous recommendation to always use the exact occupied
-duration. That was an inferred policy, not documented Live behavior. Logic's explicit destination is
-the strongest model for a list editor. Cubase contributes the useful requirement that relative
-distances stay unchanged and the destination can honor a musical grid.
+The later LiveQL verification matrix resolved the formula that the manuals left unspecified. Live
+shifts every selected note by the exact occupied span,
+`max(start_time + duration) - min(start_time)`, without grid snapping
+(`docs/liveql-schema-pass-handoff.md:329-344`). This is not the chosen Prelive behavior: a single
+short note repeating by its duration is often not a useful musical destination.
 
 Recommended Prelive behavior:
 
 - Enabled for one or more selected notes.
 - Copy every selected note field except `note_id`.
-- Compute selection start as the minimum `start_time`.
-- Compute occupied span as `max(start_time + duration) - selection start`.
-- Show **Spacing** and **Copies** controls. Spacing is the onset offset between each copy and defaults
-  to the smallest whole number of duplicate-grid units that contains the occupied span:
-  `ceil(occupied span / grid) * grid`.
-- Default the duplicate grid to one beat (a quarter note in Live's beat units), while allowing common
-  straight/triplet values and direct numeric entry. Remember the user's last value for the clip.
+- Open a dialog whose Destination is the first copied note's start.
+- Prefill Destination with the first quarter-note boundary at or after the latest selected note end.
+- Let the user edit the musical destination before confirming.
 - Preserve every note's offset from selection start; do not quantize the notes themselves.
-- Allow an explicit destination start as an alternative to relative spacing, following Logic and the
-  LOM's `destination_time` model.
 - Assign fresh negative IDs, merge and musically sort, select only the copies.
-- Record the entire duplicate as one undo step.
-- Label the one-copy action `Duplicate` and bind Cmd/Ctrl-D; open **Duplicate...** for count, grid,
-  spacing, and destination options.
+- Label the action `Duplicate...` and bind Cmd/Ctrl-D to open the dialog.
+- Reserve count, spacing, transposition, and collision modes for a later Repeat or advanced Copy
+  operation.
 
-This makes the previously problematic case predictable. With one selected sixteenth note and a
-quarter-note duplicate grid, its occupied span is one sixteenth but its default spacing rounds up to
-one quarter. With an irregular performed phrase, internal timing stays intact while the repetition
-period lands on a musical unit. Users can still request a smaller overlapping offset or a specific
-destination.
+This follows Logic's Event List, which prompts for the first copied event's destination and preserves
+the other events' relative positions. Cubase supports a separate count-based Repeat command. Digital
+Performer requires a time-range selection for Repeat and includes rests in that explicit period.
 
-#### Extending the clip playback boundary
+#### Clip playback boundaries
 
-Allow duplicates beyond the current clip length, then expand playback to include them. Do not attempt
-to set `Clip.length`: the LOM marks it read-only and derives it from loop or start/end markers.
+Duplicate note content the same way for Session and Arrangement clips. Do not attempt to set
+`Clip.length`: the LOM marks it read-only and derives it from loop or start/end markers.
 
-- For a looped Session clip, extend writable `loop_end`.
-- For an unlooped Session clip, extend writable `end_marker`; `loop_end` also represents clip end for
-  unlooped clips, but `end_marker` states the intent directly.
-- Round the new boundary up to a visible musical unit, preferably the clip's bar by default, rather
-  than creating an accidental fractional loop from a note tail. Offer the duplicate grid as a
-  secondary boundary policy.
-- Never shorten an existing boundary.
-- Do not silently wrap duplicate notes.
-- Treat Arrangement clips separately. `end_time` is read-only and represents the Arrangement clip's
-  right edge; changing its internal end marker is not proven to resize that Arrangement region.
+- Do not automatically extend `loop_end`, `end_marker`, or Arrangement edges in the first version.
+- If copies fall outside `[loop_start, loop_end]` when looping or `[start_marker, end_marker]` when
+  unlooped, show a non-blocking warning that they may not be heard.
+- Allow confirmation anyway. Automatic Session extension and bar rounding are deferred per
+  `docs/note-list-editor-reliability-and-duplicate-research.md`.
 
-Current LiveQL exposes `length`, `end_time`, and `start_time` only for reading and exposes no
-`loop_end` or `end_marker`. Add those Clip fields and a narrowly named mutation such as
-`clip_set_playback_end`. LiveQL may also expose `duplicate_notes_by_id`, but Prelive should not use it
-for draft duplication: it only accepts IDs already persisted in Live and would bypass local undo,
-new notes, and unsaved modifications.
+LiveQL now exposes the marker fields, `clip_set_properties`, and native
+`clip_duplicate_notes_by_id`. Prelive should still duplicate locally: the native function only
+accepts IDs already persisted in Live and would bypass the complete local working list.
 
-At write time, calculate `requiredEnd = max(start_time + duration)` across notes created or moved by
-the current draft. Do not expand to untouched notes that were already stored outside the playback
-markers. If the required end exceeds the current playback end, persist the notes and extend the
-boundary as one user-visible write operation. This is several LOM operations even if LiveQL wraps
-them in one composite GraphQL mutation. Neither form is truly atomic. If note insertion succeeds and
-boundary extension fails, refetch so the out-of-range notes remain visible and let the user retry
-extension; do not submit the notes again.
+At write time, submit the complete local note list through the hard-replacement operation. The
+underlying LOM calls remain non-atomic; the replacement readback is the success result and any
+failure locks the editor until **Reload from Live**.
 
 ### 2. Group mute/unmute
 
@@ -327,7 +308,7 @@ Recommended Prelive behavior:
 - Relative multi-edit remains the default; Absolute mode flattens selected values.
 - Shift provides fine movement and a second modifier provides coarse movement, consistently across
   pitch, time, duration, velocity, probability, deviation, and release velocity.
-- Render draft/score changes continuously, but create one undo entry on pointer release.
+- Render working-list and score changes continuously.
 - Escape during a drag restores the pre-drag values.
 - Keep arrow-key and typed-input alternatives for keyboard and assistive-technology users.
 - Enable wheel stepping only when the cell is focused. Cubase explicitly disables wheel parameter
@@ -364,8 +345,8 @@ exact cell editor:
 - Grid: at least 1/4, 1/8, 1/16, 1/32 and triplets.
 - Target: starts; later starts and ends.
 - Amount: 0-100%, using `original + (nearest grid - original) * amount`.
-- Preview against the draft before Apply.
-- Apply as one undo step.
+- Preview against the working list before Apply.
+- Apply as one complete list update.
 
 Live explicitly supports start/end targets and an Amount that moves notes only partway to the grid
 (`editing-midi/index.md:349-359`). Digital Performer distinguishes its exact Event List from grid
@@ -399,19 +380,20 @@ strong filtered-state indicators.
 
 Useful, but less urgent:
 
-- Humanize start time, velocity, and duration with seeded randomization so Undo/reapply is
-  understandable. Live currently humanizes start only; Logic and Digital Performer randomize all
+- Humanize start time, velocity, and duration with seeded randomization so reapplying the operation is
+  deterministic. Live currently humanizes start only; Logic and Digital Performer randomize all
   three (`midi-transform-window-presets...:19`, `region_menu.md:103-114`).
 - Split and Chop notes. Live distinguishes one split from grid-based multi-part Chop
   (`editing-midi/index.md:207-239`).
-- Join adjacent/overlapping same-pitch notes. Live preserves MPE contents; Prelive has no MPE model,
-  so document that limitation before implementing (`editing-midi/index.md:241-245`).
+- Join adjacent/overlapping same-pitch notes. MPE is unsupported in the current replacement model;
+  do not add preservation machinery until Prelive intentionally supports it
+  (`editing-midi/index.md:241-245`).
 - Remove exact duplicates. Logic erases duplicate events; Digital Performer includes a Remove
   Duplicates processor (`mute-and-delete-regions-and-events...:19-29`, `midi_plugins.md:55-57`).
 - Reverse onset order, scale time, fit to scale, pitch inversion, and interval/harmonize.
 
-These should use one shared transform contract and produce one undo entry each rather than adding
-independent state machinery per command.
+These should use one shared transform contract rather than adding independent state machinery per
+command.
 
 ## Copy And Paste
 
@@ -436,7 +418,8 @@ new notes. An in-app clipboard is sufficient initially. Writing custom data to t
 adds permission, focus, serialization, and cross-application compatibility questions without making
 the musical operation better.
 
-`Duplicate` should precede this because it answers the common same-clip case with no destination UI.
+`Duplicate...` should precede this because it answers the common same-clip case with a narrow,
+purpose-built destination dialog and no system clipboard.
 
 ## Interaction Recommendations
 
@@ -449,11 +432,10 @@ the musical operation better.
 - Apply boolean and extended-field edits to selection consistently; do not make multi-edit work only
   for the four primary numeric columns.
 - Keep direct entry unsnapped. Expose nudge and quantize resolution separately.
-- Add Undo/Redo controls and Cmd/Ctrl-Z / Cmd/Ctrl-Shift-Z before placing transforms in the toolbar.
 - Put less frequent transforms in one `Operations` menu or panel. Do not grow the top toolbar into a
   button for every DAW command.
 - Let users preview transforms against the local score immediately. Audio audition is separate and
-  should never block deterministic draft editing.
+  should never block deterministic working-list editing.
 
 ## Proposed Operation Model
 
@@ -468,8 +450,9 @@ interface NoteOperationResult {
 ```
 
 The operation layer should own clamping, temporary ID generation for copied notes, sorting, and
-selection output. The editor should own history and Live write bookkeeping. This separates musical
-rules from table gestures and allows transforms to be tested without rendering Astryx components.
+selection output. The editor should own the one complete working note list and Live synchronization
+status. This separates musical rules from table gestures and allows transforms to be tested without
+rendering Astryx components.
 
 Important invariants:
 
@@ -478,32 +461,38 @@ Important invariants:
 - Duration is finite and at least the Live-supported minimum.
 - Velocity and release velocity remain in their supported ranges.
 - Probability remains from 0 through 1.
-- Every draft row has a unique ID.
-- Persisted IDs are modified or removed, never submitted as new note IDs.
-- Newly created notes are submitted without temporary IDs.
+- Every working row has a unique UI ID.
+- Every hard-replacement note is submitted without its UI or Live ID.
 - Operations preserve unselected notes byte-for-byte.
-- One user command creates one undo entry.
+- A verified write result semantically equals the complete submitted note list.
 
 ## Delivery Plan
 
 ### Phase 0: safe editing foundation
 
-- Add draft undo/redo history.
-- Reconcile/refetch after writes and clear temporary state.
+- Add LiveQL `clip_replace_notes` with delete-all/add-all/read semantics.
+- Replace baseline, draft, and change sets with one complete controlled note list.
+- Lock all editing while a write outcome is unknown.
+- Read the complete clip by ID after success and failure.
 - Handle partial mutation failure explicitly.
-- Extend LiveQL Clip coverage with `loop_end`, `end_marker`, and a playback-end mutation.
+- Replace Discard with Reload from Live.
 - Add selected count and Escape-to-clear.
 
 ### Phase 1: selected-note essentials
 
-- Grid-aware Duplicate plus Cmd/Ctrl-D, explicit spacing/count, and playback-boundary extension.
+- Dialog-based Duplicate plus Cmd/Ctrl-D.
+- Editable destination defaulting to the next quarter-note boundary with `TIME_EPSILON` handling.
+- Same local copy transform for Session and Arrangement clips with an out-of-playback warning.
+
+### Phase 2: further selected-note essentials
+
 - Group mute/unmute plus `0`.
 - Semitone/octave transpose.
 - Configurable time and duration nudge.
 - Direct editing for probability, deviation, and release velocity.
-- Vertical drag/scrub for all numeric fields, with one undo entry per gesture.
+- Vertical drag/scrub for all numeric fields.
 
-### Phase 2: musical cleanup
+### Phase 3: musical cleanup
 
 - Set velocity and set duration.
 - Legato with documented same-pitch semantics.
@@ -511,7 +500,7 @@ Important invariants:
 - Quantize starts with grid and amount.
 - Find and Select predicates.
 
-### Phase 3: structural and creative tools
+### Phase 4: structural and creative tools
 
 - Explicit insertion position, then internal copy/paste.
 - Time-range selection and Duplicate/Insert/Delete Time.
