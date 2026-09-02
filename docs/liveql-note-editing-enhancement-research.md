@@ -33,8 +33,8 @@ audio-only clip properties, and control surfaces stay out of scope.
 
 Read from `liveql-n4m.js` and `liveql-m4l.js`.
 
-- Schema is an SDL template literal in `liveql-n4m.js`. Names mirror the LOM verbatim in snake_case;
-  mutations are `<object>_<action>`.
+- Schema is an SDL template literal in `liveql-n4m.js`. Names mirror the LOM verbatim in snake*case;
+  mutations are `<object>*<action>`.
 - The Node layer sends three action kinds to the Max `v8` layer: `get`, `set`, `call`. Each is one
   round trip over `max-api` keyed by `actionId`.
 - `get` takes four key lists: single-value properties, multi-value properties, single child ids, and
@@ -64,8 +64,8 @@ Prelive's note list editor keeps a local draft and writes it back as three seque
 Prelive's reliability research (`docs/note-list-editor-reliability-and-duplicate-research.md`)
 identified three needs that LiveQL cannot satisfy today:
 
-| Need                                                | Blocking LiveQL gap                                             |
-| --------------------------------------------------- | --------------------------------------------------------------- |
+| Need                                                 | Blocking LiveQL gap                                              |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
 | Extend playback so out-of-range duplicates are heard | No `loop_end`, `end_marker`, `loop_start`, `start_marker` access |
 | Map temporary note IDs to Live IDs after a write     | `clip_add_new_notes` drops the returned ID list                  |
 | Refetch exactly the written clip to verify           | Clips are reachable only via the detail view or a slot index     |
@@ -113,33 +113,33 @@ These follow the LiveQL `AGENTS.md` conventions and the existing resolver patter
 All from `clip/index.md`. Access column from the LOM entry where it states one; "get set" where the
 LOM lists no access line, which is the LOM's default for properties.
 
-| Field                 | Type     | LOM access  | Notes                                                                                   |
-| --------------------- | -------- | ----------- | --------------------------------------------------------------------------------------- |
-| `type`                | String!  | bridge      | Always `"Clip"`; comes from `live.type`                                                  |
-| `loop_start`          | Float!   | get set     | Looped: loop start. Unlooped: clip start. Beats for MIDI clips                           |
-| `loop_end`            | Float!   | get set     | Looped: loop end. Unlooped: clip end                                                     |
-| `start_marker`        | Float!   | get set     | Independent of loop state. "Cannot be set behind the end marker"                        |
-| `end_marker`          | Float!   | get set     | Independent of loop state. "Cannot be set before the start marker"                      |
-| `position`            | Float!   | get set     | Equals `loop_start`; setting preserves loop length                                       |
-| `is_session_clip`     | Boolean! | get         |                                                                                         |
-| `is_audio_clip`       | Boolean! | get         |                                                                                         |
-| `is_take_lane_clip`   | Boolean! | get         |                                                                                         |
-| `muted`               | Boolean! | get set     | Clip Activator off                                                                      |
-| `color`               | Int!     | get set     | `0x00rrggbb`; set snaps to nearest palette color                                        |
-| `color_index`         | Int!     | get set     |                                                                                         |
-| `is_playing`          | Boolean! | get set     | Set is documented; expose set through a mutation, not the property batch                |
-| `is_recording`        | Boolean! | get         |                                                                                         |
-| `is_triggered`        | Boolean! | get         |                                                                                         |
-| `is_overdubbing`      | Boolean! | get         |                                                                                         |
-| `playing_position`    | Float!   | get         | Beats of absolute clip time for MIDI; 0 when stopped                                    |
-| `launch_mode`         | Int!     | get set     | 0 Trigger, 1 Gate, 2 Toggle, 3 Repeat                                                   |
-| `launch_quantization` | Int!     | get set     | 0 Global … 14 1/32; table in LOM                                                        |
-| `legato`              | Boolean! | get set     |                                                                                         |
-| `velocity_amount`     | Float!   | get set     | 0 to 1                                                                                  |
-| `has_envelopes`       | Boolean! | get         |                                                                                         |
-| `has_groove`          | Boolean! | get         |                                                                                         |
-| `will_record_on_start`| Boolean! | get         |                                                                                         |
-| `view`                | ClipView!| child       | See Change 6                                                                            |
+| Field                  | Type      | LOM access | Notes                                                                    |
+| ---------------------- | --------- | ---------- | ------------------------------------------------------------------------ |
+| `type`                 | String!   | bridge     | Always `"Clip"`; comes from `live.type`                                  |
+| `loop_start`           | Float!    | get set    | Looped: loop start. Unlooped: clip start. Beats for MIDI clips           |
+| `loop_end`             | Float!    | get set    | Looped: loop end. Unlooped: clip end                                     |
+| `start_marker`         | Float!    | get set    | Independent of loop state. "Cannot be set behind the end marker"         |
+| `end_marker`           | Float!    | get set    | Independent of loop state. "Cannot be set before the start marker"       |
+| `position`             | Float!    | get set    | Equals `loop_start`; setting preserves loop length                       |
+| `is_session_clip`      | Boolean!  | get        |                                                                          |
+| `is_audio_clip`        | Boolean!  | get        |                                                                          |
+| `is_take_lane_clip`    | Boolean!  | get        |                                                                          |
+| `muted`                | Boolean!  | get set    | Clip Activator off                                                       |
+| `color`                | Int!      | get set    | `0x00rrggbb`; set snaps to nearest palette color                         |
+| `color_index`          | Int!      | get set    |                                                                          |
+| `is_playing`           | Boolean!  | get set    | Set is documented; expose set through a mutation, not the property batch |
+| `is_recording`         | Boolean!  | get        |                                                                          |
+| `is_triggered`         | Boolean!  | get        |                                                                          |
+| `is_overdubbing`       | Boolean!  | get        |                                                                          |
+| `playing_position`     | Float!    | get        | Beats of absolute clip time for MIDI; 0 when stopped                     |
+| `launch_mode`          | Int!      | get set    | 0 Trigger, 1 Gate, 2 Toggle, 3 Repeat                                    |
+| `launch_quantization`  | Int!      | get set    | 0 Global … 14 1/32; table in LOM                                         |
+| `legato`               | Boolean!  | get set    |                                                                          |
+| `velocity_amount`      | Float!    | get set    | 0 to 1                                                                   |
+| `has_envelopes`        | Boolean!  | get        |                                                                          |
+| `has_groove`           | Boolean!  | get        |                                                                          |
+| `will_record_on_start` | Boolean!  | get        |                                                                          |
+| `view`                 | ClipView! | child      | See Change 6                                                             |
 
 Keep `end_time` and `start_time`. `end_time` is useful precisely because for Session clips it already
 resolves the loop state: "if Loop is on, this is the Loop End, otherwise it's the End Marker"
@@ -313,7 +313,12 @@ type Clip {
   # ...
   notes: [Note!]
   notes_by_id(note_ids: [Int!]!): [Note!]
-  notes_in_region(from_pitch: Int!, pitch_span: Int!, from_time: Float!, time_span: Float!): [Note!]
+  notes_in_region(
+    from_pitch: Int!
+    pitch_span: Int!
+    from_time: Float!
+    time_span: Float!
+  ): [Note!]
   selected_notes: [Note!]
 }
 ```
@@ -327,21 +332,21 @@ Mark `clip_get_notes_extended`, `clip_get_selected_notes_extended`, and
 
 ### New Clip mutations
 
-| Mutation                        | LOM function            | Arguments                                                                       | Returns            |
-| ------------------------------- | ----------------------- | ------------------------------------------------------------------------------- | ------------------ |
-| `clip_duplicate_notes_by_id`    | `duplicate_notes_by_id` | `note_ids: [Int!]!`, `destination_time: Float`, `transposition_amount: Int`     | `ClipNotesPayload!` if the call returns ids, else `Clip!` (verify) |
-| `clip_duplicate_region`         | `duplicate_region`      | `region_start: Float!`, `region_length: Float!`, `destination_time: Float!`, `pitch: Int = -1`, `transposition_amount: Int = 0` | `Clip!` |
-| `clip_quantize`                 | `quantize`              | `quantization_grid: Int!`, `amount: Float!`                                     | `Clip!`            |
-| `clip_quantize_pitch`           | `quantize_pitch`        | `pitch: Int!`, `quantization_grid: Int!`, `amount: Float!`                      | `Clip!`            |
-| `clip_select_notes_by_id`       | `select_notes_by_id`    | `note_ids: [Int!]!`                                                             | `Clip!`            |
-| `clip_deselect_all_notes`       | `deselect_all_notes`    |                                                                                 | `Clip!`            |
-| `clip_duplicate_loop`           | `duplicate_loop`        |                                                                                 | `Clip!`            |
-| `clip_crop`                     | `crop`                  |                                                                                 | `Clip!`            |
-| `clip_stop`                     | `stop`                  |                                                                                 | `Clip!`            |
-| `clip_scrub`                    | `scrub`                 | `beat_time: Float!`                                                             | `Clip!`            |
-| `clip_stop_scrub`               | `stop_scrub`            |                                                                                 | `Clip!`            |
-| `clip_move_playing_pos`         | `move_playing_pos`      | `beats: Float!`                                                                 | `Clip!`            |
-| `clip_set_fire_button_state`    | `set_fire_button_state` | `state: Boolean!`                                                               | `Clip!`            |
+| Mutation                     | LOM function            | Arguments                                                                                                                       | Returns                                                            |
+| ---------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `clip_duplicate_notes_by_id` | `duplicate_notes_by_id` | `note_ids: [Int!]!`, `destination_time: Float`, `transposition_amount: Int`                                                     | `ClipNotesPayload!` if the call returns ids, else `Clip!` (verify) |
+| `clip_duplicate_region`      | `duplicate_region`      | `region_start: Float!`, `region_length: Float!`, `destination_time: Float!`, `pitch: Int = -1`, `transposition_amount: Int = 0` | `Clip!`                                                            |
+| `clip_quantize`              | `quantize`              | `quantization_grid: Int!`, `amount: Float!`                                                                                     | `Clip!`                                                            |
+| `clip_quantize_pitch`        | `quantize_pitch`        | `pitch: Int!`, `quantization_grid: Int!`, `amount: Float!`                                                                      | `Clip!`                                                            |
+| `clip_select_notes_by_id`    | `select_notes_by_id`    | `note_ids: [Int!]!`                                                                                                             | `Clip!`                                                            |
+| `clip_deselect_all_notes`    | `deselect_all_notes`    |                                                                                                                                 | `Clip!`                                                            |
+| `clip_duplicate_loop`        | `duplicate_loop`        |                                                                                                                                 | `Clip!`                                                            |
+| `clip_crop`                  | `crop`                  |                                                                                                                                 | `Clip!`                                                            |
+| `clip_stop`                  | `stop`                  |                                                                                                                                 | `Clip!`                                                            |
+| `clip_scrub`                 | `scrub`                 | `beat_time: Float!`                                                                                                             | `Clip!`                                                            |
+| `clip_stop_scrub`            | `stop_scrub`            |                                                                                                                                 | `Clip!`                                                            |
+| `clip_move_playing_pos`      | `move_playing_pos`      | `beats: Float!`                                                                                                                 | `Clip!`                                                            |
+| `clip_set_fire_button_state` | `set_fire_button_state` | `state: Boolean!`                                                                                                               | `Clip!`                                                            |
 
 Notes:
 
@@ -395,54 +400,54 @@ Resolver: `Clip.view` is a single child, fetched with `childKeysSingle: ["view"]
 
 Properties to add (`song/index.md`), all readable, set where noted:
 
-| Field                          | Type      | Set | Why                                                                |
-| ------------------------------ | --------- | --- | ------------------------------------------------------------------ |
-| `type`                         | String!   |     |                                                                    |
-| `name`                         | String!   |     | Empty if unsaved                                                   |
-| `file_path`                    | String!   |     |                                                                    |
-| `tempo`                        | Float!    | yes | 20 to 999                                                          |
-| `signature_numerator`          | Int!      | yes |                                                                    |
-| `signature_denominator`        | Int!      | yes |                                                                    |
-| `current_song_time`            | Float!    | yes | Beats                                                              |
-| `start_time`                   | Float!    | yes | Playback start position                                            |
-| `last_event_time`              | Float!    |     |                                                                    |
-| `song_length`                  | Float!    |     |                                                                    |
-| `loop`                         | Boolean!  | yes | Arrangement loop                                                   |
-| `loop_start`                   | Float!    | yes |                                                                    |
-| `loop_length`                  | Float!    | yes |                                                                    |
-| `metronome`                    | Boolean!  | yes |                                                                    |
-| `swing_amount`                 | Float!    | yes | Affects `Clip.quantize`                                            |
-| `midi_recording_quantization`  | Int!      | yes |                                                                    |
-| `clip_trigger_quantization`    | Int!      | yes | Global launch quantization                                         |
-| `root_note`                    | Int!      | yes | 0 = C                                                              |
-| `scale_name`                   | String!   | yes |                                                                    |
-| `scale_intervals`              | [Int!]!   |     | Multi-value property; use `propertyKeysMultiple`                   |
-| `scale_mode`                   | Boolean!  | yes |                                                                    |
-| `can_undo`                     | Boolean!  |     |                                                                    |
-| `can_redo`                     | Boolean!  |     |                                                                    |
-| `record_mode`                  | Boolean!  | yes |                                                                    |
-| `session_record`               | Boolean!  | yes |                                                                    |
-| `overdub`                      | Boolean!  | yes |                                                                    |
-| `arrangement_overdub`          | Boolean!  | yes |                                                                    |
-| `is_counting_in`               | Boolean!  |     |                                                                    |
-| `can_capture_midi`             | Boolean!  |     |                                                                    |
+| Field                         | Type     | Set | Why                                              |
+| ----------------------------- | -------- | --- | ------------------------------------------------ |
+| `type`                        | String!  |     |                                                  |
+| `name`                        | String!  |     | Empty if unsaved                                 |
+| `file_path`                   | String!  |     |                                                  |
+| `tempo`                       | Float!   | yes | 20 to 999                                        |
+| `signature_numerator`         | Int!     | yes |                                                  |
+| `signature_denominator`       | Int!     | yes |                                                  |
+| `current_song_time`           | Float!   | yes | Beats                                            |
+| `start_time`                  | Float!   | yes | Playback start position                          |
+| `last_event_time`             | Float!   |     |                                                  |
+| `song_length`                 | Float!   |     |                                                  |
+| `loop`                        | Boolean! | yes | Arrangement loop                                 |
+| `loop_start`                  | Float!   | yes |                                                  |
+| `loop_length`                 | Float!   | yes |                                                  |
+| `metronome`                   | Boolean! | yes |                                                  |
+| `swing_amount`                | Float!   | yes | Affects `Clip.quantize`                          |
+| `midi_recording_quantization` | Int!     | yes |                                                  |
+| `clip_trigger_quantization`   | Int!     | yes | Global launch quantization                       |
+| `root_note`                   | Int!     | yes | 0 = C                                            |
+| `scale_name`                  | String!  | yes |                                                  |
+| `scale_intervals`             | [Int!]!  |     | Multi-value property; use `propertyKeysMultiple` |
+| `scale_mode`                  | Boolean! | yes |                                                  |
+| `can_undo`                    | Boolean! |     |                                                  |
+| `can_redo`                    | Boolean! |     |                                                  |
+| `record_mode`                 | Boolean! | yes |                                                  |
+| `session_record`              | Boolean! | yes |                                                  |
+| `overdub`                     | Boolean! | yes |                                                  |
+| `arrangement_overdub`         | Boolean! | yes |                                                  |
+| `is_counting_in`              | Boolean! |     |                                                  |
+| `can_capture_midi`            | Boolean! |     |                                                  |
 
 Children to add: `scenes: [Scene!]!`, `scene(index: Int!): Scene`, `return_tracks: [Track!]!`,
 `visible_tracks: [Track!]!`, `master_track: Track!`, `cue_points` can wait.
 
 Mutations:
 
-| Mutation                    | LOM                     | Arguments                                   |
-| --------------------------- | ----------------------- | ------------------------------------------- |
-| `song_set_properties`       | property sets           | `SongPropertiesInput` with every "Set: yes" row |
-| `song_undo`                 | `undo`                  |                                             |
-| `song_redo`                 | `redo`                  |                                             |
-| `song_stop_all_clips`       | `stop_all_clips`        | `quantized: Boolean = true`                 |
-| `song_jump_by`              | `jump_by`               | `beats: Float!`                             |
-| `song_capture_midi`         | `capture_midi`          | `destination: Int = 0`                      |
-| `song_create_midi_track`    | `create_midi_track`     | `index: Int = -1`                           |
-| `song_create_scene`         | `create_scene`          | `index: Int = -1`                           |
-| `song_tap_tempo`            | `tap_tempo`             |                                             |
+| Mutation                 | LOM                 | Arguments                                       |
+| ------------------------ | ------------------- | ----------------------------------------------- |
+| `song_set_properties`    | property sets       | `SongPropertiesInput` with every "Set: yes" row |
+| `song_undo`              | `undo`              |                                                 |
+| `song_redo`              | `redo`              |                                                 |
+| `song_stop_all_clips`    | `stop_all_clips`    | `quantized: Boolean = true`                     |
+| `song_jump_by`           | `jump_by`           | `beats: Float!`                                 |
+| `song_capture_midi`      | `capture_midi`      | `destination: Int = 0`                          |
+| `song_create_midi_track` | `create_midi_track` | `index: Int = -1`                               |
+| `song_create_scene`      | `create_scene`      | `index: Int = -1`                               |
+| `song_tap_tempo`         | `tap_tempo`         |                                                 |
 
 `song_undo` and `song_redo` affect the whole Live Set, including user actions taken outside the API.
 Expose them; the client decides whether to use them. Prelive's reliability research already rules
@@ -481,29 +486,29 @@ Detail View is what lets a navigator in a client open the clip the user picked.
 
 From `track/index.md`. Add:
 
-| Field                  | Type        | Set |
-| ---------------------- | ----------- | --- |
-| `type`                 | String!     |     |
-| `arrangement_clips`    | [Clip!]!    |     |
-| `arrangement_clip(index: Int!)` | Clip |     |
-| `arm`                  | Boolean!    | yes |
-| `can_be_armed`         | Boolean!    |     |
-| `mute`                 | Boolean!    | yes |
-| `solo`                 | Boolean!    | yes |
-| `muted_via_solo`       | Boolean!    |     |
-| `color`                | Int!        | yes |
-| `color_index`          | Int!        | yes |
-| `has_audio_input`      | Boolean!    |     |
-| `has_audio_output`     | Boolean!    |     |
-| `has_midi_output`      | Boolean!    |     |
-| `is_foldable`          | Boolean!    |     |
-| `is_grouped`           | Boolean!    |     |
-| `is_visible`           | Boolean!    |     |
-| `is_frozen`            | Boolean!    |     |
-| `fold_state`           | Int         | yes | (null unless `is_foldable`) |
-| `group_track`          | Track       |     |
-| `playing_slot_index`   | Int!        |     |
-| `fired_slot_index`     | Int!        |     |
+| Field                           | Type     | Set |
+| ------------------------------- | -------- | --- | --------------------------- |
+| `type`                          | String!  |     |
+| `arrangement_clips`             | [Clip!]! |     |
+| `arrangement_clip(index: Int!)` | Clip     |     |
+| `arm`                           | Boolean! | yes |
+| `can_be_armed`                  | Boolean! |     |
+| `mute`                          | Boolean! | yes |
+| `solo`                          | Boolean! | yes |
+| `muted_via_solo`                | Boolean! |     |
+| `color`                         | Int!     | yes |
+| `color_index`                   | Int!     | yes |
+| `has_audio_input`               | Boolean! |     |
+| `has_audio_output`              | Boolean! |     |
+| `has_midi_output`               | Boolean! |     |
+| `is_foldable`                   | Boolean! |     |
+| `is_grouped`                    | Boolean! |     |
+| `is_visible`                    | Boolean! |     |
+| `is_frozen`                     | Boolean! |     |
+| `fold_state`                    | Int      | yes | (null unless `is_foldable`) |
+| `group_track`                   | Track    |     |
+| `playing_slot_index`            | Int!     |     |
+| `fired_slot_index`              | Int!     |     |
 
 `arm`, `mute`, `solo`, `playing_slot_index`, `fired_slot_index` are documented as not available on
 return or master tracks. Make them nullable and return `null` when the property read fails, since
@@ -511,15 +516,15 @@ return or master tracks. Make them nullable and return `null` when the property 
 
 Mutations:
 
-| Mutation                              | LOM                            | Arguments                                   |
-| ------------------------------------- | ------------------------------ | ------------------------------------------- |
-| `track_set_properties`                | property sets                  | `name, arm, mute, solo, color, color_index, fold_state` |
-| `track_stop_all_clips`                | `stop_all_clips`               |                                             |
-| `track_create_midi_clip`              | `create_midi_clip`             | `start_time: Float!, length: Float!`        |
-| `track_delete_clip`                   | `delete_clip`                  | `clip_id: Int!`                             |
-| `track_duplicate_clip_slot`           | `duplicate_clip_slot`          | `index: Int!`                               |
-| `track_duplicate_clip_to_arrangement` | `duplicate_clip_to_arrangement`| `clip_id: Int!, destination_time: Float!`   |
-| `track_jump_in_running_session_clip`  | `jump_in_running_session_clip` | `beats: Float!`                             |
+| Mutation                              | LOM                             | Arguments                                               |
+| ------------------------------------- | ------------------------------- | ------------------------------------------------------- |
+| `track_set_properties`                | property sets                   | `name, arm, mute, solo, color, color_index, fold_state` |
+| `track_stop_all_clips`                | `stop_all_clips`                |                                                         |
+| `track_create_midi_clip`              | `create_midi_clip`              | `start_time: Float!, length: Float!`                    |
+| `track_delete_clip`                   | `delete_clip`                   | `clip_id: Int!`                                         |
+| `track_duplicate_clip_slot`           | `duplicate_clip_slot`           | `index: Int!`                                           |
+| `track_duplicate_clip_to_arrangement` | `duplicate_clip_to_arrangement` | `clip_id: Int!, destination_time: Float!`               |
+| `track_jump_in_running_session_clip`  | `jump_in_running_session_clip`  | `beats: Float!`                                         |
 
 `track_set_name` stays, `@deprecated` in favor of the batch.
 
@@ -527,28 +532,28 @@ Mutations:
 
 From `clipslot/index.md`:
 
-| Field                   | Type     |
-| ----------------------- | -------- |
-| `type`                  | String!  |
-| `is_playing`            | Boolean! |
-| `is_recording`          | Boolean! |
-| `is_triggered`          | Boolean! |
-| `playing_status`        | Int!     |
-| `has_stop_button`       | Boolean! (settable) |
-| `is_group_slot`         | Boolean! |
-| `will_record_on_start`  | Boolean! |
-| `color`                 | Int      |
+| Field                  | Type                |
+| ---------------------- | ------------------- |
+| `type`                 | String!             |
+| `is_playing`           | Boolean!            |
+| `is_recording`         | Boolean!            |
+| `is_triggered`         | Boolean!            |
+| `playing_status`       | Int!                |
+| `has_stop_button`      | Boolean! (settable) |
+| `is_group_slot`        | Boolean!            |
+| `will_record_on_start` | Boolean!            |
+| `color`                | Int                 |
 
 Mutations:
 
-| Mutation                      | LOM                  | Arguments                                              |
-| ----------------------------- | -------------------- | ------------------------------------------------------ |
-| `clip_slot_fire`              | `fire`               | `record_length: Float`, `launch_quantization: Int`     |
-| `clip_slot_stop`              | `stop`               |                                                        |
-| `clip_slot_create_clip`       | `create_clip`        | `length: Float!`                                       |
-| `clip_slot_delete_clip`       | `delete_clip`        |                                                        |
-| `clip_slot_duplicate_clip_to` | `duplicate_clip_to`  | `target_clip_slot_id: Int!`                            |
-| `clip_slot_set_has_stop_button` | property set       | `has_stop_button: Boolean!`                            |
+| Mutation                        | LOM                 | Arguments                                          |
+| ------------------------------- | ------------------- | -------------------------------------------------- |
+| `clip_slot_fire`                | `fire`              | `record_length: Float`, `launch_quantization: Int` |
+| `clip_slot_stop`                | `stop`              |                                                    |
+| `clip_slot_create_clip`         | `create_clip`       | `length: Float!`                                   |
+| `clip_slot_delete_clip`         | `delete_clip`       |                                                    |
+| `clip_slot_duplicate_clip_to`   | `duplicate_clip_to` | `target_clip_slot_id: Int!`                        |
+| `clip_slot_set_has_stop_button` | property set        | `has_stop_button: Boolean!`                        |
 
 `clip_slot_create_clip` is how a client creates an empty MIDI clip from nothing, which the current
 schema cannot do at all.
@@ -599,11 +604,11 @@ Node can build the operation-naming error described above.
 
 ## Breaking Changes
 
-| Change                                     | Effect on Prelive                                                     |
-| ------------------------------------------ | --------------------------------------------------------------------- |
-| `clip_add_new_notes` returns a payload     | `AddNotesData` schema and `writeNotes` must decode `{ clip, note_ids }` |
-| `clip_get_*` mutations deprecated          | None immediately; migrate reads to `Clip` fields when convenient      |
-| `clip_set_looping`, `track_set_name` deprecated | None immediately                                                  |
+| Change                                          | Effect on Prelive                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| `clip_add_new_notes` returns a payload          | `AddNotesData` schema and `writeNotes` must decode `{ clip, note_ids }` |
+| `clip_get_*` mutations deprecated               | None immediately; migrate reads to `Clip` fields when convenient        |
+| `clip_set_looping`, `track_set_name` deprecated | None immediately                                                        |
 
 Everything else is additive. Regenerate `refs/liveql-schema.graphql` in Prelive with
 `pnpm liveql:schema` against the running device once the LiveQL change lands.

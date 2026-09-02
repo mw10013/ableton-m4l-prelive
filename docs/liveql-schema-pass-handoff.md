@@ -15,9 +15,9 @@ Every name in the schema is a Live Object Model (LOM) name, taken from `refs/m4l
 
 - Object types are LOM classes: `Song`, `SongView`, `Track`, `ClipSlot`, `Scene`, `Clip`, `ClipView`,
   `Application`.
-- Fields are LOM properties and children under their exact snake_case names. Read-only LOM functions
-  are fields too, under the full function name including `get_` (`Clip.get_all_notes_extended`,
-  `Application.get_major_version`).
+- Fields are LOM properties and children under their exact snake*case names. Read-only LOM functions
+  are fields too, under the full function name including `get*` (`Clip.get_all_notes_extended`,
+`Application.get_major_version`).
 - Mutations are `<object>_<function>` for LOM functions (`clip_duplicate_loop`, `scene_fire`) and
   `<object>_set_<property>` for single property writes (`clip_slot_set_has_stop_button`,
   `song_view_set_detail_clip`).
@@ -30,16 +30,16 @@ Every name in the schema is a Live Object Model (LOM) name, taken from `refs/m4l
 
 ## Breaking Changes
 
-| Before | After | Notes |
-| --- | --- | --- |
-| `Clip.notes: [Note!]` | `Clip.get_all_notes_extended: NotesDictionary` | Select `{ notes { ... } }`. In the LOM `notes` is an observer bang, not a list, so the old name collided |
-| `clip_add_new_notes(id, notes_dictionary: { notes: [...] })` returns `Clip` | `clip_add_new_notes(id, notes: [NoteInput!]!)` returns `ClipNotesPayload { clip, note_ids }` | `note_ids` are the ids Live assigned, in input order (confirmed in Live) |
-| `clip_apply_note_modifications(id, notes_dictionary: { notes })` | `clip_apply_note_modifications(id, notes: [NoteInput!]!)` | Now fails with an error naming missing `note_id`s instead of silently doing nothing |
-| `clip_remove_notes_by_id(id, ids)` | `clip_remove_notes_by_id(id, note_ids)` | |
-| `clip_get_all_notes_extended`, `clip_get_notes_extended`, `clip_get_selected_notes_extended` mutations | `Clip.get_all_notes_extended`, `Clip.get_notes_extended(...)`, `Clip.get_selected_notes_extended` fields | Removed as mutations |
-| `clip_set_looping(id, looping)` | `clip_set_properties(id, properties: { looping })` | Removed |
-| `track_set_name(id, name)` | `track_set_properties(id, properties: { name })` | Removed |
-| `NotesDictionaryInput` | gone | Note lists are passed directly |
+| Before                                                                                                 | After                                                                                                    | Notes                                                                                                    |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `Clip.notes: [Note!]`                                                                                  | `Clip.get_all_notes_extended: NotesDictionary`                                                           | Select `{ notes { ... } }`. In the LOM `notes` is an observer bang, not a list, so the old name collided |
+| `clip_add_new_notes(id, notes_dictionary: { notes: [...] })` returns `Clip`                            | `clip_add_new_notes(id, notes: [NoteInput!]!)` returns `ClipNotesPayload { clip, note_ids }`             | `note_ids` are the ids Live assigned, in input order (confirmed in Live)                                 |
+| `clip_apply_note_modifications(id, notes_dictionary: { notes })`                                       | `clip_apply_note_modifications(id, notes: [NoteInput!]!)`                                                | Now fails with an error naming missing `note_id`s instead of silently doing nothing                      |
+| `clip_remove_notes_by_id(id, ids)`                                                                     | `clip_remove_notes_by_id(id, note_ids)`                                                                  |                                                                                                          |
+| `clip_get_all_notes_extended`, `clip_get_notes_extended`, `clip_get_selected_notes_extended` mutations | `Clip.get_all_notes_extended`, `Clip.get_notes_extended(...)`, `Clip.get_selected_notes_extended` fields | Removed as mutations                                                                                     |
+| `clip_set_looping(id, looping)`                                                                        | `clip_set_properties(id, properties: { looping })`                                                       | Removed                                                                                                  |
+| `track_set_name(id, name)`                                                                             | `track_set_properties(id, properties: { name })`                                                         | Removed                                                                                                  |
+| `NotesDictionaryInput`                                                                                 | gone                                                                                                     | Note lists are passed directly                                                                           |
 
 Everything else is additive.
 
@@ -323,21 +323,21 @@ all assertions, no manual steps except the one noted below. Prelive can depend o
 7. `clip(id)` with a track id, and `track(id)` with an unknown id, return `null` with no `errors`.
 8. `Clip.get_notes_by_id` with an id that is not in the clip returns `notes: []`.
 9. The composite failure message is literally `liveql: clip_write_notes step <step> failed after
-   add_new_notes (ids <n>): liveql: apply_note_modifications on <id>: ignored because these note_ids
-   are not in the clip: <ids>`, so matching on the step name is safe.
+add_new_notes (ids <n>): liveql: apply_note_modifications on <id>: ignored because these note_ids
+are not in the clip: <ids>`, so matching on the step name is safe.
 
 ### `clip_duplicate_notes_by_id` default placement
 
 Omitting `destination_time` shifts every copy by **the span of the selection** — its last note end
 minus its first note start. Measured in Live:
 
-| Selection | Shift |
-| --- | --- |
-| one sixteenth at 0 | 0.25 |
-| one note at 0.3, duration 0.25 | 0.25 (float, *not* snapped to the grid) |
-| chord at 0, durations 0.5 / 1 / 2 | 2 (the longest note) |
-| notes at 0 and 2, duration 0.25 | 2.25 |
-| note at 7.5, duration 2 (ends past `loop_end` 8) | 2 |
+| Selection                                        | Shift                                   |
+| ------------------------------------------------ | --------------------------------------- |
+| one sixteenth at 0                               | 0.25                                    |
+| one note at 0.3, duration 0.25                   | 0.25 (float, _not_ snapped to the grid) |
+| chord at 0, durations 0.5 / 1 / 2                | 2 (the longest note)                    |
+| notes at 0 and 2, duration 0.25                  | 2.25                                    |
+| note at 7.5, duration 2 (ends past `loop_end` 8) | 2                                       |
 
 Copies keep their durations and their relative offsets, nothing snaps to `view.grid_quantization`,
 and copies landing beyond `loop_end` **do not** extend the clip's region — Prelive extends it itself
@@ -348,18 +348,18 @@ if it wants the copies inside the loop.
 `quantization_grid` is Live's Quantize dialog in menu order, measured by quantizing notes off every
 grid and reading where they land. One beat is a quarter note.
 
-| `quantization_grid` | Grid | Step in beats |
-| --- | --- | --- |
-| 0 | no quantization (no-op) | — |
-| 1 | 1/4 | 1 |
-| 2 | 1/8 | 0.5 |
-| 3 | 1/8T | 1/3 |
-| 4 | 1/8 + 1/8T | 0.5 and 1/3 |
-| 5 | 1/16 | 0.25 |
-| 6 | 1/16T | 1/6 |
-| 7 | 1/16 + 1/16T | 0.25 and 1/6 |
-| 8 | 1/32 | 0.125 |
-| 9 and up | silently ignored — no error, nothing moves | — |
+| `quantization_grid` | Grid                                       | Step in beats |
+| ------------------- | ------------------------------------------ | ------------- |
+| 0                   | no quantization (no-op)                    | —             |
+| 1                   | 1/4                                        | 1             |
+| 2                   | 1/8                                        | 0.5           |
+| 3                   | 1/8T                                       | 1/3           |
+| 4                   | 1/8 + 1/8T                                 | 0.5 and 1/3   |
+| 5                   | 1/16                                       | 0.25          |
+| 6                   | 1/16T                                      | 1/6           |
+| 7                   | 1/16 + 1/16T                               | 0.25 and 1/6  |
+| 8                   | 1/32                                       | 0.125         |
+| 9 and up            | silently ignored — no error, nothing moves | —             |
 
 Quantizing takes `Song.swing_amount` into account, so zero it first for an exact grid.
 
@@ -372,18 +372,18 @@ for `clip_quantize` and `8` for the view. Prelive must not reuse one value for t
 `0`, `5` and `9` were read directly off the grid label in the top right of Live's note editor; the
 rest follow from the count (ten values, nine Fixed Grid entries plus Off) and the menu's order.
 
-| `grid_quantization` | Grid |
-| --- | --- |
-| 0 | Off — the editor's Snap to Grid is unchecked |
-| 1 | 8 Bars |
-| 2 | 4 Bars |
-| 3 | 2 Bars |
-| 4 | 1 Bar |
-| 5 | 1/2 |
-| 6 | 1/4 |
-| 7 | 1/8 |
-| 8 | 1/16 |
-| 9 | 1/32 |
+| `grid_quantization` | Grid                                         |
+| ------------------- | -------------------------------------------- |
+| 0                   | Off — the editor's Snap to Grid is unchecked |
+| 1                   | 8 Bars                                       |
+| 2                   | 4 Bars                                       |
+| 3                   | 2 Bars                                       |
+| 4                   | 1 Bar                                        |
+| 5                   | 1/2                                          |
+| 6                   | 1/4                                          |
+| 7                   | 1/8                                          |
+| 8                   | 1/16                                         |
+| 9                   | 1/32                                         |
 
 Anything outside `0`-`9` is ignored and leaves the current value — no error. The menu's Adaptive
 Grid entries (Widest … Narrowest) are **not** reachable through this property, and Triplet Grid is
@@ -400,12 +400,12 @@ as a confident lie — `arm: true` on a track whose `can_be_armed` is `false`, `
 The capability flags themselves read correctly, so nullability is now derived from them rather than
 from the value:
 
-| Field | Null when |
-| --- | --- |
-| `arm` | `can_be_armed` is false |
-| `mute`, `solo` | the track is the master track (by `path`) |
-| `fold_state` | `is_foldable` is false |
-| `playing_slot_index`, `fired_slot_index` | the track has no clip slots |
+| Field                                    | Null when                                 |
+| ---------------------------------------- | ----------------------------------------- |
+| `arm`                                    | `can_be_armed` is false                   |
+| `mute`, `solo`                           | the track is the master track (by `path`) |
+| `fold_state`                             | `is_foldable` is false                    |
+| `playing_slot_index`, `fired_slot_index` | the track has no clip slots               |
 
 Return tracks keep real `mute` and `solo` — they have both in Live — so the guard is not simply
 "return or master". `pnpm test` covers each case against a fake that now returns Live's `1`, and
