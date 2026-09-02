@@ -75,16 +75,15 @@ export const Note = Schema.Struct({
   release_velocity: Schema.Number,
 });
 
-export const NoteInput = Schema.Struct({
-  note_id: Schema.optional(Schema.Number),
+export const ReplacementNote = Schema.Struct({
   pitch: Schema.Number,
   start_time: Schema.Number,
   duration: Schema.Number,
-  velocity: Schema.optional(Schema.Number),
-  mute: Schema.optional(Schema.Boolean),
-  probability: Schema.optional(Schema.Number),
-  velocity_deviation: Schema.optional(Schema.Number),
-  release_velocity: Schema.optional(Schema.Number),
+  velocity: Schema.Number,
+  mute: Schema.Boolean,
+  probability: Schema.Number,
+  velocity_deviation: Schema.Number,
+  release_velocity: Schema.Number,
 });
 
 export const ClipWithNotes = Schema.Struct({
@@ -94,17 +93,26 @@ export const ClipWithNotes = Schema.Struct({
   ),
 });
 
-export const WriteNotesInput = Schema.Struct({
-  clipId: Schema.Number,
-  newNotes: Schema.Array(NoteInput),
-  modifiedNotes: Schema.Array(NoteInput),
-  removedNoteIds: Schema.Array(Schema.Number),
+export const ClipRegion = Schema.Struct({
+  looping: Schema.Boolean,
+  start: Schema.Number,
+  end: Schema.Number,
 });
 
+export const ReplaceNotesInput = Schema.Struct({
+  clipId: Schema.Number,
+  notes: Schema.Array(ReplacementNote),
+  region: Schema.optional(ClipRegion),
+});
+
+export const ClipIdInput = Schema.Struct({ clipId: Schema.Number });
+
 export type Note = Schema.Schema.Type<typeof Note>;
-export type NoteInput = Schema.Schema.Type<typeof NoteInput>;
+export type ReplacementNote = Schema.Schema.Type<typeof ReplacementNote>;
 export type ClipWithNotes = Schema.Schema.Type<typeof ClipWithNotes>;
-export type WriteNotesInput = Schema.Schema.Type<typeof WriteNotesInput>;
+export type ClipRegion = Schema.Schema.Type<typeof ClipRegion>;
+export type ReplaceNotesInput = Schema.Schema.Type<typeof ReplaceNotesInput>;
+export type ClipIdInput = Schema.Schema.Type<typeof ClipIdInput>;
 
 export const SongOverview = Schema.Struct({
   ...Song.fields,

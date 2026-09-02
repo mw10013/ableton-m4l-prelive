@@ -1,4 +1,4 @@
-import { Config, Context, Effect, Layer, Schema } from "effect";
+import { Config, Context, type Duration, Effect, Layer, Schema } from "effect";
 import {
   FetchHttpClient,
   HttpClient,
@@ -29,6 +29,7 @@ export class LiveQL extends Context.Service<
       schema: Schema.ConstraintDecoder<A>,
       query: string,
       variables?: Record<string, unknown>,
+      options?: { readonly timeout?: Duration.Input },
     ) => Effect.Effect<A, LiveQLError>;
   }
 >()("app/LiveQL") {
@@ -51,12 +52,13 @@ export class LiveQL extends Context.Service<
         schema: Schema.ConstraintDecoder<A>,
         query: string,
         variables?: Record<string, unknown>,
+        options?: { readonly timeout?: Duration.Input },
       ) {
         const { data, errors } = yield* HttpClientRequest.post(endpoint).pipe(
           HttpClientRequest.bodyJsonUnsafe({ query, variables }),
           client.execute,
           Effect.flatMap(HttpClientResponse.schemaBodyJson(GqlEnvelope)),
-          Effect.timeout("10 seconds"),
+          Effect.timeout(options?.timeout ?? "10 seconds"),
           Effect.mapError(
             (cause) =>
               new LiveQLError({

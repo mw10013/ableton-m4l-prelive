@@ -111,6 +111,7 @@ function NoteNumberCell({
   max,
   step,
   isIntegerOnly,
+  isDisabled,
   format,
   onCommit,
 }: {
@@ -120,6 +121,7 @@ function NoteNumberCell({
   max?: number;
   step: number;
   isIntegerOnly?: boolean;
+  isDisabled: boolean;
   format: (value: number) => string;
   onCommit: (value: number) => void;
 }) {
@@ -133,7 +135,7 @@ function NoteNumberCell({
     if (pending !== undefined && pending !== value) onCommit(pending);
     close();
   };
-  return isEditing ? (
+  return isEditing && !isDisabled ? (
     <NumberInput
       label={label}
       isLabelHidden
@@ -158,6 +160,7 @@ function NoteNumberCell({
       size="sm"
       label={format(value)}
       tooltip={label}
+      isDisabled={isDisabled}
       onClick={() => {
         setIsEditing(true);
       }}
@@ -171,6 +174,7 @@ interface NoteTableProps {
   signatureDenominator: number;
   selectedKeys: Set<string>;
   setSelectedKeys: React.Dispatch<React.SetStateAction<Set<string>>>;
+  isDisabled: boolean;
   onCommitField: (noteId: number, field: EditableField, value: number) => void;
   onToggleMute: (noteId: number, mute: boolean) => void;
 }
@@ -181,6 +185,7 @@ export function NoteTable({
   signatureDenominator,
   selectedKeys,
   setSelectedKeys,
+  isDisabled,
   onCommitField,
   onToggleMute,
 }: NoteTableProps) {
@@ -195,6 +200,7 @@ export function NoteTable({
   });
   const selectionPlugin = useTableSelection<NoteRow>({
     ...selectionConfig,
+    getIsItemEnabled: () => !isDisabled,
     getRowLabel: (row) =>
       `note ${noteName(row.pitch)} at ${positionLabel(row.start_time, signatureNumerator, signatureDenominator)}`,
   });
@@ -237,6 +243,7 @@ export function NoteTable({
         max={max}
         step={step}
         isIntegerOnly={isIntegerOnly}
+        isDisabled={isDisabled}
         format={format}
         onCommit={(value) => {
           onCommitField(row.note_id, key, value);
@@ -298,6 +305,7 @@ export function NoteTable({
               label={`Mute note ${noteName(row.pitch)}`}
               isLabelHidden
               size="sm"
+              isDisabled={isDisabled}
               value={row.mute}
               onChange={(checked) => {
                 onToggleMute(row.note_id, checked);

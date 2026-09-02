@@ -170,39 +170,61 @@ export const fireClip = Effect.fn("LiveSet.fireClip")(function* (input: {
   );
 });
 
-const WriteNotesData = Schema.Struct({
-  clip_write_notes: Schema.Struct({
-    clip: Schema.Struct({ id: Schema.Number }),
-    note_ids: Schema.Array(Schema.Number),
-  }),
-});
-
 const ClipByIdData = Schema.Struct({
-  clip: Domain.ClipWithNotes,
+  clip: Schema.NullOr(Domain.ClipWithNotes),
 });
 
-export const writeNotes = Effect.fn("LiveSet.writeNotes")(function* (
-  input: Domain.WriteNotesInput,
+export const readClipById = Effect.fn("LiveSet.readClipById")(function* (
+  input: Domain.ClipIdInput,
 ) {
-  const { gqlDecode } = yield* LiveQL;
-  const { clip_write_notes } = yield* gqlDecode(
-    WriteNotesData,
-    `mutation($id: Int!, $input: ClipWriteNotesInput!) {
-      clip_write_notes(id: $id, input: $input) { clip { id } note_ids }
-    }`,
-    {
-      id: input.clipId,
-      input: {
-        add_new_notes: input.newNotes,
-        apply_note_modifications: input.modifiedNotes,
-        remove_notes_by_id: input.removedNoteIds,
-      },
-    },
-  );
-  const { clip } = yield* gqlDecode(
+  return yield* (yield* LiveQL).gqlDecode(
     ClipByIdData,
     `query($id: Int!) { clip(id: $id) { ${ClipWithNotesFields} } }`,
     { id: input.clipId },
   );
-  return { clip, note_ids: clip_write_notes.note_ids };
+});
+
+const ReplaceNotesData = Schema.Struct({
+  clip_replace_notes: Domain.ClipWithNotes,
+});
+
+const SetClipPropertiesData = Schema.Struct({
+  clip_set_properties: Schema.Struct({ id: Schema.Number }),
+});
+
+/**
+ * Region first, then notes: Live drops a marker that would cross its partner, so
+ * a region that has to grow must grow before the notes that need it land.
+ * Not atomic, and deliberately so — the region write and the note replacement
+ * are separate LOM operations, and any failure leaves the clip in whichever
+ * state it reached. The caller treats every failure as unverified and recovers
+ * by reloading, never by retrying.
+ */
+export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
+  input: Domain.ReplaceNotesInput,
+) {
+  const { gqlDecode } = yield* LiveQL;
+  if (input.region !== undefined) {
+    const { looping, start, end } = input.region;
+    yield* gqlDecode(
+      SetClipPropertiesData,
+      `mutation($id: Int!, $properties: ClipPropertiesInput!) {
+        clip_set_properties(id: $id, properties: $properties) { id }
+      }`,
+      {
+        id: input.clipId,
+        properties: looping
+          ? { loop_start: start, loop_end: end }
+          : { start_marker: start, end_marker: end },
+      },
+    );
+  }
+  return yield* gqlDecode(
+    ReplaceNotesData,
+    `mutation($id: Int!, $notes: [ReplacementNoteInput!]!) {
+      clip_replace_notes(id: $id, notes: $notes) { ${ClipWithNotesFields} }
+    }`,
+    { id: input.clipId, notes: input.notes },
+    { timeout: "60 seconds" },
+  );
 });

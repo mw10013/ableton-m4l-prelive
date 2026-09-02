@@ -27,11 +27,13 @@ export const togglePlay = createServerFn({ method: "POST" }).handler(() =>
 );
 
 export const fireClip = createServerFn({ method: "POST" })
-  .validator(
-    Schema.toStandardSchemaV1(Schema.Struct({ clipId: Schema.Number })),
-  )
+  .validator(Schema.toStandardSchemaV1(Domain.ClipIdInput))
   .handler(({ data }) => runServerFn(LiveSet.fireClip(data)));
 
-export const writeNotes = createServerFn({ method: "POST" })
-  .validator(Schema.toStandardSchemaV1(Domain.WriteNotesInput))
-  .handler(({ data }) => runServerFn(LiveSet.writeNotes(data)));
+export const readClipById = createServerFn({ method: "GET" })
+  .validator(Schema.toStandardSchemaV1(Domain.ClipIdInput))
+  .handler(({ data }) => runServerFn(LiveSet.readClipById(data)));
+
+export const replaceNotes = createServerFn({ method: "POST" })
+  .validator(Schema.toStandardSchemaV1(Domain.ReplaceNotesInput))
+  .handler(({ data }) => runServerFn(LiveSet.replaceNotes(data)));

@@ -1,6 +1,7 @@
 import type { TableColumn } from "@astryxdesign/core/Table";
 
-import type { ClipWithNotes } from "@/lib/Domain";
+import type { EditorStatus } from "@/components/NoteListEditor";
+import type { ClipWithNotes, Note } from "@/lib/Domain";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -28,16 +29,23 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 
-import {
-  NoteListEditor,
-  type NoteListEditorState,
-} from "@/components/NoteListEditor";
+import { NoteListEditor } from "@/components/NoteListEditor";
 import { ScorePanel } from "@/components/ScorePanel";
+import {
+  byMusicalOrder,
+  isSameRegion,
+  playbackRegion,
+  quartersPerBar,
+  requiredPlaybackRegion,
+  toReplacementNotes,
+} from "@/lib/noteEdits";
 import {
   fireClip,
   readClip,
+  readClipById,
   readClipBySlot,
   readLiveSetOverview,
+  replaceNotes,
   togglePlay,
 } from "@/lib/serverFns";
 
@@ -46,8 +54,11 @@ interface ClipInfo {
   name: string;
   path: string;
   length: number;
+  isMidiClip: boolean;
+  looping: boolean;
   signatureNumerator: number;
   signatureDenominator: number;
+  playback: { readonly start: number; readonly end: number };
 }
 
 type ClipSource =
@@ -82,6 +93,24 @@ const sameSource = (a: ClipSource, b: ClipSource) =>
     : b.kind === "slot" &&
       a.trackIndex === b.trackIndex &&
       a.slotIndex === b.slotIndex;
+
+const clipInfoOf = (clip: ClipWithNotes): ClipInfo => ({
+  id: clip.id,
+  name: clip.name,
+  path: clip.path,
+  length: clip.length,
+  isMidiClip: clip.is_midi_clip,
+  looping: clip.looping,
+  signatureNumerator: clip.signature_numerator,
+  signatureDenominator: clip.signature_denominator,
+  playback: playbackRegion(clip),
+});
+
+const notesOf = (clip: ClipWithNotes): readonly Note[] =>
+  byMusicalOrder(clip.get_all_notes_extended?.notes ?? []);
+
+const messageOf = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 const overviewQueryOptions = queryOptions({
   queryKey: ["liveSetOverview"],
@@ -135,10 +164,8 @@ function RouteComponent() {
   const [clipInfo, setClipInfo] = useState<ClipInfo | null>(null);
   const [trackName, setTrackName] = useState<string | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
-  const [editorState, setEditorState] = useState<NoteListEditorState>({
-    notes: [],
-    hasDraft: false,
-  });
+  const [notes, setNotes] = useState<readonly Note[]>([]);
+  const [isClipMissing, setIsClipMissing] = useState(false);
 
   const overview = overviewQuery.data?.live_set ?? null;
   const liveSelectedClipId =
@@ -146,6 +173,36 @@ function RouteComponent() {
     clipQuery.dataUpdatedAt > overviewQuery.dataUpdatedAt
       ? (clipQuery.data?.liveSelectedClipId ?? null)
       : (overview?.view.detail_clip?.id ?? null);
+
+  const refreshClip = useCallback((clip: ClipWithNotes) => {
+    setClipInfo(clipInfoOf(clip));
+    setNotes(notesOf(clip));
+    setEditorRevision((prev) => prev + 1);
+  }, []);
+
+  const replaceMutation = useMutation({
+    mutationFn: replaceNotes,
+    onSuccess: ({ clip_replace_notes: clip }) => {
+      if (clip.id === clipInfo?.id) refreshClip(clip);
+    },
+  });
+
+  const reloadMutation = useMutation({
+    mutationFn: readClipById,
+    onSuccess: ({ clip }) => {
+      replaceMutation.reset();
+      if (clip === null) {
+        setClipInfo(null);
+        setNotes([]);
+        setIsClipMissing(true);
+        return;
+      }
+      if (clip.id === clipInfo?.id) refreshClip(clip);
+    },
+  });
+
+  const { reset: resetReplace } = replaceMutation;
+  const { reset: resetReload } = reloadMutation;
 
   const applyClip = useCallback(
     ({
@@ -155,26 +212,14 @@ function RouteComponent() {
       clip: ClipWithNotes;
       trackName: string | null;
     }) => {
+      resetReplace();
+      resetReload();
+      setIsClipMissing(false);
       setTrackName(trackName);
-      setClipInfo({
-        id: clip.id,
-        name: clip.name,
-        path: clip.path,
-        length: clip.length,
-        signatureNumerator: clip.signature_numerator,
-        signatureDenominator: clip.signature_denominator,
-      });
-      setEditorState({
-        notes:
-          clip.get_all_notes_extended?.notes.toSorted(
-            (a, b) => a.start_time - b.start_time || a.pitch - b.pitch,
-          ) ?? [],
-        hasDraft: false,
-      });
-      setEditorRevision((prev) => prev + 1);
+      refreshClip(clip);
       setIsNavigatorOpen(false);
     },
-    [],
+    [refreshClip, resetReplace, resetReload],
   );
 
   useEffect(() => {
@@ -182,6 +227,20 @@ function RouteComponent() {
     if (result === undefined || result.clip === null) return;
     applyClip({ clip: result.clip, trackName: result.trackName });
   }, [clipQuery.data, applyClip]);
+
+  const editorStatus: EditorStatus =
+    (
+      [
+        ["writing", replaceMutation.isPending],
+        ["reloading", reloadMutation.isPending],
+        ["loading", clipQuery.isFetching],
+        ["unverified", replaceMutation.isError],
+      ] as const
+    ).find(([, isActive]) => isActive)?.[0] ?? "idle";
+  const isClipBusy =
+    editorStatus === "writing" ||
+    editorStatus === "reloading" ||
+    editorStatus === "loading";
 
   const selectClipSource = (next: ClipSource) => {
     if (clipSource !== null && sameSource(clipSource, next)) {
@@ -211,6 +270,7 @@ function RouteComponent() {
       if (
         target instanceof HTMLElement &&
         (target.isContentEditable ||
+          target.closest("dialog") !== null ||
           ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName))
       )
         return;
@@ -262,7 +322,7 @@ function RouteComponent() {
               label={clip.name || "Clip"}
               tooltip={`${clip.name} (${clip.path})`}
               isPressed={isAppSelected}
-              isDisabled={clipQuery.isFetching}
+              isDisabled={isClipBusy}
               icon={
                 clip.id === liveSelectedClipId ? (
                   <Icon icon="check" color="inherit" />
@@ -324,6 +384,7 @@ function RouteComponent() {
                     variant="primary"
                     size="sm"
                     isLoading={clipQuery.isFetching}
+                    isDisabled={isClipBusy}
                     onClick={() => {
                       selectClipSource({ kind: "detail" });
                     }}
@@ -380,6 +441,13 @@ function RouteComponent() {
                 />
               )}
             </Collapsible>
+            {isClipMissing && (
+              <Banner
+                status="warning"
+                title="Clip is gone"
+                description="Live no longer has that clip. Pick another one from the navigator."
+              />
+            )}
             {navigatorError && (
               <Banner
                 status="error"
@@ -422,7 +490,7 @@ function RouteComponent() {
                     <Button
                       label="Play Clip"
                       size="sm"
-                      isDisabled={editorState.notes.length === 0}
+                      isDisabled={notes.length === 0 || isClipBusy}
                       isLoading={fireClipMutation.isPending}
                       onClick={() => {
                         fireClipMutation.mutate({
@@ -433,14 +501,60 @@ function RouteComponent() {
                   </>
                 }
               />
-              <NoteListEditor
-                key={editorRevision}
-                clipId={clipInfo.id}
-                initialNotes={editorState.notes}
-                signatureNumerator={clipInfo.signatureNumerator}
-                signatureDenominator={clipInfo.signatureDenominator}
-                onStateChange={setEditorState}
-              />
+              {clipInfo.isMidiClip ? (
+                <NoteListEditor
+                  key={editorRevision}
+                  clip={{
+                    id: clipInfo.id,
+                    signatureNumerator: clipInfo.signatureNumerator,
+                    signatureDenominator: clipInfo.signatureDenominator,
+                    playback: clipInfo.playback,
+                  }}
+                  notes={notes}
+                  onNotesChange={setNotes}
+                  status={editorStatus}
+                  writeError={
+                    replaceMutation.isError
+                      ? messageOf(replaceMutation.error, "Write failed.")
+                      : null
+                  }
+                  reloadError={
+                    reloadMutation.isError
+                      ? messageOf(reloadMutation.error, "Reload failed.")
+                      : null
+                  }
+                  onWrite={() => {
+                    const region = requiredPlaybackRegion({
+                      notes,
+                      region: clipInfo.playback,
+                      quartersPerBar: quartersPerBar(
+                        clipInfo.signatureNumerator,
+                        clipInfo.signatureDenominator,
+                      ),
+                    });
+                    replaceMutation.mutate({
+                      data: {
+                        clipId: clipInfo.id,
+                        notes: toReplacementNotes(notes),
+                        region: isSameRegion(region, clipInfo.playback)
+                          ? undefined
+                          : { looping: clipInfo.looping, ...region },
+                      },
+                    });
+                  }}
+                  onReload={() => {
+                    reloadMutation.mutate({
+                      data: { clipId: clipInfo.id },
+                    });
+                  }}
+                />
+              ) : (
+                <EmptyState
+                  isCompact
+                  title="Audio clip"
+                  description="Only MIDI clips have a note list."
+                />
+              )}
               {fireClipMutation.isError && (
                 <Banner
                   status="error"
@@ -456,8 +570,8 @@ function RouteComponent() {
           </Section>
         )}
 
-        {clipInfo && editorState.notes.length > 0 && (
-          <ScorePanel key={editorRevision} notes={editorState.notes} />
+        {clipInfo?.isMidiClip && notes.length > 0 && (
+          <ScorePanel key={editorRevision} notes={notes} />
         )}
       </VStack>
     </AppShell>

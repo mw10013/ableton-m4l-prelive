@@ -15,7 +15,8 @@ product review.
 6. Local undo/redo is out of scope.
 7. **Duplicate...** opens a destination dialog modeled after Logic's Event List.
 8. Duplicate transforms Session and Arrangement clip notes identically.
-9. Duplicate does not resize clip playback boundaries in the first version.
+9. **Write to Live** auto-extends the clip's playback region to cover every note. It never shrinks
+   it, and no edit ever produces an out-of-range warning.
 10. MPE and other unmodeled per-note expression are unsupported and may be removed by replacement.
 
 ## One-List Editor Model
@@ -312,20 +313,19 @@ Each copied start is `source.start_time + offset`. Do not round copied starts or
 
 ### Playback boundaries
 
-Duplicate applies the same transformation to Session and Arrangement clips. The first version does
-not change `loop_end`, `end_marker`, or Arrangement edges.
+Duplicate applies the same transformation to Session and Arrangement clips.
 
-If any copy falls before the current playback start or ends after the current playback end, show a
-non-blocking warning in the dialog:
+Copies that land outside the clip's playback region are never warned about. Write extends the region
+instead, so anything the editor holds can be heard. The region is `[loop_start, loop_end]` when
+looping and `[start_marker, end_marker]` when unlooped; Write grows the matching pair, rounded out to
+the bar from the clip time signature, and never shrinks it. A destination earlier than the current
+region start pulls the start back the same way.
 
-> Some copied notes are outside the clip's current playback region and may not be heard.
+Extension is a property of Write, not of Duplicate: it is computed from the complete note list, so an
+added or dragged note extends the clip exactly as a copy does. The dialog states the consequence
+plainly rather than warning about it — `clip extends to N bars on write`.
 
-For warning purposes, use `[loop_start, loop_end]` when looping and `[start_marker, end_marker]` when
-unlooped. This is a clip-content warning, not an attempt to calculate or resize the Arrangement edge.
-The user may still confirm.
-
-Automatic Session extension, Arrangement resizing, and bar rounding are deferred. This removes clip
-kind from the first Duplicate implementation.
+This removes clip kind from the first Duplicate implementation.
 
 ## Acceptance Matrix
 
@@ -374,7 +374,8 @@ kind from the first Duplicate implementation.
 - Invalid Destination cannot confirm.
 - Cmd/Ctrl-D and table/playback shortcuts do not fire behind an open dialog.
 - Session and Arrangement notes use the same copy transform.
-- Out-of-playback copies warn but can be confirmed.
+- Copies past the region end never warn; Write extends the region to the bar and never shrinks it.
+- A destination before the region start pulls the region start back.
 
 ## Delivery Plan
 
@@ -395,13 +396,13 @@ kind from the first Duplicate implementation.
 - Replace Discard with Reload from Live.
 - Add idle/writing/unverified status and disable all relevant controls.
 - Prevent stale query results and clip switches from replacing the wrong list.
-- Send complete replacement notes with every ID stripped.
+- Send complete replacement notes with every ID stripped, plus the extended region when it grew.
 
 ### Slice 3: Duplicate
 
 - Discover Astryx Dialog and input APIs through the project CLI.
 - Extract pure default-destination and copy operations.
-- Implement dialog, validation, warning, and keyboard behavior.
+- Implement dialog, validation, extension readout, and keyboard behavior.
 - Apply one complete list update and select copied rows.
 
 ### Deferred
@@ -414,7 +415,7 @@ kind from the first Duplicate implementation.
 - Concurrent Live editing support.
 - Duplicate count, spacing, transposition, and collision modes.
 - Time-range Repeat.
-- Automatic playback-boundary resizing.
+- Shrinking a playback region that edits no longer fill.
 
 Prelive currently has no application test runner (`package.json:6-20`). Do not add one solely for
 this work. Keep destination and copy operations pure, exercise the manual acceptance matrix, and run

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-- Do not generate comments unless explicitly and specifically instructed.
+- Prefer JSDoc for comments for complex and subtle behavior the code cannot show. A JSDoc must carry its reasoning inline and must cite neither `docs/` nor `refs/` — research docs go stale and get deleted, and refs are refetched at another version. The code is the truth, the JSDoc next; a stable external URL is the only acceptable citation.
 - Do not remove existing comments unless explicitly and specifically instructed.
 - Your answers and explanations should be concise and scannable so the user can scan quickly and easily understand. Scarifice grammar for the sake of concision.
 - Ground your answers and explanations with excerpts from documentation and code.
@@ -25,7 +25,7 @@ Downloaded source code of libraries are in `refs/` for reference.
 - **Astryx**: `refs/astryx/` (`facebook/astryx` v0.3.0 — component source in `packages/core/src/`, build plugin in `packages/build/`)
 - **StyleX**: `refs/stylex/` (`facebook/stylex` v0.19.0 — docs in `apps/docs/`)
 - **liveql**: `refs/liveql/` — GraphQL API for Ableton Live via Max for Live
-  - GraphQL schema defined as `typeDefs` template literal in `refs/liveql/liveql-n4m.js:92` (types: `Song`, `SongView`, `Track`, `ClipSlot`, `Clip`, `Note`, `NotesDictionary` + input types, single `Query.live_set`, mutations for playback/clips/notes)
+  - GraphQL schema defined as `typeDefs` template literal in `refs/liveql/liveql-n4m.js` (types: `Song`, `SongView`, `Track`, `ClipSlot`, `Clip`, `Note`, `NotesDictionary` + input types, single `Query.live_set`, mutations for playback/clips/notes)
 - **Effect Docs**: `refs/effect/ai-docs/src/` (Effect v4 release candidate)
 - **LilyPond**: `refs/lilypond/` — Music engraving program (master branch)
 
@@ -54,7 +54,7 @@ pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this fi
 - Use interfaces for data structures and type definitions
 - Prefer immutable data (const, readonly)
 - Use optional chaining (?.) and nullish coalescing (??) operators
-- **Do not add any comments to generated code.** Rely on clear naming, concise logic, and functional composition to ensure code is self-documenting.
+- **Do not add comments to generated code** beyond the JSDoc rule above. Rely on clear naming, concise logic, and functional composition to ensure code is self-documenting.
 - Employ a concise and dense coding style. Prefer inlining expressions, function composition (e.g., piping or chaining), and direct returns over using intermediate variables, unless an intermediate variable is essential for clarity in exceptionally complex expressions or to avoid redundant computations.
 - Inline types when practical instead of introducing extra interfaces or type aliases.
 - Avoid intermediate variables that are not necessary for clarity.
