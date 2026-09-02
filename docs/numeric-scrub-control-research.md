@@ -62,14 +62,20 @@ The production control should:
 2. Preserve direct text entry and keyboard stepping. A click without material movement must focus the input,
    not change its value.
 3. Use the field's existing `step`, `min`, and `max`; it must never emit an out-of-range value.
-4. Anchor the entire gesture to the value at press time. Moving back to the press height restores that value;
-   event frequency cannot change the result.
+4. Anchor the gesture to the value at press time so event frequency cannot change the result. Moving back to
+   the press height restores that value, with two deliberate exceptions that re-anchor at the current
+   position: pressing or releasing Shift mid-drag, and overshooting a bound. Live absorbs overshoot so that
+   reversing direction responds immediately, with no dead zone; Prelive must match that.
 5. Continue when the pointer leaves the input, then stop on `pointerup`, `pointercancel`, or lost capture.
-6. Be mouse/pen progressive enhancement only. Touch retains the ordinary number-input behavior and page
+   Escape during a drag restores the pre-gesture value and ends the gesture.
+6. Separate tracking from committing. `onChange` fires on every step so the field tracks the gesture;
+   `onCommit` fires once on release, on Enter, or on blur with a changed value, and is the only path that
+   should write to Live. Escape never commits.
+7. Be mouse/pen progressive enhancement only. Touch retains the ordinary number-input behavior and page
    scrolling/zooming.
-7. Retain normal form semantics: label, native numeric input, keyboard navigation, and assistive-technology
+8. Retain normal form semantics: label, native numeric input, keyboard navigation, and assistive-technology
    value announcements remain owned by `NumberInput`.
-8. Evaluate hovered wheel input separately from press-and-drag. It is attractive for trackpads, but must only
+9. Evaluate hovered wheel input separately from press-and-drag. It is attractive for trackpads, but must only
    consume page scroll while the pointer is directly over the numeric field.
 
 ### Live-Compatible Value Rules
@@ -84,7 +90,7 @@ are product requirements, not a claim that the current proof of concept has all 
 | Shift while dragging gives finer resolution      | A vertical drag remains anchored to its press value; Shift makes each step require four times as much movement.                         |
 | Delete returns to default                        | Support this only when the field has an explicit product default. It must not mean `min`, `0`, or a browser default by accident.        |
 | Digits type a value                              | A click enters ordinary text-edit mode; digits, `+`, `-`, and decimal separators are accepted as applicable, while letters are ignored. |
-| Escape cancels entry                             | Escape restores the value present when typing or scrubbing began and returns to the resting display.                                    |
+| Escape cancels entry                             | Escape restores the value present when typing or scrubbing began and returns to the resting display. Implemented.                       |
 | Enter confirms entry                             | Enter commits a valid typed value and leaves a visible, stable value.                                                                   |
 | `.`/`,` moves to the next bar/beat/16th field    | Apply only to a future compound musical-time editor, not to a scalar number field.                                                      |
 
@@ -109,8 +115,26 @@ The calculation is absolute from the press point rather than accumulating `movem
 The wrapper rounds to the decimal precision of `step` after calculation, preventing familiar binary floating
 point displays such as `0.30000000000000004`.
 
-Shift now uses four times as many vertical pixels per step. The prototype deliberately does not yet implement
-Escape cancellation or Delete reset; those require the field-specific definitions in the requirements above.
+Shift uses four times as many vertical pixels per step and re-anchors at the moment it changes, so the value
+continues from where it is instead of being re-divided from the press point. Once the threshold is crossed the
+gesture stays active, so returning to the origin restores the press value rather than being ignored. The
+wrapper owns `pointerdown` (it prevents the native caret drag) and performs click-to-type itself: a release
+without movement focuses the field and selects its text. A press on an already-focused field blurs it first so
+any pending typed text is committed before the gesture anchors; otherwise Astryx would re-commit the stale
+text on blur and discard the scrub. Escape cancels both scrubbing and typing. Delete reset is still deferred
+pending field-specific defaults.
+
+### Pointer Lock Trial
+
+The observed Live gesture on macOS is three-finger drag (Accessibility, Pointer Control, Trackpad Options),
+which the OS delivers as a held-button drag. The browser sees it as `pointerdown` and `pointermove`, so the
+drag path above is the right one. Live also hides the cursor, allows unlimited travel, and restores the cursor
+at the press point on release. The web equivalent is the Pointer Lock API, so the wrapper has a `pointerLock`
+prop and the home page shows both variants side by side. The lock is requested only after the movement
+threshold, so a plain click never locks. While locked, position accumulates `movementY`; the cursor reappears
+at the lock point on release. Any lock exit the wrapper did not request (Escape, focus loss) is treated as
+cancel, which matches Live. Known costs to judge in testing: the browser's "press Esc" notice on lock, and
+Chrome's refusal of a re-lock within roughly a second of an exit, which falls back to plain capture.
 
 ### Hovered Wheel Experiment
 
@@ -119,10 +143,11 @@ gesture while the pointer is over the field increases or decreases the value and
 scrolling; Shift makes this four times less sensitive. It accumulates pixel deltas before taking a step, which
 keeps high-resolution trackpads from producing a change for every tiny event.
 
-This is the likely web equivalent of the observed Live interaction. Browsers receive `pointermove` when one
-finger moves the cursor, while a trackpad scrolling gesture is normally delivered as `wheel`. The browser does
-not expose a reliable finger count, so this cannot be specified as "three-finger scrub." It must be tested on
-the target macOS/browser setup before it becomes a product requirement.
+This is no longer the candidate for the observed Live gesture, which turned out to be three-finger drag (see
+the Pointer Lock Trial). It remains an optional two-finger convenience with known problems: the browser cannot
+see the OS natural-scrolling preference, so the sign can be inverted relative to drag; trackpad inertia keeps
+stepping after the fingers lift; and macOS browsers turn Shift+wheel into a horizontal delta, which the
+handler reads as a fallback. Wheel steps commit after a short idle delay and are ignored during a drag.
 
 ## Platform Choice
 
@@ -137,13 +162,13 @@ Sources:
 - [MDN: Pointer events](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events)
 - [MDN: Element.setPointerCapture()](https://developer.mozilla.org/en-US/docs/Web/API/Element/setPointerCapture)
 
-### Pointer Lock: do not use initially
+### Pointer Lock: trial behind a prop
 
 Pointer Lock hides the cursor, supplies unlimited relative movement, and permits motion after reaching the
-browser or screen edge. It could support exceptionally large adjustments, but it requires an engagement
-gesture, has limited availability, and changes the expected escape/release behavior. That is disproportionate
-for an inline number field. Normal capture has a natural range limited by the screen; the user can release
-and make another gesture.
+browser or screen edge. It was initially rejected as disproportionate, but it is exactly what Live does, so it
+is now available behind `pointerLock` with capture as the fallback. Escape exiting the lock maps directly onto
+Live's cancel semantics. The trial decides whether the browser's lock notice and re-lock rate limit are
+acceptable.
 
 Source: [MDN: Pointer Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_Lock_API).
 
@@ -160,6 +185,8 @@ Source: [MDN: Element wheel event](https://developer.mozilla.org/en-US/docs/Web/
 
 Test the current prototype with a mouse and trackpad before migrating it into the note table. Then decide:
 
+0. Does the pointer-lock variant feel like Live, and is its lock notice acceptable? If yes, it becomes the
+   default and the capture path remains the fallback.
 1. Is 8 pixels per pointer-drag step and 40 wheel pixels per step comfortable for pitch and velocity? Time
    fields may need a field-specific sensitivity.
 2. Does hovered wheel input on macOS Safari and Chrome feel like the observed Live interaction, and is
@@ -176,7 +203,11 @@ Before product adoption, manually test Chrome 123+, Firefox 120+, and Safari 17.
 
 - Click, type, Enter, blur, ArrowUp, and ArrowDown.
 - Up/down scrub, return to the origin, bounds, fractional steps, and fast pointer movement.
+- Shift pressed and released mid-drag; overshoot past a bound then reverse; Escape mid-drag and while typing.
+- Type a value, then drag without leaving the field; the scrubbed value must survive blur.
 - Pointer exiting the field before release, cancellation, and page scroll after release.
+- Pointer lock: click without lock, cursor hidden while dragging, cursor restored on release, a fast second
+  drag after release, and Cmd-Tab mid-drag.
 - Mouse, trackpad, pen if available, keyboard-only, and touch device behavior.
 - A selected multi-note row and both relative and absolute edit modes once the wrapper is connected to the
   note table.

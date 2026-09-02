@@ -169,6 +169,9 @@ function RouteComponent() {
   const [isClipMissing, setIsClipMissing] = useState(false);
   const [scrubPrototypeValue, setScrubPrototypeValue] = useState(64);
   const [scrubPrototypeDuration, setScrubPrototypeDuration] = useState(1);
+  const [scrubLockedValue, setScrubLockedValue] = useState(64);
+  const [scrubLockedDuration, setScrubLockedDuration] = useState(1);
+  const [scrubLastCommit, setScrubLastCommit] = useState<string | null>(null);
 
   const overview = overviewQuery.data?.live_set ?? null;
   const liveSelectedClipId =
@@ -372,7 +375,7 @@ function RouteComponent() {
               <StackItem size="fill">
                 <ScrubbableNumberInput
                   label="Velocity"
-                  description="Hover and scroll, or drag vertically. Hold Shift for finer changes; click to type."
+                  description="Drag vertically. Shift for fine steps, Escape to cancel, release to commit; click to type."
                   value={scrubPrototypeValue}
                   min={0}
                   max={127}
@@ -380,21 +383,67 @@ function RouteComponent() {
                   isIntegerOnly
                   width="100%"
                   onChange={setScrubPrototypeValue}
+                  onCommit={(v) => {
+                    setScrubLastCommit(`Velocity ${String(v)}`);
+                  }}
                 />
               </StackItem>
               <StackItem size="fill">
                 <ScrubbableNumberInput
                   label="Duration"
-                  description="Independent field for testing adjacent hover and scroll behavior."
+                  description="Fractional step, plain pointer capture."
                   value={scrubPrototypeDuration}
                   min={0.25}
                   max={16}
                   step={0.25}
                   width="100%"
                   onChange={setScrubPrototypeDuration}
+                  onCommit={(v) => {
+                    setScrubLastCommit(`Duration ${String(v)}`);
+                  }}
                 />
               </StackItem>
             </HStack>
+            <HStack gap={2} width="100%" wrap="wrap">
+              <StackItem size="fill">
+                <ScrubbableNumberInput
+                  label="Velocity (pointer lock)"
+                  description="Same gesture; the cursor hides while dragging and range is unlimited."
+                  value={scrubLockedValue}
+                  min={0}
+                  max={127}
+                  step={1}
+                  isIntegerOnly
+                  width="100%"
+                  pointerLock
+                  onChange={setScrubLockedValue}
+                  onCommit={(v) => {
+                    setScrubLastCommit(`Velocity (lock) ${String(v)}`);
+                  }}
+                />
+              </StackItem>
+              <StackItem size="fill">
+                <ScrubbableNumberInput
+                  label="Duration (pointer lock)"
+                  description="Fractional step with pointer lock."
+                  value={scrubLockedDuration}
+                  min={0.25}
+                  max={16}
+                  step={0.25}
+                  width="100%"
+                  pointerLock
+                  onChange={setScrubLockedDuration}
+                  onCommit={(v) => {
+                    setScrubLastCommit(`Duration (lock) ${String(v)}`);
+                  }}
+                />
+              </StackItem>
+            </HStack>
+            <Text type="supporting">
+              {scrubLastCommit === null
+                ? "No commit yet."
+                : `Last commit: ${scrubLastCommit}`}
+            </Text>
           </VStack>
         </Section>
         <Section paddingBlock={2}>
