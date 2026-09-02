@@ -13,7 +13,7 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Section } from "@astryxdesign/core/Section";
-import { VStack } from "@astryxdesign/core/Stack";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { pixel, Table } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
@@ -31,6 +31,7 @@ import { RefreshCw } from "lucide-react";
 
 import { NoteListEditor } from "@/components/NoteListEditor";
 import { ScorePanel } from "@/components/ScorePanel";
+import { ScrubbableNumberInput } from "@/components/ScrubbableNumberInput";
 import {
   byMusicalOrder,
   isSameRegion,
@@ -166,6 +167,8 @@ function RouteComponent() {
   const [editorRevision, setEditorRevision] = useState(0);
   const [notes, setNotes] = useState<readonly Note[]>([]);
   const [isClipMissing, setIsClipMissing] = useState(false);
+  const [scrubPrototypeValue, setScrubPrototypeValue] = useState(64);
+  const [scrubPrototypeDuration, setScrubPrototypeDuration] = useState(1);
 
   const overview = overviewQuery.data?.live_set ?? null;
   const liveSelectedClipId =
@@ -362,6 +365,38 @@ function RouteComponent() {
       }
     >
       <VStack gap={4} width="100%" maxWidth={1152} xstyle={xs.column}>
+        <Section paddingBlock={2}>
+          <VStack gap={2} maxWidth={640}>
+            <Text type="label">Numeric scrub prototype</Text>
+            <HStack gap={2} width="100%" wrap="wrap">
+              <StackItem size="fill">
+                <ScrubbableNumberInput
+                  label="Velocity"
+                  description="Hover and scroll, or drag vertically. Hold Shift for finer changes; click to type."
+                  value={scrubPrototypeValue}
+                  min={0}
+                  max={127}
+                  step={1}
+                  isIntegerOnly
+                  width="100%"
+                  onChange={setScrubPrototypeValue}
+                />
+              </StackItem>
+              <StackItem size="fill">
+                <ScrubbableNumberInput
+                  label="Duration"
+                  description="Independent field for testing adjacent hover and scroll behavior."
+                  value={scrubPrototypeDuration}
+                  min={0.25}
+                  max={16}
+                  step={0.25}
+                  width="100%"
+                  onChange={setScrubPrototypeDuration}
+                />
+              </StackItem>
+            </HStack>
+          </VStack>
+        </Section>
         <Section paddingBlock={2}>
           <VStack gap={2}>
             <Toolbar
