@@ -273,11 +273,14 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
   const data = yield* gqlDecode(
     Schema.Record(Schema.String, Schema.Unknown),
     mutationDocument(steps),
-    Object.fromEntries(
-      steps.flatMap((s, i) =>
-        Object.entries(s.args).map(([k, v]) => [varName(k, i), v]),
+    {
+      id: input.clipId,
+      ...Object.fromEntries(
+        steps.flatMap((s, i) =>
+          Object.entries(s.args).map(([k, v]) => [varName(k, i), v]),
+        ),
       ),
-    ),
+    },
     { timeout: "60 seconds" },
   );
   const lastIndex = steps.length - 1;

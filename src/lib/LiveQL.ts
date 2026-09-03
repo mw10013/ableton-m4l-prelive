@@ -44,9 +44,12 @@ export class LiveQL extends Context.Service<
         Config.withDefault("http://localhost:4000/graphql"),
         Effect.orDie,
       );
+      // No filterStatusOk: a GraphQL server answers a malformed document with
+      // 400 and the reason in the errors array. Filtering on status would turn
+      // that into a transport failure and throw the reason away, reporting an
+      // unreachable server for a request the server in fact answered.
       const client = (yield* HttpClient.HttpClient).pipe(
         HttpClient.mapRequest(HttpClientRequest.acceptJson),
-        HttpClient.filterStatusOk,
       );
       const gqlDecode = Effect.fn("LiveQL.gqlDecode")(function* <A>(
         schema: Schema.ConstraintDecoder<A>,
