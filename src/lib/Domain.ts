@@ -39,6 +39,22 @@ export const ClipView = Schema.Struct({
   grid_is_triplet: Schema.Boolean,
 });
 
+/**
+ * A Live clip as LiveQL returns it.
+ *
+ * Session clips and Arrangement clips are the same LOM class and are
+ * interchangeable for everything Prelive does: notes, markers, loop, time
+ * signature, and scale all live on the clip and mean the same thing in both
+ * views. Note `start_time`s are clip-relative beats where 0 is the clip's bar
+ * 1.1.1, regardless of where the clip sits in the Arrangement. Do not branch
+ * on `is_arrangement_clip` / `is_session_clip` for note editing or display.
+ *
+ * The only members whose meaning differs by kind are the clip's own
+ * `start_time` and `end_time` (Arrangement position versus last launch time),
+ * and Prelive does not use them; the playback region comes from
+ * `start_marker`, `end_marker`, `loop_start`, `loop_end`, and `looping`.
+ * See docs/note-list-editor-clip-context-research.md.
+ */
 export const Clip = Schema.Struct({
   id: Schema.Number,
   path: Schema.String,
