@@ -188,7 +188,7 @@ function RouteComponent() {
 
   const replaceMutation = useMutation({
     mutationFn: replaceNotes,
-    onSuccess: ({ clip_replace_notes: clip }) => {
+    onSuccess: ({ clip }) => {
       if (clip.id === clipInfo?.id) refreshClip(clip);
     },
   });

@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 
 import * as Domain from "@/lib/Domain";
-import { LiveQL } from "@/lib/LiveQL";
+import { LiveQL, LiveQLError } from "@/lib/LiveQL";
 
 const ClipFields = `
   id path type name color end_time is_arrangement_clip is_session_clip is_midi_clip
@@ -184,47 +184,170 @@ export const readClipById = Effect.fn("LiveSet.readClipById")(function* (
   );
 });
 
-const ReplaceNotesData = Schema.Struct({
-  clip_replace_notes: Domain.ClipWithNotes,
-});
-
-const SetClipPropertiesData = Schema.Struct({
-  clip_set_properties: Schema.Struct({ id: Schema.Number }),
-});
-
 /**
- * Region first, then notes: Live drops a marker that would cross its partner, so
- * a region that has to grow must grow before the notes that need it land.
- * Not atomic, and deliberately so — the region write and the note replacement
- * are separate LOM operations, and any failure leaves the clip in whichever
- * state it reached. The caller treats every failure as unverified and recovers
- * by reloading, never by retrying.
+ * A whole-clip rewrite done with one-LOM-call mutations only, so the
+ * sequence of Live Object Model operations is visible here rather than
+ * hidden in a LiveQL composite. Four phases, in order:
+ *
+ * 1. A fresh read of the clip: the current markers decide the order of the
+ *    marker writes, and the current notes decide the deletion window.
+ * 2. Markers, one `set` per property. Live silently drops a start_marker set
+ *    past the end marker (and an end set before the start), so when the
+ *    region grows the end is written before the start, otherwise the start
+ *    before the end. loop_start/loop_end for a looping clip,
+ *    start_marker/end_marker otherwise. Skipped when the region is unchanged.
+ * 3. `remove_notes_extended` over pitches 0-127 and a window from the
+ *    earliest onset just read through one beat past the latest. The LOM has
+ *    no delete-all; the window is computed from a read because Live can keep
+ *    a note at a negative start_time, which a fixed 0..N window would miss.
+ * 4. `add_new_notes` with the full list. Every note gets a new note_id.
+ *
+ * Phases 2-4 go in one GraphQL document as aliased mutation fields, which
+ * the spec executes serially in document order; the last field selects the
+ * whole clip, so the readback is in the same request and the write is one
+ * round trip after the read, without a composite on the server. Not atomic: nothing over the LOM is.
+ * A failure leaves the clip in whichever state it reached; the caller
+ * treats every failure as unverified and recovers by reloading, never by
+ * retrying. Notes added in Live between the read and the delete survive;
+ * concurrent editing is unsupported.
  */
 export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
   input: Domain.ReplaceNotesInput,
 ) {
   const { gqlDecode } = yield* LiveQL;
-  if (input.region !== undefined) {
-    const { looping, start, end } = input.region;
-    yield* gqlDecode(
-      SetClipPropertiesData,
-      `mutation($id: Int!, $properties: ClipPropertiesInput!) {
-        clip_set_properties(id: $id, properties: $properties) { id }
-      }`,
-      {
-        id: input.clipId,
-        properties: looping
-          ? { loop_start: start, loop_end: end }
-          : { start_marker: start, end_marker: end },
-      },
+  const { clip: current } = yield* readClipById({ clipId: input.clipId });
+  if (current === null) {
+    return yield* Effect.fail(
+      new LiveQLError({
+        reason: "graphql",
+        message: `clip ${String(input.clipId)} no longer exists`,
+        cause: undefined,
+      }),
     );
   }
-  return yield* gqlDecode(
-    ReplaceNotesData,
-    `mutation($id: Int!, $notes: [ReplacementNoteInput!]!) {
-      clip_replace_notes(id: $id, notes: $notes) { ${ClipWithNotesFields} }
-    }`,
-    { id: input.clipId, notes: input.notes },
+
+  const steps: Step[] = [];
+
+  if (input.region !== undefined) {
+    const { looping, start, end } = input.region;
+    const [startKey, endKey] = looping
+      ? (["loop_start", "loop_end"] as const)
+      : (["start_marker", "end_marker"] as const);
+    const startStep = {
+      field: "clip_set_properties",
+      args: { properties: { [startKey]: start } },
+    };
+    const endStep = {
+      field: "clip_set_properties",
+      args: { properties: { [endKey]: end } },
+    };
+    const grows = end > current[endKey];
+    steps.push(...(grows ? [endStep, startStep] : [startStep, endStep]));
+  }
+
+  const existing = current.get_all_notes_extended?.notes ?? [];
+  if (existing.length > 0) {
+    const starts = existing.map((n) => n.start_time);
+    const from_time = Math.min(...starts);
+    steps.push({
+      field: "clip_remove_notes_extended",
+      args: {
+        from_pitch: 0,
+        pitch_span: 128,
+        from_time,
+        time_span: Math.max(...starts) + 1 - from_time,
+      },
+    });
+  }
+
+  if (input.notes.length > 0) {
+    steps.push({
+      field: "clip_add_new_notes",
+      args: { notes: input.notes },
+    });
+  }
+
+  if (steps.length === 0) {
+    return { clip: current };
+  }
+  const data = yield* gqlDecode(
+    Schema.Record(Schema.String, Schema.Unknown),
+    mutationDocument(steps),
+    Object.fromEntries(
+      steps.flatMap((s, i) =>
+        Object.entries(s.args).map(([k, v]) => [varName(k, i), v]),
+      ),
+    ),
     { timeout: "60 seconds" },
   );
+  const lastIndex = steps.length - 1;
+  const last = data[stepAlias(lastIndex)];
+  const clip = yield* Schema.decodeUnknownEffect(Domain.ClipWithNotes)(
+    steps.at(lastIndex)?.field === "clip_add_new_notes"
+      ? (last as { clip: unknown }).clip
+      : last,
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new LiveQLError({
+          reason: "decode",
+          message: "LiveQL response validation failed",
+          cause,
+        }),
+    ),
+  );
+  return { clip };
 });
+
+interface Step {
+  readonly field: string;
+  readonly args: Record<string, unknown>;
+}
+
+const varName = (arg: string, step: number) => `${arg}${String(step)}`;
+const stepAlias = (step: number) => `s${String(step)}`;
+
+/**
+ * What each field selects. Intermediate steps select the minimum; the last
+ * step selects the whole clip so the readback rides in the same request.
+ * `clip_add_new_notes` returns a payload with the ids Live assigned and the
+ * clip nested under `clip`; the others return the clip itself.
+ */
+const selection = (field: string, isLast: boolean) => {
+  const clip = isLast ? ClipWithNotesFields : "id";
+  return field === "clip_add_new_notes"
+    ? `{ note_ids clip { ${clip} } }`
+    : `{ ${clip} }`;
+};
+
+const ARG_TYPES: Record<string, string> = {
+  properties: "ClipPropertiesInput!",
+  from_pitch: "Int!",
+  pitch_span: "Int!",
+  from_time: "Float!",
+  time_span: "Float!",
+  notes: "[NoteInput!]!",
+};
+
+/**
+ * One mutation document with one aliased root field per step. Variables are
+ * suffixed with the step index so the same argument name can appear in
+ * several steps. The last field carries the full clip selection, which is the
+ * readback: the spec runs mutation fields serially, so it reflects every
+ * earlier step.
+ */
+const mutationDocument = (steps: readonly Step[]) => {
+  const vars = ["$id: Int!"];
+  const fields: string[] = [];
+  steps.forEach((s, i) => {
+    const args = ["id: $id"];
+    for (const k of Object.keys(s.args)) {
+      vars.push(`$${varName(k, i)}: ${ARG_TYPES[k]}`);
+      args.push(`${k}: $${varName(k, i)}`);
+    }
+    fields.push(
+      `${stepAlias(i)}: ${s.field}(${args.join(", ")}) ${selection(s.field, i === steps.length - 1)}`,
+    );
+  });
+  return `mutation(${vars.join(", ")}) {\n${fields.join("\n")}\n}`;
+};
