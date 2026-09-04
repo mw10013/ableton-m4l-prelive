@@ -5,7 +5,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
 
-import { useScrub } from "@/components/useScrub";
+import { type ScrubCommitOptions, useScrub } from "@/components/useScrub";
 import {
   type BeatTimeKind,
   formatBeatTime,
@@ -49,8 +49,11 @@ export interface BarBeatSixteenthInputProps {
   isDisabled?: boolean;
   /** Fires on every scrub step so a parent can mirror the gesture. */
   onChange?: (beats: number) => void;
-  /** Fires once per gesture (scrub release, Enter, blur with a change). Escape never commits. */
-  onCommit: (beats: number) => void;
+  /**
+   * Fires once per gesture (scrub release, Enter, blur with a change). Escape never commits.
+   * `isMetaHeld` is true when Cmd/Ctrl was held at release or with Enter.
+   */
+  onCommit: (beats: number, options: ScrubCommitOptions) => void;
   /** See `useScrub`'s `pointerLock`. */
   pointerLock?: boolean;
 }
@@ -92,9 +95,9 @@ export function BarBeatSixteenthInput({
   const cancelling = useRef(false);
   const beats = pending ?? value;
 
-  const commitBeats = (next: number) => {
+  const commitBeats = (next: number, isMetaHeld = false) => {
     const clamped = Math.max(min, next);
-    if (clamped !== value) onCommit(clamped);
+    if (clamped !== value) onCommit(clamped, { isMetaHeld });
   };
 
   const scrub = useScrub({
@@ -104,9 +107,9 @@ export function BarBeatSixteenthInput({
       setPending(next);
       onChange?.(next);
     },
-    onCommit: (next) => {
+    onCommit: (next, { isMetaHeld }) => {
       setPending(undefined);
-      commitBeats(next);
+      commitBeats(next, isMetaHeld);
     },
     pointerLock,
   });
@@ -169,7 +172,7 @@ export function BarBeatSixteenthInput({
   };
 
   if (draft !== null) {
-    const submit = (viaBlur: boolean) => {
+    const submit = (viaBlur: boolean, isMetaHeld = false) => {
       if (cancelling.current) {
         closeEditor();
         return;
@@ -180,7 +183,7 @@ export function BarBeatSixteenthInput({
         else setIsInvalid(true);
         return;
       }
-      commitBeats(parsed);
+      commitBeats(parsed, isMetaHeld);
       closeEditor();
     };
     return (
@@ -197,13 +200,16 @@ export function BarBeatSixteenthInput({
           setIsInvalid(false);
           setDraft(text);
         }}
-        onEnter={() => {
-          submit(false);
-        }}
         onBlur={() => {
           submit(true);
         }}
         onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            // Handled here rather than `onEnter` so the modifier state reaches the commit.
+            event.preventDefault();
+            submit(false, event.metaKey || event.ctrlKey);
+            return;
+          }
           if (event.key === "Escape") {
             event.preventDefault();
             cancelling.current = true;

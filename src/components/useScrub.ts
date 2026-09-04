@@ -37,8 +37,12 @@ export interface UseScrubOptions {
   precision?: number;
   /** Fires on every step so the field tracks the gesture. */
   onChange: (value: number) => void;
-  /** Fires once per gesture on release or wheel idle. Escape restores the pre-gesture value without committing. */
-  onCommit?: (value: number) => void;
+  /**
+   * Fires once per gesture on release or wheel idle. Escape restores the pre-gesture value without
+   * committing. `isMetaHeld` reports Cmd (macOS) or Ctrl held at release so a caller can give the
+   * commit a second meaning; wheel commits never report it.
+   */
+  onCommit?: (value: number, options: ScrubCommitOptions) => void;
   /**
    * Hide the cursor and use unlimited relative movement while scrubbing, like Live. Falls back to
    * plain pointer capture when the browser refuses the lock.
@@ -58,6 +62,10 @@ export interface UseScrubOptions {
   wheel?: ScrubUnit;
 }
 
+export interface ScrubCommitOptions {
+  readonly isMetaHeld: boolean;
+}
+
 export interface ScrubHandlers {
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   onPointerMove: (event: React.PointerEvent<HTMLElement>) => void;
@@ -75,6 +83,7 @@ interface Scrub {
   anchorPos: number;
   anchorValue: number;
   shift: boolean;
+  meta: boolean;
   started: boolean;
   lockRequested: boolean;
   locked: boolean;
@@ -163,10 +172,10 @@ export function useScrub({
     onChangeRef.current(rounded);
     return rounded;
   };
-  const commit = () => {
+  const commit = (isMetaHeld = false) => {
     if (valueRef.current === restingValue.current) return;
     restingValue.current = valueRef.current;
-    onCommitRef.current?.(valueRef.current);
+    onCommitRef.current?.(valueRef.current, { isMetaHeld });
   };
   /** Marks the tracked value as the value Escape returns to. Called at the start of every gesture. */
   const rest = () => {
@@ -239,7 +248,7 @@ export function useScrub({
     active.element.style.cursor = "";
     document.body.style.userSelect = "";
     if (cancel) revert();
-    else if (active.started) commit();
+    else if (active.started) commit(active.meta);
   };
 
   useEffect(() => {
@@ -333,6 +342,7 @@ export function useScrub({
         anchorPos: -event.clientY,
         anchorValue: valueRef.current,
         shift: event.shiftKey,
+        meta: event.metaKey || event.ctrlKey,
         started: false,
         lockRequested: false,
         locked: false,
@@ -354,6 +364,7 @@ export function useScrub({
         if (Math.abs(active.pos - active.anchorPos) < SCRUB_THRESHOLD) return;
         startScrub(active);
       }
+      active.meta = event.metaKey || event.ctrlKey;
       if (event.shiftKey !== active.shift) {
         // Modifier changed mid-gesture: continue from here instead of re-dividing the whole drag.
         active.shift = event.shiftKey;
@@ -382,6 +393,7 @@ export function useScrub({
       const active = scrub.current;
       if (active === null || active.pointerId !== event.pointerId) return;
       const wasClick = !active.started;
+      active.meta = event.metaKey || event.ctrlKey;
       endScrub(false);
       if (wasClick) onClick?.(event);
     },
@@ -407,6 +419,7 @@ export function useScrub({
     },
     rest,
     revert,
+    /** Commit the tracked value now (typed text confirmed); pass the modifier state of the confirming key. */
     commit,
   };
 }

@@ -293,3 +293,43 @@ vertical and visual density win that fits the sorted-by-start table; note it for
   `Text` and open a `NumberInput` on click. Rest cells are `Text type="supporting"` with tabular
   numbers (ladder step 1); Start/Duration are 88 px, Pitch/Velocity 72 px (ladder step 2).
 - Pointer lock stays off for segment scrubs (open question 1 unchanged).
+
+## Refinement Pass (2026-09-03, second session)
+
+Tried in Live-connected dev server. Kept: click opens the text field with the bar segment selected;
+left/right select the previous/next whole segment (Live's field hop, so the caret never lands on a
+separator); up/down step the selected segment with carry. Scrubbing stays a rest-state gesture.
+
+Changes:
+
+- All hover tooltips removed from the note list (Start, Duration, Pitch, Velocity). They obscured the
+  neighbouring cells and added nothing the cell itself does not show.
+- `useScrub` now defaults `pointerLock` to true. `cursor: none` on the body was tried first and did
+  nothing, because the segment's own `cursor: ns-resize` wins; the capture fallback now sets the cursor
+  on the element too. The VS Code embedded browser shows no "press Esc" banner; plain Chrome will, and
+  the user accepts that. Still to verify in Chrome proper.
+- Open question 1 (pointer lock default) is therefore closed: on.
+
+Deferred: the single-state Live-parity control (segments always selectable, typing and scrubbing in
+one mode without a native input). The incremental text-field fixes above were judged good enough.
+
+### Velocity anomaly (unresolved)
+
+After editing a Start value and the list re-sorting, one note's Velocity read `81.71875` where 100
+was expected. No write to Live had been made. Investigation:
+
+- `commitField` spreads the note and replaces only the edited field; group edits do the same per
+  selected note. Velocity cannot change from a Start edit.
+- The Pitch/Velocity scrub uses `precision: 0`, so it emits integers only; the `NumberInput` is
+  integer-only. No client code path can produce a fractional velocity from integer inputs.
+- Reproduced the Start edit through scrub, Enter, blur, blur-by-pressing-on-Velocity, and a scrub
+  followed by a Velocity scrub, driving the dev server with Playwright (cached Chromium, see memory).
+  Velocity stayed 100 in every case. Pointer lock does not engage under Playwright, so the locked drag
+  itself is untested, but its arithmetic is the same rounded integer path.
+- The server log does not record note payloads, so the value Live originally sent is unknown. A
+  fractional velocity like 2615/32 is exactly what Live's velocity randomiser or MIDI scaling leave
+  behind, and Live's own UI rounds it for display.
+
+Next: retest from the reset clip (all velocities 100, written and read back) with exact steps. If it
+recurs with no write, it is ours. Either way, round Velocity to an integer at rest and show the exact
+float only in the editor, mirroring the off-grid treatment for times.

@@ -1,5 +1,6 @@
 import type { Note, ReplacementNote } from "@/lib/Domain";
 
+import { MIN_DURATION } from "@/lib/beatTime";
 export const TIME_EPSILON = 1e-9;
 
 export const byMusicalOrder = (notes: readonly Note[]): readonly Note[] =>
@@ -115,3 +116,79 @@ export const isSameRegion = (
   a: { readonly start: number; readonly end: number },
   b: { readonly start: number; readonly end: number },
 ) => a.start === b.start && a.end === b.end;
+
+export type EditableField =
+  | "pitch"
+  | "start_time"
+  | "duration"
+  | "velocity"
+  | "probability"
+  | "velocity_deviation"
+  | "release_velocity";
+
+export const FIELD_RANGE: Record<
+  EditableField,
+  { readonly min: number; readonly max: number; readonly isInteger: boolean }
+> = {
+  pitch: { min: 0, max: 127, isInteger: true },
+  start_time: { min: 0, max: Infinity, isInteger: false },
+  duration: { min: MIN_DURATION, max: Infinity, isInteger: false },
+  velocity: { min: 0, max: 127, isInteger: false },
+  probability: { min: 0, max: 1, isInteger: false },
+  velocity_deviation: { min: -127, max: 127, isInteger: false },
+  release_velocity: { min: 0, max: 127, isInteger: false },
+};
+
+export const clampField = (field: EditableField, value: number): number => {
+  const { min, max, isInteger } = FIELD_RANGE[field];
+  const clamped = Math.min(max, Math.max(min, value));
+  return isInteger ? Math.round(clamped) : clamped;
+};
+
+/** Every target gets `value`. Cubase: "To set all selected events to the same value, press Ctrl/Cmd". */
+export const setField = (
+  notes: readonly Note[],
+  targetIds: ReadonlySet<number>,
+  field: EditableField,
+  value: number,
+): readonly Note[] =>
+  byMusicalOrder(
+    notes.map((note) =>
+      targetIds.has(note.note_id)
+        ? { ...note, [field]: clampField(field, value) }
+        : note,
+    ),
+  );
+
+/**
+ * Every target moves by `delta`, shortened so that no target leaves the field's range: the group
+ * stops when its first member reaches a bound, so a transposed chord keeps its voicing and a
+ * velocity ramp keeps its slope. This is Logic's plain-drag rule for multi-selections ("parameter
+ * values can only be altered until the parameter value of one of the selected events has reached
+ * its maximum or minimum value") and Cubase's ("any initial value differences between the events
+ * are maintained"). Integer fields round the delta first so every member moves by the same amount.
+ */
+export const shiftField = (
+  notes: readonly Note[],
+  targetIds: ReadonlySet<number>,
+  field: EditableField,
+  delta: number,
+): readonly Note[] => {
+  const { min, max, isInteger } = FIELD_RANGE[field];
+  const values = notes
+    .filter((note) => targetIds.has(note.note_id))
+    .map((note) => note[field]);
+  const headroom = Math.min(...values.map((value) => max - value));
+  const legroom = Math.max(...values.map((value) => min - value));
+  const step = Math.max(legroom, Math.min(headroom, delta));
+  const applied = isInteger ? Math.round(step) : step;
+  return applied === 0
+    ? notes
+    : byMusicalOrder(
+        notes.map((note) =>
+          targetIds.has(note.note_id)
+            ? { ...note, [field]: clampField(field, note[field] + applied) }
+            : note,
+        ),
+      );
+};
