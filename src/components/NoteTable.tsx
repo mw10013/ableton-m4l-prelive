@@ -38,6 +38,7 @@ import {
   type CellEditProps,
   type EditEndReason,
 } from "@/components/BarBeatSixteenthInput";
+import { useDoubleClick } from "@/components/useDoubleClick";
 import { useScrub } from "@/components/useScrub";
 import { formatBeatTime, MIN_DURATION } from "@/lib/beatTime";
 import { FIELD_RANGE } from "@/lib/noteEdits";
@@ -57,6 +58,8 @@ type Column = EditableField | "mute";
  * Logic's Event List order (M, Position, Num, Val, Length) with the Live-only fields after it. Start
  * leads because the list is sorted by it; Length is last because its ragged sixteenth wants the edge.
  */
+/** Where a gutter click parks focus when no column is current: Start, not the blank M cell. */
+const DEFAULT_COLUMN: Column = "start_time";
 const BASE_COLUMNS: readonly Column[] = [
   "mute",
   "start_time",
@@ -193,6 +196,8 @@ interface NoteRow extends Record<string, unknown> {
  * Integer note field (pitch, velocity, chance...). Rest state is tabular text that scrubs
  * vertically.
  *
+ * Rest-state pointer: a single click only focuses the cell (so Shift+arrows extend the selection
+ * from anywhere in a row); double-click opens the editor, as Logic's "double-click the value".
  * Rest-state keys: Enter, Space or F2 open the editor; a digit opens it with that digit typed;
  * Alt+Up/Down step by one in place. Plain arrows bubble to the table for cell navigation.
  *
@@ -253,6 +258,14 @@ function NoteNumberCell({
       onCommit(next, isMetaHeld ? "absolute" : "relative");
     close(reason);
   };
+  const onClick = useDoubleClick(
+    (event) => {
+      event.currentTarget.focus();
+    },
+    () => {
+      onEditStart();
+    },
+  );
   const scrub = useScrub({
     value: shown,
     min,
@@ -295,14 +308,7 @@ function NoteNumberCell({
       />
     );
   }
-  const handlers = isDisabled
-    ? {}
-    : scrub.bind({
-        step: 1,
-        onClick: () => {
-          onEditStart();
-        },
-      });
+  const handlers = isDisabled ? {} : scrub.bind({ step: 1, onClick });
   return (
     <span
       role="spinbutton"
@@ -425,7 +431,9 @@ interface NoteTableProps {
  * - Up/Down: move the current row and select only it. Shift+Up/Down: extend the range from the
  *   anchor. Cmd/Ctrl+Up/Down: move without changing the selection.
  * - Left/Right: move across columns. Home/End: first/last column; Cmd/Ctrl+Home/End: first/last row.
- * - Enter, Space, F2 or a digit: open the current cell (handled by the cell).
+ * - Enter, Space, F2, a digit, or a double-click: open the current cell (handled by the cell). A
+ *   single click on a value only focuses it, so a click anywhere in a row followed by Shift+arrows
+ *   extends the selection instead of stepping a number inside an editor.
  * - Alt+Up/Down: step the current cell's value in place (handled by the cell).
  * - Escape: clear the selection.
  * - Delete/Backspace, Cmd+A, Cmd+D, 0: owned by `NoteListEditor`'s hotkeys.
@@ -779,9 +787,10 @@ export function NoteTable({
                   state.selectOnly(id);
                   isDragging.current = true;
                 }
-                const column = state.currentColumn ?? BASE_COLUMNS[0];
-                if (column !== undefined)
-                  state.setCurrent({ noteId: id, column });
+                state.setCurrent({
+                  noteId: id,
+                  column: state.currentColumn ?? DEFAULT_COLUMN,
+                });
               } else if (!state.isSelected(id)) {
                 state.selectOnly(id);
               }

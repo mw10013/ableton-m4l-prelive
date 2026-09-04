@@ -5,6 +5,7 @@ import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
 
 import { cellTextStyles } from "@/components/NoteTable";
+import { useDoubleClick } from "@/components/useDoubleClick";
 import { type ScrubCommitOptions, useScrub } from "@/components/useScrub";
 import {
   type BeatTimeKind,
@@ -107,6 +108,9 @@ export interface BarBeatSixteenthInputProps extends CellEditProps {
  * Off-grid values display rounded to the nearest sixteenth with a dimmed marker; the exact value is in
  * the tooltip and in the text field.
  *
+ * Rest-state pointer: a single click focuses the field; double-click opens the editor (Logic:
+ * "double-click the position indicator, then enter a new value").
+ *
  * Rest-state keys:
  * - Enter, Space, F2: open the editor with the bar segment selected.
  * - Digit: open the editor with that digit typed.
@@ -148,6 +152,7 @@ export function BarBeatSixteenthInput({
   const [draft, setDraft] = useState<string | null>(null);
   const [isInvalid, setIsInvalid] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const rest = useRef<HTMLSpanElement>(null);
   const selectAfterRender = useRef<{ start: number; end: number } | null>(null);
   const cancelling = useRef(false);
   const beats = pending ?? value;
@@ -174,6 +179,15 @@ export function BarBeatSixteenthInput({
     },
     pointerLock,
   });
+
+  const onClick = useDoubleClick(
+    () => {
+      rest.current?.focus();
+    },
+    () => {
+      onEditStart();
+    },
+  );
 
   const closeEditor = (reason: EditEndReason) => {
     setDraft(null);
@@ -337,14 +351,7 @@ export function BarBeatSixteenthInput({
   const shownExact = formatBeatTime(beats, meter, kind, { exact: true });
   const segments = text.split(".");
   const bindings = units.map((unit) =>
-    isDisabled
-      ? {}
-      : scrub.bind({
-          ...unit,
-          onClick: () => {
-            onEditStart();
-          },
-        }),
+    isDisabled ? {} : scrub.bind({ ...unit, onClick }),
   );
 
   return (
@@ -357,6 +364,7 @@ export function BarBeatSixteenthInput({
       aria-disabled={isDisabled || undefined}
       tabIndex={!isDisabled && isCurrent ? 0 : -1}
       data-cell={cellId}
+      ref={rest}
       {...stylex.props(styles.rest)}
       onFocus={onFocus}
       onKeyDown={(event) => {
