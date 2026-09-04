@@ -13,11 +13,8 @@ import { Text } from "@astryxdesign/core/Text";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 
 import { DuplicateNotesDialog } from "@/components/DuplicateNotesDialog";
-import {
-  type EditableField,
-  MIN_DURATION,
-  NoteTable,
-} from "@/components/NoteTable";
+import { type EditableField, NoteTable } from "@/components/NoteTable";
+import { MIN_DURATION } from "@/lib/beatTime";
 import { byMusicalOrder, duplicateNotes, nextTempId } from "@/lib/noteEdits";
 
 export type EditorStatus =

@@ -4,7 +4,6 @@ import type { Note } from "@/lib/Domain";
 
 import { useCallback, useState } from "react";
 
-import { Button } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -17,10 +16,30 @@ import {
   useTableSelectionState,
 } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
+import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
+import * as stylex from "@stylexjs/stylex";
+
+import { BarBeatSixteenthInput } from "@/components/BarBeatSixteenthInput";
+import { useScrub } from "@/components/useScrub";
+import { formatBeatTime, MIN_DURATION } from "@/lib/beatTime";
 
 export type EditableField = "pitch" | "start_time" | "duration" | "velocity";
 
-export const MIN_DURATION = 1 / 128;
+export { MIN_DURATION };
+
+const styles = stylex.create({
+  rest: {
+    display: "inline-block",
+    cursor: "ns-resize",
+    userSelect: "none",
+    borderRadius: 2,
+    outline: {
+      default: "none",
+      ":focus-visible": `2px solid ${colorVars["--color-accent"]}`,
+    },
+    outlineOffset: 1,
+  },
+});
 
 const NOTE_NAMES = [
   "C",
@@ -42,42 +61,11 @@ export const noteName = (pitch: number) =>
 
 const trimmed = (value: number) => String(Number(value.toFixed(3)));
 
-const meterUnits = (numerator: number, denominator: number) => ({
-  quartersPerBar: (numerator * 4) / denominator,
-  quartersPerBeat: 4 / denominator,
-});
-
 export const positionLabel = (
   beats: number,
   numerator: number,
   denominator: number,
-) => {
-  const { quartersPerBar, quartersPerBeat } = meterUnits(
-    numerator,
-    denominator,
-  );
-  const bar = Math.floor(beats / quartersPerBar);
-  const rem = beats - bar * quartersPerBar;
-  const beat = Math.floor(rem / quartersPerBeat);
-  const sixteenth = (rem - beat * quartersPerBeat) * 4;
-  return `${String(bar + 1)}.${String(beat + 1)}.${trimmed(sixteenth + 1)}`;
-};
-
-export const lengthLabel = (
-  beats: number,
-  numerator: number,
-  denominator: number,
-) => {
-  const { quartersPerBar, quartersPerBeat } = meterUnits(
-    numerator,
-    denominator,
-  );
-  const bar = Math.floor(beats / quartersPerBar);
-  const rem = beats - bar * quartersPerBar;
-  const beat = Math.floor(rem / quartersPerBeat);
-  const sixteenth = (rem - beat * quartersPerBeat) * 4;
-  return `${String(bar)}.${String(beat)}.${trimmed(sixteenth)}`;
-};
+) => formatBeatTime(beats, { numerator, denominator }, "position");
 
 const extrasLabel = ({
   probability,
@@ -104,13 +92,15 @@ interface NoteRow extends Record<string, unknown> {
   release_velocity: number;
 }
 
+/**
+ * Integer note field (pitch, velocity). Rest state is tabular text that scrubs vertically; a click,
+ * Enter, Space or a typed digit opens a `NumberInput`. Enter and blur commit, Escape cancels.
+ */
 function NoteNumberCell({
   label,
   value,
   min,
   max,
-  step,
-  isIntegerOnly,
   isDisabled,
   format,
   onCommit,
@@ -118,15 +108,14 @@ function NoteNumberCell({
   label: string;
   value: number;
   min: number;
-  max?: number;
-  step: number;
-  isIntegerOnly?: boolean;
+  max: number;
   isDisabled: boolean;
   format: (value: number) => string;
   onCommit: (value: number) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [pending, setPending] = useState<number | undefined>();
+  const shown = pending ?? value;
   const close = () => {
     setIsEditing(false);
     setPending(undefined);
@@ -135,36 +124,88 @@ function NoteNumberCell({
     if (pending !== undefined && pending !== value) onCommit(pending);
     close();
   };
-  return isEditing && !isDisabled ? (
-    <NumberInput
-      label={label}
-      isLabelHidden
-      size="sm"
-      width="100%"
-      value={pending ?? value}
-      min={min}
-      max={max}
-      step={step}
-      isIntegerOnly={isIntegerOnly}
-      hasAutoFocus
-      onChange={setPending}
-      onEnter={commit}
-      onBlur={commit}
-      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Escape") close();
+  const scrub = useScrub({
+    value: shown,
+    min,
+    max,
+    precision: 0,
+    onChange: setPending,
+    onCommit: (next) => {
+      setPending(undefined);
+      if (next !== value) onCommit(next);
+    },
+  });
+  if (isEditing && !isDisabled) {
+    return (
+      <NumberInput
+        label={label}
+        isLabelHidden
+        size="sm"
+        width="100%"
+        value={pending ?? value}
+        min={min}
+        max={max}
+        step={1}
+        isIntegerOnly
+        hasAutoFocus
+        onChange={(next) => {
+          setPending(next ?? undefined);
+        }}
+        onEnter={commit}
+        onBlur={commit}
+        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+          if (e.key === "Escape") close();
+        }}
+      />
+    );
+  }
+  const handlers = isDisabled
+    ? {}
+    : scrub.bind({
+        step: 1,
+        onClick: () => {
+          setIsEditing(true);
+        },
+      });
+  return (
+    <span
+      role="spinbutton"
+      aria-label={label}
+      aria-valuenow={shown}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuetext={format(shown)}
+      aria-disabled={isDisabled || undefined}
+      tabIndex={isDisabled ? -1 : 0}
+      {...stylex.props(styles.rest)}
+      {...handlers}
+      onKeyDown={(event) => {
+        if (isDisabled) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setIsEditing(true);
+        } else if (/^\d$/.test(event.key)) {
+          event.preventDefault();
+          setPending(Number(event.key));
+          setIsEditing(true);
+        } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+          const next = Math.min(
+            max,
+            Math.max(min, shown + (event.key === "ArrowUp" ? 1 : -1)),
+          );
+          if (next !== value) onCommit(next);
+        }
       }}
-    />
-  ) : (
-    <Button
-      variant="ghost"
-      size="sm"
-      label={format(value)}
-      tooltip={label}
-      isDisabled={isDisabled}
-      onClick={() => {
-        setIsEditing(true);
-      }}
-    />
+    >
+      <Text
+        type="supporting"
+        color={isDisabled ? "secondary" : "primary"}
+        hasTabularNumbers
+      >
+        {format(shown)}
+      </Text>
+    </span>
   );
 }
 
@@ -215,36 +256,63 @@ export function NoteTable({
     );
   }
 
+  const rowLabel = (row: NoteRow) =>
+    `note ${noteName(row.pitch)} at ${positionLabel(row.start_time, signatureNumerator, signatureDenominator)}`;
+
   const numberColumn = ({
     key,
     header,
     min,
     max,
-    step,
-    isIntegerOnly,
     format,
   }: {
-    key: EditableField;
+    key: "pitch" | "velocity";
     header: string;
     min: number;
-    max?: number;
-    step: number;
-    isIntegerOnly?: boolean;
+    max: number;
     format: (value: number) => string;
   }): TableColumn<NoteRow> => ({
     key,
     header,
-    width: pixel(112),
+    width: pixel(72),
     renderCell: (row) => (
       <NoteNumberCell
-        label={`${header} of note ${noteName(row.pitch)} at ${positionLabel(row.start_time, signatureNumerator, signatureDenominator)}`}
+        label={`${header} of ${rowLabel(row)}`}
         value={row[key]}
         min={min}
         max={max}
-        step={step}
-        isIntegerOnly={isIntegerOnly}
         isDisabled={isDisabled}
         format={format}
+        onCommit={(value) => {
+          onCommitField(row.note_id, key, value);
+        }}
+      />
+    ),
+  });
+
+  const timeColumn = ({
+    key,
+    header,
+    kind,
+    min,
+  }: {
+    key: "start_time" | "duration";
+    header: string;
+    kind: "position" | "length";
+    min: number;
+  }): TableColumn<NoteRow> => ({
+    key,
+    header,
+    width: pixel(88),
+    renderCell: (row) => (
+      <BarBeatSixteenthInput
+        label={`${header} of ${rowLabel(row)}`}
+        value={row[key]}
+        kind={kind}
+        numerator={signatureNumerator}
+        denominator={signatureDenominator}
+        min={min}
+        isDisabled={isDisabled}
         onCommit={(value) => {
           onCommitField(row.note_id, key, value);
         }}
@@ -266,34 +334,26 @@ export function NoteTable({
           header: "Pitch",
           min: 0,
           max: 127,
-          step: 1,
-          isIntegerOnly: true,
           format: noteName,
         }),
-        numberColumn({
+        timeColumn({
           key: "start_time",
           header: "Start",
+          kind: "position",
           min: 0,
-          step: 0.25,
-          format: (value) =>
-            positionLabel(value, signatureNumerator, signatureDenominator),
         }),
-        numberColumn({
+        timeColumn({
           key: "duration",
           header: "Duration",
+          kind: "length",
           min: MIN_DURATION,
-          step: 0.25,
-          format: (value) =>
-            lengthLabel(value, signatureNumerator, signatureDenominator),
         }),
         numberColumn({
           key: "velocity",
           header: "Velocity",
           min: 0,
           max: 127,
-          step: 1,
-          isIntegerOnly: true,
-          format: trimmed,
+          format: String,
         }),
         {
           key: "mute",

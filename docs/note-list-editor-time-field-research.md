@@ -29,11 +29,11 @@ fighting Astryx?
 `src/components/NoteTable.tsx` (`positionLabel`, `lengthLabel`):
 
 ```ts
-quartersPerBar  = numerator * 4 / denominator
-quartersPerBeat = 4 / denominator
-bar       = floor(beats / quartersPerBar)
-beat      = floor(rem / quartersPerBeat)
-sixteenth = (rem - beat * quartersPerBeat) * 4      // may be fractional
+quartersPerBar = (numerator * 4) / denominator;
+quartersPerBeat = 4 / denominator;
+bar = floor(beats / quartersPerBar);
+beat = floor(rem / quartersPerBeat);
+sixteenth = (rem - beat * quartersPerBeat) * 4; // may be fractional
 ```
 
 - Position label adds 1 to every segment; length label does not. This matches Live: positions are
@@ -56,15 +56,15 @@ Live manual, Arrangement View:
 "Fields", plural, and "when one of the fields is selected": Live treats bar, beat, and sixteenth as
 three sub-fields. The keyboard shortcut table (41.6 Adjusting Values) confirms:
 
-| Action | Key |
-| --- | --- |
-| Decrement/Increment | up / down |
-| Fine adjustment | Shift + up / down |
-| Finer resolution when dragging | Shift |
-| Return to default | Delete |
-| Type in value | 0…9 |
-| **Go to next field (Bar/Beat/16th)** | `.` `,` |
-| Cancel / confirm | Esc / Enter |
+| Action                               | Key               |
+| ------------------------------------ | ----------------- |
+| Decrement/Increment                  | up / down         |
+| Fine adjustment                      | Shift + up / down |
+| Finer resolution when dragging       | Shift             |
+| Return to default                    | Delete            |
+| Type in value                        | 0…9               |
+| **Go to next field (Bar/Beat/16th)** | `.` `,`           |
+| Cancel / confirm                     | Esc / Enter       |
 
 Clip View 8.2.1 explains the screenshot: Start/End are two absolute positions; Loop uses Position
 (absolute) plus Length (a span). The Set buttons capture the playhead, quantized to global
@@ -192,7 +192,7 @@ Contract:
 Implementation shape:
 
 1. Extract the gesture from `ScrubbableNumberInput` into `useScrub({ value, step, min, max, onChange,
-   onCommit, pointerLock })` returning pointer handlers and an `isScrubbing` flag. Re-wrap
+onCommit, pointerLock })` returning pointer handlers and an `isScrubbing` flag. Re-wrap
    `ScrubbableNumberInput` on top of it so the home-page prototype stays green.
 2. New component in `src/components/`, composed of Astryx `Text` (rest) and `TextInput` (edit). The
    segment spans need `xstyle` for `cursor: ns-resize` and `user-select: none`; that is a sanctioned
@@ -212,14 +212,14 @@ decimal sixteenth (`1.1.1.5`) only while editing, where the context makes it una
 
 Measured from Astryx source (`Table/TableCell.tsx`, `Button.tsx`, `NumberInput.tsx`, tokens):
 
-| Layer | Value |
-| --- | --- |
-| Compact cell padding | 4 px block, 8 px inline |
-| Text line height (body 14 px) | 20 px |
-| sm Button / NumberInput / TextInput height | 28 px |
-| Current row (sm Button in compact cell) | ≈ 36 px |
-| Row with `Text` rest state | ≈ 28 px |
-| Supporting text (12 px, 20 px leading) | same row, smaller glyphs |
+| Layer                                      | Value                    |
+| ------------------------------------------ | ------------------------ |
+| Compact cell padding                       | 4 px block, 8 px inline  |
+| Text line height (body 14 px)              | 20 px                    |
+| sm Button / NumberInput / TextInput height | 28 px                    |
+| Current row (sm Button in compact cell)    | ≈ 36 px                  |
+| Row with `Text` rest state                 | ≈ 28 px                  |
+| Supporting text (12 px, 20 px leading)     | same row, smaller glyphs |
 
 Findings:
 
@@ -278,3 +278,18 @@ vertical and visual density win that fits the sorted-by-start table; note it for
 - Event List Anatomy artifact (DAW screenshots):
   https://claude.ai/code/artifact/9f6a2caf-afee-4aca-8a81-719870295cab
 - `src/components/NoteTable.tsx`, `src/components/ScrubbableNumberInput.tsx`, `src/components/NoteListEditor.tsx`
+
+## Implementation (2026-09-03)
+
+- `src/components/useScrub.ts`: the gesture engine from `ScrubbableNumberInput`, as a hook. `bind(unit)`
+  returns pointer handlers for any element; a unit is `{ step, fineStep? }`, so several elements can
+  share one hook with different units. Values round to 9 decimals by default so remainders survive
+  coarse steps; `ScrubbableNumberInput` passes the step's own precision to keep snapping.
+- `src/lib/beatTime.ts`: `formatBeatTime`, `parseBeatTime`, `isOffGrid`, `segmentRanges` and the
+  meter helpers, pure and shared with the Duplicate dialog via `positionLabel`.
+- `src/components/BarBeatSixteenthInput.tsx`: approach C + D. Segment drag, Live typing rules, Shift
+  fine steps, off-grid `+` marker with the exact value in the tooltip and text field.
+- `NoteTable`: Start and Duration use the new input; Pitch and Velocity render rest state as scrubbable
+  `Text` and open a `NumberInput` on click. Rest cells are `Text type="supporting"` with tabular
+  numbers (ladder step 1); Start/Duration are 88 px, Pitch/Velocity 72 px (ladder step 2).
+- Pointer lock stays off for segment scrubs (open question 1 unchanged).

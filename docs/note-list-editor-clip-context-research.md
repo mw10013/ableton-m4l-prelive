@@ -29,11 +29,11 @@ Prelive's `src/lib/LiveSet.ts`, `src/routes/index.tsx`, `src/components/NoteTabl
 
 ### Time signature
 
-| Source | LOM members | In LiveQL | In Prelive |
-| --- | --- | --- | --- |
-| Clip | `signature_numerator`, `signature_denominator` (get, set, observe) | Yes, on `Clip` and `ClipPropertiesInput` | Fetched in `ClipFields`; used by `positionLabel`, `lengthLabel`, the Duplicate dialog, and `requiredPlaybackRegion` |
-| Song | `signature_numerator`, `signature_denominator` | Yes, on `Song` and `SongPropertiesInput` | Not fetched |
-| Scene | `tempo`, `time_signature_*`, `*_enabled` | Yes | Not fetched |
+| Source | LOM members                                                        | In LiveQL                                | In Prelive                                                                                                          |
+| ------ | ------------------------------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Clip   | `signature_numerator`, `signature_denominator` (get, set, observe) | Yes, on `Clip` and `ClipPropertiesInput` | Fetched in `ClipFields`; used by `positionLabel`, `lengthLabel`, the Duplicate dialog, and `requiredPlaybackRegion` |
+| Song   | `signature_numerator`, `signature_denominator`                     | Yes, on `Song` and `SongPropertiesInput` | Not fetched                                                                                                         |
+| Scene  | `tempo`, `time_signature_*`, `*_enabled`                           | Yes                                      | Not fetched                                                                                                         |
 
 Manual 8.2.2: the clip time signature is display-only, independent of the Set's, and is what the
 MIDI Note Editor's ruler uses. So the clip pair is the correct one for the note list, and the Song
