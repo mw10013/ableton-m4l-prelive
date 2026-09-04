@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
 
+import { cellTextStyles } from "@/components/NoteTable";
 import { type ScrubCommitOptions, useScrub } from "@/components/useScrub";
 import {
   type BeatTimeKind,
@@ -29,12 +29,24 @@ const styles = stylex.create({
     },
     outlineOffset: 1,
   },
+  /**
+   * Logic's Position column: each unit right-aligned in its own slot, separated by space rather
+   * than Live's dots, so bars line up down the column once they reach two digits. Widths are the
+   * widest value each slot can show: a 3-digit bar, a beat sized to content (2 digits in 12/8), one
+   * sixteenth digit.
+   */
+  slots: {
+    display: "inline-grid",
+    gridTemplateColumns: "3ch auto 1ch",
+    columnGap: "0.6ch",
+    textAlign: "end",
+  },
   segment: {
     cursor: "ns-resize",
     userSelect: "none",
   },
-  separator: {
-    userSelect: "none",
+  offGrid: {
+    marginInlineStart: "0.2ch",
   },
 });
 
@@ -71,6 +83,8 @@ export interface BarBeatSixteenthInputProps extends CellEditProps {
   denominator: number;
   min: number;
   isDisabled?: boolean;
+  /** Renders in secondary text colour, as Live grays out deactivated notes. */
+  isMuted?: boolean;
   /** Fires on every scrub step so a parent can mirror the gesture. */
   onChange?: (beats: number) => void;
   /**
@@ -85,7 +99,8 @@ export interface BarBeatSixteenthInputProps extends CellEditProps {
 /**
  * Live-style bars.beats.sixteenths field over a single beats float.
  *
- * Rest state renders three tabular-number segments. Dragging a segment vertically scrubs in that
+ * Rest state renders three right-aligned slots, space-separated like Logic's Event List; the dots
+ * only appear in the editor and in `aria-valuetext`. Dragging a segment vertically scrubs in that
  * segment's unit (bar, beat or sixteenth; Logic's per-unit drag). Shift drops to a sixteenth on the bar
  * and beat segments and to 1/128 on the sixteenth segment, so an off-grid value is reachable without
  * typing a float. Scrubbing adds to the raw beats, so sub-sixteenth remainders survive coarse drags.
@@ -115,6 +130,7 @@ export function BarBeatSixteenthInput({
   denominator,
   min,
   isDisabled = false,
+  isMuted = false,
   onChange,
   onCommit,
   pointerLock,
@@ -361,25 +377,35 @@ export function BarBeatSixteenthInput({
         }
       }}
     >
-      <Text
-        type="supporting"
-        color={isDisabled ? "secondary" : "primary"}
-        hasTabularNumbers
+      <span
+        {...stylex.props(
+          styles.slots,
+          cellTextStyles.base,
+          (isDisabled || isMuted) && cellTextStyles.secondary,
+        )}
       >
         {segments.map((segment, index) => (
-          // eslint-disable-next-line react/no-array-index-key
-          <span key={index}>
-            {index > 0 && <span {...stylex.props(styles.separator)}>.</span>}
-            <span {...stylex.props(styles.segment)} {...bindings[index]}>
-              {segment}
-            </span>
+          <span
+            // eslint-disable-next-line react/no-array-index-key
+            key={index}
+            {...stylex.props(styles.segment)}
+            {...bindings[index]}
+          >
+            {segment}
           </span>
         ))}
-      </Text>
+      </span>
       {offGrid && (
-        <Text type="supporting" color="secondary" aria-hidden>
+        <span
+          aria-hidden
+          {...stylex.props(
+            cellTextStyles.base,
+            cellTextStyles.secondary,
+            styles.offGrid,
+          )}
+        >
           +
-        </Text>
+        </span>
       )}
     </span>
   );

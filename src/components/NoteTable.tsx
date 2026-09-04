@@ -17,17 +17,20 @@ import {
   useState,
 } from "react";
 
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import {
   pixel,
+  proportional,
   resolveContextActions,
   Table,
   useTableRowIndex,
 } from "@astryxdesign/core/Table";
-import { Text } from "@astryxdesign/core/Text";
-import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
+import {
+  colorVars,
+  spacingVars,
+  typeScaleVars,
+} from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
 
 import {
@@ -47,17 +50,21 @@ export type CommitMode = "relative" | "absolute";
 /** Live's Chance is a percentage; the LOM stores probability 0..1. */
 const PROBABILITY_SCALE = 100;
 
-/** A navigable column. `mute` is the checkbox; the rest are spinbutton fields. */
+/** A navigable column. `mute` is the letter toggle; the rest are spinbutton fields. */
 type Column = EditableField | "mute";
 
+/**
+ * Logic's Event List order (M, Position, Num, Val, Length) with the Live-only fields after it. Start
+ * leads because the list is sorted by it; Length is last because its ragged sixteenth wants the edge.
+ */
 const BASE_COLUMNS: readonly Column[] = [
-  "pitch",
+  "mute",
   "start_time",
-  "duration",
+  "pitch",
   "velocity",
+  "duration",
 ];
 const DETAIL_COLUMNS: readonly Column[] = [
-  "mute",
   "probability",
   "velocity_deviation",
   "release_velocity",
@@ -90,9 +97,16 @@ const styles = stylex.create({
     },
     outlineOffset: 1,
   },
-  /** Live: "When a note is deactivated it is grayed out and will not be played." */
-  mutedRow: {
-    opacity: 0.45,
+  /** A toggle button drawn as plain text: Logic's M column has no box, just the letter. */
+  muteCell: {
+    cursor: "default",
+    minWidth: "1ch",
+    width: "100%",
+    background: "none",
+    borderWidth: 0,
+    padding: 0,
+    fontFamily: "inherit",
+    lineHeight: "inherit",
   },
   selectedRow: {
     backgroundColor: colorVars["--color-background-blue"],
@@ -102,8 +116,40 @@ const styles = stylex.create({
     cursor: "default",
     userSelect: "none",
   },
-  checkboxCell: {
-    display: "inline-flex",
+  /**
+   * The one styling override in this table, scoped to its cells. Astryx compact density plus
+   * `Text`'s 20 px leading lands rows at 36 px; Logic's list is about 20 px. Body cells own a
+   * context menu, so Astryx moves their padding onto the right-click trigger wrapper (4 px block,
+   * 8 px inline) where `xstyle` cannot reach it; zeroing the `<td>` padding leaves that alone and
+   * gives 24 px rows. Headers have no trigger, so they keep a small padding that lines up with it.
+   */
+  denseBodyCell: {
+    paddingBlock: 0,
+    paddingInline: 0,
+    fontSize: typeScaleVars["--text-supporting-size"],
+    lineHeight: 1.25,
+  },
+  denseHeaderCell: {
+    paddingBlock: spacingVars["--spacing-0-5"],
+    paddingInline: spacingVars["--spacing-2"],
+    lineHeight: 1.25,
+    fontSize: typeScaleVars["--text-supporting-size"],
+  },
+});
+
+/**
+ * Rest-state cell text. Astryx `Text` carries its own 20 px leading, which would defeat `denseCell`,
+ * so cells set the supporting size and tabular figures directly.
+ */
+export const cellTextStyles = stylex.create({
+  base: {
+    fontSize: typeScaleVars["--text-supporting-size"],
+    fontVariantNumeric: "tabular-nums",
+    color: colorVars["--color-text-primary"],
+  },
+  /** Live: "When a note is deactivated it is grayed out"; also the disabled state. */
+  secondary: {
+    color: colorVars["--color-text-secondary"],
   },
 });
 
@@ -159,6 +205,7 @@ function NoteNumberCell({
   min,
   max,
   isDisabled,
+  isMuted,
   format,
   onCommit,
   isCurrent,
@@ -174,6 +221,7 @@ function NoteNumberCell({
   min: number;
   max: number;
   isDisabled: boolean;
+  isMuted: boolean;
   format: (value: number) => string;
   onCommit: (value: number, mode: CommitMode) => void;
 } & CellEditProps) {
@@ -294,14 +342,53 @@ function NoteNumberCell({
         }
       }}
     >
-      <Text
-        type="supporting"
-        color={isDisabled ? "secondary" : "primary"}
-        hasTabularNumbers
+      <span
+        {...stylex.props(
+          cellTextStyles.base,
+          (isDisabled || isMuted) && cellTextStyles.secondary,
+        )}
       >
         {format(shown)}
-      </Text>
+      </span>
     </span>
+  );
+}
+
+/**
+ * Logic's M column: blank at rest, the letter when muted, click or Enter/Space toggles. A text cell
+ * rather than a checkbox so it shares the roving focus and the row height with the other cells.
+ */
+function MuteCell({
+  label,
+  value,
+  isDisabled,
+  onToggle,
+  isCurrent,
+  onFocus,
+  cellId: id,
+}: {
+  label: string;
+  value: boolean;
+  isDisabled: boolean;
+  onToggle: (mute: boolean) => void;
+} & Pick<CellEditProps, "isCurrent" | "onFocus" | "cellId">) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={value}
+      disabled={isDisabled}
+      tabIndex={!isDisabled && isCurrent ? 0 : -1}
+      data-cell={id}
+      {...stylex.props(styles.rest, styles.muteCell, cellTextStyles.base)}
+      onFocus={onFocus}
+      onClick={() => {
+        onToggle(!value);
+      }}
+    >
+      {/* A non-breaking space keeps the empty button clickable at full row height. */}
+      {value ? "M" : "\u00A0"}
+    </button>
   );
 }
 
@@ -312,7 +399,7 @@ interface NoteTableProps {
   selectedKeys: Set<string>;
   setSelectedKeys: React.Dispatch<React.SetStateAction<Set<string>>>;
   isDisabled: boolean;
-  /** Mute, Probability, Velocity Deviation and Release Velocity columns; hidden in the basic view. */
+  /** Chance, Dev and Rel columns; hidden in the basic view. */
   showDetails: boolean;
   onCommitField: (
     noteId: number,
@@ -352,7 +439,12 @@ interface NoteTableProps {
  * header gutter toggles select all. Clicking a value cell selects its row unless the row is already
  * part of the selection, so a multi-row edit can start from any selected row.
  *
- * Known gap: the Mute checkbox keeps its own Tab stop; Astryx `CheckboxInput` has no `tabIndex`.
+ * Layout follows Logic's Event List (research 2026-09-04): columns sized to their longest value,
+ * numbers right-aligned, ~20 px rows, and a single-letter M column instead of a checkbox. Headers use
+ * Live's clip-panel words, not the LOM's: "Start" because Live's "Position" means where the loop
+ * sits, and "Length" because Live and Logic both say Length for a span while "Duration" is only the
+ * LOM property name. Muted rows keep full-strength M and drop the value cells to secondary text
+ * rather than dimming the whole row, so the selection band and row number stay legible.
  */
 export function NoteTable({
   notes,
@@ -648,14 +740,20 @@ export function NoteTable({
                   if (!live.current.isDisabled) live.current.selectAll();
                 },
               },
-              xstyle: withStyles(props.xstyle, styles.gutter),
+              xstyle: withStyles(
+                props.xstyle,
+                styles.gutter,
+                styles.denseHeaderCell,
+              ),
             }
-          : props,
+          : {
+              ...props,
+              xstyle: withStyles(props.xstyle, styles.denseHeaderCell),
+            },
       transformBodyRow: (props, item) => {
         const selected = live.current.isSelected(item.note_id);
         const xstyle = withStyles(
           props.xstyle,
-          ...(item.mute ? [styles.mutedRow] : []),
           ...(selected ? [styles.selectedRow] : []),
         );
         return {
@@ -703,8 +801,8 @@ export function NoteTable({
             : { ...props.htmlProps, role: "gridcell" },
         xstyle:
           column.key === "__rowIndex"
-            ? withStyles(props.xstyle, styles.gutter)
-            : props.xstyle,
+            ? withStyles(props.xstyle, styles.gutter, styles.denseBodyCell)
+            : withStyles(props.xstyle, styles.denseBodyCell),
         contextMenuActions: () => [
           ...resolveContextActions(props.contextMenuActions),
           ...live.current.rowActions(item),
@@ -730,25 +828,32 @@ export function NoteTable({
   const numberColumn = ({
     key,
     header,
+    label,
+    width,
     format = String,
     scale = 1,
   }: {
     key: Exclude<EditableField, "start_time" | "duration">;
     header: string;
+    /** Full name for the accessible label when the header is abbreviated. */
+    label?: string;
+    width: number;
     format?: (value: number) => string;
     /** Display units per stored unit; the cell shows and edits whole display units. */
     scale?: number;
   }): TableColumn<NoteRow> => ({
     key,
     header,
-    width: pixel(72),
+    width: pixel(width),
+    align: "end",
     renderCell: (row) => (
       <NoteNumberCell
-        label={`${header} of ${rowLabel(row)}`}
+        label={`${label ?? header} of ${rowLabel(row)}`}
         value={Math.round(row[key] * scale)}
         min={FIELD_RANGE[key].min * scale}
         max={FIELD_RANGE[key].max * scale}
         isDisabled={isDisabled}
+        isMuted={row.mute}
         format={format}
         onCommit={(value, mode) => {
           onCommitField(row.note_id, key, value / scale, mode);
@@ -771,7 +876,8 @@ export function NoteTable({
   }): TableColumn<NoteRow> => ({
     key,
     header,
-    width: pixel(88),
+    width: pixel(72),
+    align: "end",
     renderCell: (row) => (
       <BarBeatSixteenthInput
         label={`${header} of ${rowLabel(row)}`}
@@ -781,6 +887,7 @@ export function NoteTable({
         denominator={signatureDenominator}
         min={min}
         isDisabled={isDisabled}
+        isMuted={row.mute}
         onCommit={(value, { isMetaHeld }) => {
           onCommitField(
             row.note_id,
@@ -794,46 +901,49 @@ export function NoteTable({
     ),
   });
 
-  const detailColumns: TableColumn<NoteRow>[] = [
-    {
-      key: "mute",
-      header: "Mute",
-      width: pixel(64),
-      align: "center",
-      renderCell: (row) => {
-        const cell = { noteId: row.note_id, column: "mute" as const };
-        const props = cellProps(cell);
-        return (
-          <span
-            data-cell={props.cellId}
-            {...stylex.props(styles.checkboxCell)}
-            onFocus={props.onFocus}
-          >
-            <CheckboxInput
-              label={`Mute note ${noteName(row.pitch)}`}
-              isLabelHidden
-              size="sm"
-              isDisabled={isDisabled}
-              value={row.mute}
-              onChange={(checked) => {
-                onToggleMute(row.note_id, checked);
-              }}
-            />
-          </span>
-        );
-      },
+  const muteColumn: TableColumn<NoteRow> = {
+    key: "mute",
+    header: "M",
+    width: pixel(28),
+    align: "center",
+    renderCell: (row) => {
+      const props = cellProps({ noteId: row.note_id, column: "mute" });
+      return (
+        <MuteCell
+          label={`Mute ${rowLabel(row)}`}
+          value={row.mute}
+          isDisabled={isDisabled}
+          onToggle={(mute) => {
+            onToggleMute(row.note_id, mute);
+          }}
+          isCurrent={props.isCurrent}
+          onFocus={props.onFocus}
+          cellId={props.cellId}
+        />
+      );
     },
+  };
+
+  const detailColumns: TableColumn<NoteRow>[] = [
     numberColumn({
       key: "probability",
       header: "Chance",
+      width: 60,
       format: (value) => `${String(value)}%`,
       scale: PROBABILITY_SCALE,
     }),
     numberColumn({
       key: "velocity_deviation",
-      header: "Vel. dev.",
+      header: "Dev",
+      label: "Velocity deviation",
+      width: 48,
     }),
-    numberColumn({ key: "release_velocity", header: "Release" }),
+    numberColumn({
+      key: "release_velocity",
+      header: "Rel",
+      label: "Release velocity",
+      width: 44,
+    }),
   ];
 
   return (
@@ -848,21 +958,40 @@ export function NoteTable({
         note: notePlugin,
       }}
       columns={[
-        numberColumn({ key: "pitch", header: "Pitch", format: noteName }),
+        muteColumn,
         timeColumn({
           key: "start_time",
           header: "Start",
           kind: "position",
           min: 0,
         }),
+        numberColumn({
+          key: "pitch",
+          header: "Pitch",
+          width: 48,
+          format: noteName,
+        }),
+        numberColumn({
+          key: "velocity",
+          header: "Vel",
+          label: "Velocity",
+          width: 44,
+        }),
         timeColumn({
           key: "duration",
-          header: "Duration",
+          header: "Length",
           kind: "length",
           min: MIN_DURATION,
         }),
-        numberColumn({ key: "velocity", header: "Velocity" }),
         ...(showDetails ? detailColumns : []),
+        // Astryx stretches an all-pixel column set to the table's full width; a proportional filler
+        // absorbs the slack so the data columns stay content-sized, as in Logic.
+        {
+          key: "__filler",
+          header: "",
+          width: proportional(1, { minWidth: 0 }),
+          renderCell: () => null,
+        },
       ]}
     />
   );

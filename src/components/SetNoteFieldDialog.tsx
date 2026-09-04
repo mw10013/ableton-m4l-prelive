@@ -17,7 +17,7 @@ export type SettableField = Exclude<EditableField, "start_time">;
 
 export const FIELD_LABEL: Record<SettableField, string> = {
   pitch: "pitch",
-  duration: "duration",
+  duration: "length",
   velocity: "velocity",
   probability: "chance",
   velocity_deviation: "velocity deviation",
