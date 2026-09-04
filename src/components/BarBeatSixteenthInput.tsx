@@ -38,7 +38,31 @@ const styles = stylex.create({
   },
 });
 
-export interface BarBeatSixteenthInputProps {
+/**
+ * Why an editor closed. `commit` and `cancel` return focus to the rest state; `blur` does not (the
+ * pointer went elsewhere); `next` and `previous` ask the owner to open the neighbouring cell.
+ */
+export type EditEndReason = "commit" | "cancel" | "blur" | "next" | "previous";
+
+/**
+ * Edit-state contract shared by the note table's cells. The table owns which cell is open so Tab can
+ * chain from one editor into the next; a cell only asks to open or close.
+ */
+export interface CellEditProps {
+  /** Roving focus: the current cell is the table's single Tab stop. */
+  isCurrent: boolean;
+  isEditing: boolean;
+  /** Text the editor opens with when a typed key started the edit. */
+  editInitial?: string;
+  onEditStart: (initial?: string) => void;
+  onEditEnd: (reason: EditEndReason) => void;
+  /** Rest-state focus, so the table's current cell follows pointer and Tab focus. */
+  onFocus: () => void;
+  /** `data-cell` value the table uses to find and focus this cell. */
+  cellId: string;
+}
+
+export interface BarBeatSixteenthInputProps extends CellEditProps {
   label: string;
   /** Quarter-note beats. */
   value: number;
@@ -50,7 +74,7 @@ export interface BarBeatSixteenthInputProps {
   /** Fires on every scrub step so a parent can mirror the gesture. */
   onChange?: (beats: number) => void;
   /**
-   * Fires once per gesture (scrub release, Enter, blur with a change). Escape never commits.
+   * Fires once per gesture (scrub release, Enter, Tab, blur with a change). Escape never commits.
    * `isMetaHeld` is true when Cmd/Ctrl was held at release or with Enter.
    */
   onCommit: (beats: number, options: ScrubCommitOptions) => void;
@@ -68,10 +92,20 @@ export interface BarBeatSixteenthInputProps {
  * Off-grid values display rounded to the nearest sixteenth with a dimmed marker; the exact value is in
  * the tooltip and in the text field.
  *
- * A click, Enter, Space or a typed digit opens one text field with Live's typing conventions: `.`,
- * `,` or space hop to the next segment (and are accepted as separators when parsing), missing
- * trailing segments default to the first sixteenth (positions) or zero (lengths), up/down step the
- * segment containing the caret, Enter commits, Escape cancels. Segment overflow carries.
+ * Rest-state keys:
+ * - Enter, Space, F2: open the editor with the bar segment selected.
+ * - Digit: open the editor with that digit typed.
+ * - Alt+Up/Down: step a sixteenth in place; Shift+Alt for 1/128. Plain arrows bubble to the table,
+ *   which uses them to move between cells.
+ *
+ * Editor keys (Live's typing conventions):
+ * - `.`, `,`, space: hop to the next segment; they also parse as separators, so `3.2.2` pastes.
+ * - Left/Right: select the previous/next segment whole.
+ * - Up/Down: step the segment under the caret; Shift for the fine step.
+ * - Missing trailing segments default to the first sixteenth (positions) or zero (lengths).
+ * - Enter: commit and stay (Cmd/Ctrl+Enter commits as absolute for a multi-selection).
+ * - Tab / Shift+Tab: commit and open the next / previous cell.
+ * - Escape: cancel. Blur: commit if valid, otherwise close.
  */
 export function BarBeatSixteenthInput({
   label,
@@ -84,6 +118,13 @@ export function BarBeatSixteenthInput({
   onChange,
   onCommit,
   pointerLock,
+  isCurrent,
+  isEditing,
+  editInitial,
+  onEditStart,
+  onEditEnd,
+  onFocus,
+  cellId,
 }: BarBeatSixteenthInputProps) {
   const meter: Meter = { numerator, denominator };
   const { quartersPerBar, quartersPerBeat } = meterUnits(meter);
@@ -94,6 +135,10 @@ export function BarBeatSixteenthInput({
   const selectAfterRender = useRef<{ start: number; end: number } | null>(null);
   const cancelling = useRef(false);
   const beats = pending ?? value;
+  const exactText = formatBeatTime(value, meter, kind, { exact: true });
+  const isOpen = isEditing && !isDisabled;
+  // The draft is derived on open so the editor renders with content on its first frame.
+  const shownDraft = draft ?? editInitial ?? exactText;
 
   const commitBeats = (next: number, isMetaHeld = false) => {
     const clamped = Math.max(min, next);
@@ -114,33 +159,37 @@ export function BarBeatSixteenthInput({
     pointerLock,
   });
 
-  const openEditor = (initial?: string) => {
-    if (isDisabled) return;
-    setIsInvalid(false);
-    const text = formatBeatTime(value, meter, kind, { exact: true });
-    setDraft(initial ?? text);
-    // Live highlights the bar field on click; left/right then move between fields.
-    selectAfterRender.current =
-      initial === undefined
-        ? (segmentRanges(text)[0] ?? { start: 0, end: -1 })
-        : { start: initial.length, end: initial.length };
-  };
-  const closeEditor = () => {
+  const closeEditor = (reason: EditEndReason) => {
     setDraft(null);
     setIsInvalid(false);
     cancelling.current = false;
+    onEditEnd(reason);
   };
+
+  // Live highlights the bar field on click; left/right then move between fields. A typed digit
+  // leaves the caret after it instead.
+  useEffect(() => {
+    if (!isOpen) return;
+    const text = editInitial ?? exactText;
+    selectAfterRender.current =
+      editInitial === undefined
+        ? (segmentRanges(text)[0] ?? { start: 0, end: -1 })
+        : { start: text.length, end: text.length };
+    setDraft(text);
+    // Only the open transition matters; the text is captured then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     const target = input.current;
     const range = selectAfterRender.current;
-    if (draft === null || target === null || range === null) return;
+    if (!isOpen || target === null || range === null) return;
     selectAfterRender.current = null;
     target.setSelectionRange(
       range.start,
-      range.end === -1 ? draft.length : range.end,
+      range.end === -1 ? shownDraft.length : range.end,
     );
-  }, [draft]);
+  }, [isOpen, shownDraft]);
 
   const units = [
     { step: quartersPerBar, fineStep: SIXTEENTH },
@@ -171,20 +220,22 @@ export function BarBeatSixteenthInput({
     setDraft(next);
   };
 
-  if (draft !== null) {
-    const submit = (viaBlur: boolean, isMetaHeld = false) => {
+  if (isOpen) {
+    /** Parses and commits the draft. Returns false when the text is invalid and the editor stays. */
+    const submit = (reason: EditEndReason, isMetaHeld = false): boolean => {
       if (cancelling.current) {
-        closeEditor();
-        return;
+        closeEditor("cancel");
+        return true;
       }
-      const parsed = parseBeatTime(draft, meter, kind);
+      const parsed = parseBeatTime(shownDraft, meter, kind);
       if (parsed === null) {
-        if (viaBlur) closeEditor();
+        if (reason === "blur") closeEditor("blur");
         else setIsInvalid(true);
-        return;
+        return false;
       }
       commitBeats(parsed, isMetaHeld);
-      closeEditor();
+      closeEditor(reason);
+      return true;
     };
     return (
       <TextInput
@@ -192,7 +243,7 @@ export function BarBeatSixteenthInput({
         isLabelHidden
         size="sm"
         width="100%"
-        value={draft}
+        value={shownDraft}
         ref={input}
         hasAutoFocus
         status={isInvalid ? { type: "error" } : undefined}
@@ -201,31 +252,40 @@ export function BarBeatSixteenthInput({
           setDraft(text);
         }}
         onBlur={() => {
-          submit(true);
+          submit("blur");
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             // Handled here rather than `onEnter` so the modifier state reaches the commit.
             event.preventDefault();
-            submit(false, event.metaKey || event.ctrlKey);
+            submit("commit", event.metaKey || event.ctrlKey);
+            return;
+          }
+          if (event.key === "Tab") {
+            event.preventDefault();
+            submit(event.shiftKey ? "previous" : "next");
             return;
           }
           if (event.key === "Escape") {
             event.preventDefault();
             cancelling.current = true;
-            event.currentTarget.blur();
+            closeEditor("cancel");
             return;
           }
           if (event.key === "ArrowUp" || event.key === "ArrowDown") {
             event.preventDefault();
-            stepDraft(draft, event.key === "ArrowUp" ? 1 : -1, event.shiftKey);
+            stepDraft(
+              shownDraft,
+              event.key === "ArrowUp" ? 1 : -1,
+              event.shiftKey,
+            );
             return;
           }
           if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
             // Live: left/right select the previous/next field (Bar/Beat/16th) as a whole.
             event.preventDefault();
             const target = event.currentTarget;
-            const ranges = segmentRanges(draft);
+            const ranges = segmentRanges(shownDraft);
             const caret = target.selectionStart ?? 0;
             let index = ranges.findIndex((range) => caret <= range.end);
             if (index === -1) index = ranges.length - 1;
@@ -238,7 +298,7 @@ export function BarBeatSixteenthInput({
           }
           if (event.key === "." || event.key === "," || event.key === " ") {
             const target = event.currentTarget;
-            const ranges = segmentRanges(draft);
+            const ranges = segmentRanges(shownDraft);
             const caret = target.selectionStart ?? 0;
             const index = ranges.findIndex((range) => caret <= range.end);
             const next = index === -1 ? undefined : ranges[index + 1];
@@ -258,7 +318,7 @@ export function BarBeatSixteenthInput({
 
   const offGrid = isOffGrid(beats);
   const text = formatBeatTime(beats, meter, kind);
-  const exactText = formatBeatTime(beats, meter, kind, { exact: true });
+  const shownExact = formatBeatTime(beats, meter, kind, { exact: true });
   const segments = text.split(".");
   const bindings = units.map((unit) =>
     isDisabled
@@ -266,7 +326,7 @@ export function BarBeatSixteenthInput({
       : scrub.bind({
           ...unit,
           onClick: () => {
-            openEditor();
+            onEditStart();
           },
         }),
   );
@@ -277,19 +337,24 @@ export function BarBeatSixteenthInput({
       aria-label={label}
       aria-valuenow={beats}
       aria-valuemin={min}
-      aria-valuetext={exactText}
+      aria-valuetext={shownExact}
       aria-disabled={isDisabled || undefined}
-      tabIndex={isDisabled ? -1 : 0}
+      tabIndex={!isDisabled && isCurrent ? 0 : -1}
+      data-cell={cellId}
       {...stylex.props(styles.rest)}
+      onFocus={onFocus}
       onKeyDown={(event) => {
         if (isDisabled) return;
-        if (event.key === "Enter" || event.key === " ") {
+        if (event.key === "Enter" || event.key === " " || event.key === "F2") {
           event.preventDefault();
-          openEditor();
+          onEditStart();
         } else if (/^\d$/.test(event.key)) {
           event.preventDefault();
-          openEditor(event.key);
-        } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          onEditStart(event.key);
+        } else if (
+          event.altKey &&
+          (event.key === "ArrowUp" || event.key === "ArrowDown")
+        ) {
           event.preventDefault();
           const step = event.shiftKey ? MIN_DURATION : SIXTEENTH;
           commitBeats(beats + (event.key === "ArrowUp" ? step : -step));

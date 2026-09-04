@@ -1,4 +1,5 @@
 import type {
+  BodyRowRenderProps,
   TableColumn,
   TableContextAction,
   TablePlugin,
@@ -7,7 +8,14 @@ import type {
 import type { Note } from "@/lib/Domain";
 import type { EditableField } from "@/lib/noteEdits";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -17,14 +25,16 @@ import {
   resolveContextActions,
   Table,
   useTableRowIndex,
-  useTableSelection,
-  useTableSelectionState,
 } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
 
-import { BarBeatSixteenthInput } from "@/components/BarBeatSixteenthInput";
+import {
+  BarBeatSixteenthInput,
+  type CellEditProps,
+  type EditEndReason,
+} from "@/components/BarBeatSixteenthInput";
 import { useScrub } from "@/components/useScrub";
 import { formatBeatTime, MIN_DURATION } from "@/lib/beatTime";
 import { FIELD_RANGE } from "@/lib/noteEdits";
@@ -36,6 +46,37 @@ export type CommitMode = "relative" | "absolute";
 
 /** Live's Chance is a percentage; the LOM stores probability 0..1. */
 const PROBABILITY_SCALE = 100;
+
+/** A navigable column. `mute` is the checkbox; the rest are spinbutton fields. */
+type Column = EditableField | "mute";
+
+const BASE_COLUMNS: readonly Column[] = [
+  "pitch",
+  "start_time",
+  "duration",
+  "velocity",
+];
+const DETAIL_COLUMNS: readonly Column[] = [
+  "mute",
+  "probability",
+  "velocity_deviation",
+  "release_velocity",
+];
+
+/** The current cell, addressed by note id so it survives the re-sort after a Start edit. */
+interface CellRef {
+  readonly noteId: number;
+  readonly column: Column;
+}
+
+const cellId = ({ noteId, column }: CellRef) => `${String(noteId)}:${column}`;
+
+type XStyle = BodyRowRenderProps["xstyle"];
+
+/** Astryx types `xstyle` as `any[]`, which the lint's unsafe-spread rule cannot see through. */
+const withStyles = (base: XStyle, ...extra: XStyle): XStyle =>
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return
+  [...base, ...extra];
 
 const styles = stylex.create({
   rest: {
@@ -52,6 +93,17 @@ const styles = stylex.create({
   /** Live: "When a note is deactivated it is grayed out and will not be played." */
   mutedRow: {
     opacity: 0.45,
+  },
+  selectedRow: {
+    backgroundColor: colorVars["--color-background-blue"],
+  },
+  /** Logic's Status column: the one non-editable click target, "to avoid any unintentional parameter alterations". */
+  gutter: {
+    cursor: "default",
+    userSelect: "none",
+  },
+  checkboxCell: {
+    display: "inline-flex",
   },
 });
 
@@ -92,8 +144,14 @@ interface NoteRow extends Record<string, unknown> {
 }
 
 /**
- * Integer note field (pitch, velocity). Rest state is tabular text that scrubs vertically; a click,
- * Enter, Space or a typed digit opens a `NumberInput`. Enter and blur commit, Escape cancels.
+ * Integer note field (pitch, velocity, chance...). Rest state is tabular text that scrubs
+ * vertically.
+ *
+ * Rest-state keys: Enter, Space or F2 open the editor; a digit opens it with that digit typed;
+ * Alt+Up/Down step by one in place. Plain arrows bubble to the table for cell navigation.
+ *
+ * Editor keys: Enter commits and stays (Cmd/Ctrl+Enter commits as absolute for a multi-selection);
+ * Tab / Shift+Tab commit and open the next / previous cell; Escape cancels; blur commits.
  */
 function NoteNumberCell({
   label,
@@ -103,6 +161,13 @@ function NoteNumberCell({
   isDisabled,
   format,
   onCommit,
+  isCurrent,
+  isEditing,
+  editInitial,
+  onEditStart,
+  onEditEnd,
+  onFocus,
+  cellId: id,
 }: {
   label: string;
   value: number;
@@ -111,8 +176,7 @@ function NoteNumberCell({
   isDisabled: boolean;
   format: (value: number) => string;
   onCommit: (value: number, mode: CommitMode) => void;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
+} & CellEditProps) {
   const [pending, setPending] = useState<number | undefined>();
   // Astryx `NumberInput` parses and emits on the same keydown that reaches `onKeyDown`, before React
   // re-renders, so Enter must read the latest value from a ref rather than the render's `pending`.
@@ -121,16 +185,25 @@ function NoteNumberCell({
     pendingRef.current = next ?? null;
     setPending(next);
   };
+  const isOpen = isEditing && !isDisabled;
+  useEffect(() => {
+    if (isOpen)
+      setPendingValue(
+        editInitial === undefined ? undefined : Number(editInitial),
+      );
+    // Only the open transition seeds the draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
   const shown = pending ?? value;
-  const close = () => {
-    setIsEditing(false);
+  const close = (reason: EditEndReason) => {
     setPendingValue(undefined);
+    onEditEnd(reason);
   };
-  const commit = (isMetaHeld: boolean) => {
+  const commit = (reason: EditEndReason, isMetaHeld: boolean) => {
     const next = pendingRef.current;
     if (next !== null && next !== value)
       onCommit(next, isMetaHeld ? "absolute" : "relative");
-    close();
+    close(reason);
   };
   const scrub = useScrub({
     value: shown,
@@ -143,14 +216,16 @@ function NoteNumberCell({
       if (next !== value) onCommit(next, isMetaHeld ? "absolute" : "relative");
     },
   });
-  if (isEditing && !isDisabled) {
+  if (isOpen) {
     return (
       <NumberInput
         label={label}
         isLabelHidden
         size="sm"
         width="100%"
-        value={pending ?? value}
+        value={
+          pending ?? (editInitial === undefined ? value : Number(editInitial))
+        }
         min={min}
         max={max}
         step={1}
@@ -160,11 +235,14 @@ function NoteNumberCell({
           setPendingValue(next ?? undefined);
         }}
         onBlur={() => {
-          commit(false);
+          commit("blur", false);
         }}
         onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-          if (e.key === "Enter") commit(e.metaKey || e.ctrlKey);
-          else if (e.key === "Escape") close();
+          if (e.key === "Enter") commit("commit", e.metaKey || e.ctrlKey);
+          else if (e.key === "Tab") {
+            e.preventDefault();
+            commit(e.shiftKey ? "previous" : "next", false);
+          } else if (e.key === "Escape") close("cancel");
         }}
       />
     );
@@ -174,7 +252,7 @@ function NoteNumberCell({
     : scrub.bind({
         step: 1,
         onClick: () => {
-          setIsEditing(true);
+          onEditStart();
         },
       });
   return (
@@ -186,19 +264,23 @@ function NoteNumberCell({
       aria-valuemax={max}
       aria-valuetext={format(shown)}
       aria-disabled={isDisabled || undefined}
-      tabIndex={isDisabled ? -1 : 0}
+      tabIndex={!isDisabled && isCurrent ? 0 : -1}
+      data-cell={id}
       {...stylex.props(styles.rest)}
       {...handlers}
+      onFocus={onFocus}
       onKeyDown={(event) => {
         if (isDisabled) return;
-        if (event.key === "Enter" || event.key === " ") {
+        if (event.key === "Enter" || event.key === " " || event.key === "F2") {
           event.preventDefault();
-          setIsEditing(true);
+          onEditStart();
         } else if (/^\d$/.test(event.key)) {
           event.preventDefault();
-          setPendingValue(Number(event.key));
-          setIsEditing(true);
-        } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          onEditStart(event.key);
+        } else if (
+          event.altKey &&
+          (event.key === "ArrowUp" || event.key === "ArrowDown")
+        ) {
           event.preventDefault();
           const next = Math.min(
             max,
@@ -239,10 +321,39 @@ interface NoteTableProps {
     mode: CommitMode,
   ) => void;
   onToggleMute: (noteId: number, mute: boolean) => void;
+  /** Adds a note after the last row and returns its id; Tab past the last cell calls this. */
+  onAddNote: () => number;
   /** Right-click actions for a row; the table adds them after the selection plugin's own. */
   rowActions: (row: Note) => readonly TableContextAction[];
 }
 
+/**
+ * Editable note grid with keyboard navigation and Finder-style selection.
+ *
+ * Model (WAI-ARIA grid, with Logic's "navigation is selection" twist): one Tab stop, a roving
+ * current cell, and an edit layer entered on purpose. Moving the current row also selects it, as
+ * Logic's Left/Right Arrow "select the previous/next event".
+ *
+ * Navigation layer (no editor open):
+ * - Up/Down: move the current row and select only it. Shift+Up/Down: extend the range from the
+ *   anchor. Cmd/Ctrl+Up/Down: move without changing the selection.
+ * - Left/Right: move across columns. Home/End: first/last column; Cmd/Ctrl+Home/End: first/last row.
+ * - Enter, Space, F2 or a digit: open the current cell (handled by the cell).
+ * - Alt+Up/Down: step the current cell's value in place (handled by the cell).
+ * - Escape: clear the selection.
+ * - Delete/Backspace, Cmd+A, Cmd+D, 0: owned by `NoteListEditor`'s hotkeys.
+ *
+ * Edit layer: Enter commits and stays; Tab / Shift+Tab commit and open the next / previous cell,
+ * wrapping across rows; Tab past the last cell of the last row adds a note and opens its Pitch;
+ * Escape cancels; blur commits without moving focus.
+ *
+ * Pointer selection lives in the row-number gutter, the one non-editable column: click selects one
+ * row, Shift-click a range from the anchor, Cmd/Ctrl-click toggles, drag sweeps a range, and the
+ * header gutter toggles select all. Clicking a value cell selects its row unless the row is already
+ * part of the selection, so a multi-row edit can start from any selected row.
+ *
+ * Known gap: the Mute checkbox keeps its own Tab stop; Astryx `CheckboxInput` has no `tabIndex`.
+ */
 export function NoteTable({
   notes,
   signatureNumerator,
@@ -253,40 +364,350 @@ export function NoteTable({
   showDetails,
   onCommitField,
   onToggleMute,
+  onAddNote,
   rowActions,
 }: NoteTableProps) {
   const rows = notes.map((note): NoteRow => ({ ...note }));
   const getRowKey = useCallback((row: NoteRow) => String(row.note_id), []);
   const rowIndexPlugin = useTableRowIndex<NoteRow>({ data: rows, getRowKey });
-  const { selectionConfig } = useTableSelectionState<NoteRow>({
-    data: rows,
-    idKey: getRowKey,
-    selectedKeys,
-    setSelectedKeys,
-  });
-  const selectionPlugin = useTableSelection<NoteRow>({
-    ...selectionConfig,
-    getIsItemEnabled: () => !isDisabled,
-    getRowLabel: (row) =>
-      `note ${noteName(row.pitch)} at ${positionLabel(row.start_time, signatureNumerator, signatureDenominator)}`,
+  const columns: readonly Column[] = showDetails
+    ? [...BASE_COLUMNS, ...DETAIL_COLUMNS]
+    : BASE_COLUMNS;
+  const rowIds = rows.map((row) => row.note_id);
+
+  const [current, setCurrent] = useState<CellRef | null>(null);
+  const [editing, setEditing] = useState<{
+    readonly cell: CellRef;
+    readonly initial?: string;
+  } | null>(null);
+  /** Selection anchor for Shift ranges and gutter drags. */
+  const anchor = useRef<number | null>(null);
+  const isDragging = useRef(false);
+  const wrapper = useRef<HTMLDivElement | null>(null);
+  /** Set by keyboard navigation and editor exits; the effect below moves DOM focus once. */
+  const focusRequest = useRef(false);
+  /** A Tab out of an editor, resolved after the commit's re-render so it sees the re-sorted rows. */
+  const pendingMove = useRef<{ from: CellRef; direction: 1 | -1 } | null>(null);
+  const [moveTick, setMoveTick] = useState(0);
+
+  const isCurrentValid =
+    current !== null &&
+    rowIds.includes(current.noteId) &&
+    columns.includes(current.column);
+  const firstCell: CellRef | null =
+    rowIds[0] === undefined || columns[0] === undefined
+      ? null
+      : { noteId: rowIds[0], column: columns[0] };
+  const effectiveCurrent = isCurrentValid ? current : firstCell;
+
+  const isSelected = (noteId: number) => selectedKeys.has(String(noteId));
+  const selectOnly = (noteId: number) => {
+    setSelectedKeys(new Set([String(noteId)]));
+    anchor.current = noteId;
+  };
+  const selectRange = (fromId: number, toId: number) => {
+    const a = rowIds.indexOf(fromId);
+    const b = rowIds.indexOf(toId);
+    if (a === -1 || b === -1) return;
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    setSelectedKeys(new Set(rowIds.slice(lo, hi + 1).map(String)));
+  };
+  const toggleSelected = (noteId: number) => {
+    setSelectedKeys((keys) => {
+      const next = new Set(keys);
+      const key = String(noteId);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    anchor.current = noteId;
+  };
+
+  const moveTo = (cell: CellRef) => {
+    focusRequest.current = true;
+    setCurrent(cell);
+  };
+
+  /** The cell `direction` steps from `from` in reading order, or null past either end. */
+  const neighbour = (from: CellRef, direction: 1 | -1): CellRef | null => {
+    const rowIndex = rowIds.indexOf(from.noteId);
+    const columnIndex = columns.indexOf(from.column);
+    if (rowIndex === -1 || columnIndex === -1) return null;
+    let nextColumn = columnIndex + direction;
+    let nextRow = rowIndex;
+    if (nextColumn >= columns.length) {
+      nextColumn = 0;
+      nextRow += 1;
+    } else if (nextColumn < 0) {
+      nextColumn = columns.length - 1;
+      nextRow -= 1;
+    }
+    const noteId = rowIds[nextRow];
+    const column = columns[nextColumn];
+    return noteId === undefined || column === undefined
+      ? null
+      : { noteId, column };
+  };
+
+  useLayoutEffect(() => {
+    const move = pendingMove.current;
+    if (move === null) return;
+    pendingMove.current = null;
+    const next = neighbour(move.from, move.direction);
+    if (next !== null) {
+      setCurrent(next);
+      setEditing({ cell: next });
+    } else if (move.direction === 1) {
+      const noteId = onAddNote();
+      const column = columns[0];
+      if (column === undefined) return;
+      const cell = { noteId, column };
+      setCurrent(cell);
+      setEditing({ cell });
+      selectOnly(noteId);
+    } else {
+      focusRequest.current = true;
+      setCurrent({ ...move.from });
+    }
+    // Runs once per Tab out of an editor, after the commit's re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveTick]);
+
+  useEffect(() => {
+    if (!focusRequest.current || editing !== null || effectiveCurrent === null)
+      return;
+    focusRequest.current = false;
+    const host = wrapper.current?.querySelector<HTMLElement>(
+      `[data-cell="${cellId(effectiveCurrent)}"]`,
+    );
+    if (host === null || host === undefined) return;
+    const target = host.matches("input,[tabindex]")
+      ? host
+      : host.querySelector<HTMLElement>("input,[tabindex]");
+    target?.focus();
+    host.scrollIntoView({ block: "nearest" });
   });
 
-  const rowActionsRef = useRef(rowActions);
-  rowActionsRef.current = rowActions;
+  useEffect(() => {
+    const stop = () => {
+      isDragging.current = false;
+    };
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    return () => {
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+  }, []);
+
+  const cellProps = (cell: CellRef): CellEditProps => ({
+    isCurrent:
+      effectiveCurrent !== null &&
+      effectiveCurrent.noteId === cell.noteId &&
+      effectiveCurrent.column === cell.column,
+    isEditing:
+      editing !== null &&
+      editing.cell.noteId === cell.noteId &&
+      editing.cell.column === cell.column,
+    editInitial:
+      editing !== null && editing.cell.noteId === cell.noteId
+        ? editing.initial
+        : undefined,
+    onEditStart: (initial) => {
+      if (isDisabled) return;
+      setCurrent(cell);
+      setEditing({ cell, initial });
+    },
+    onEditEnd: (reason) => {
+      setEditing(null);
+      if (reason === "next" || reason === "previous") {
+        pendingMove.current = {
+          from: cell,
+          direction: reason === "next" ? 1 : -1,
+        };
+        setMoveTick((tick) => tick + 1);
+      } else if (reason !== "blur") {
+        focusRequest.current = true;
+      }
+    },
+    onFocus: () => {
+      setCurrent((prev) =>
+        prev !== null &&
+        prev.noteId === cell.noteId &&
+        prev.column === cell.column
+          ? prev
+          : cell,
+      );
+    },
+    cellId: cellId(cell),
+  });
+
+  const onWrapperKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (isDisabled || editing !== null || effectiveCurrent === null) return;
+    if (event.altKey) return;
+    const { noteId, column } = effectiveCurrent;
+    const rowIndex = rowIds.indexOf(noteId);
+    const columnIndex = columns.indexOf(column);
+    const isMod = event.metaKey || event.ctrlKey;
+    const toRow = (index: number) => {
+      const nextId = rowIds[Math.min(rowIds.length - 1, Math.max(0, index))];
+      if (nextId === undefined) return;
+      if (event.shiftKey) selectRange(anchor.current ?? noteId, nextId);
+      else if (!isMod) selectOnly(nextId);
+      moveTo({ noteId: nextId, column });
+    };
+    const toColumn = (index: number) => {
+      const next = columns[Math.min(columns.length - 1, Math.max(0, index))];
+      if (next !== undefined) moveTo({ noteId, column: next });
+    };
+    switch (event.key) {
+      case "ArrowUp": {
+        toRow(rowIndex - 1);
+        break;
+      }
+      case "ArrowDown": {
+        toRow(rowIndex + 1);
+        break;
+      }
+      case "ArrowLeft": {
+        toColumn(columnIndex - 1);
+        break;
+      }
+      case "ArrowRight": {
+        toColumn(columnIndex + 1);
+        break;
+      }
+      case "Home": {
+        if (isMod) toRow(0);
+        else toColumn(0);
+        break;
+      }
+      case "End": {
+        if (isMod) toRow(rowIds.length - 1);
+        else toColumn(columns.length - 1);
+        break;
+      }
+      case "Escape": {
+        setSelectedKeys(new Set());
+        break;
+      }
+      default: {
+        return;
+      }
+    }
+    event.preventDefault();
+  };
+
+  // Plugins are memoized once; everything they need comes through refs so rows still see fresh
+  // handlers without the Table re-planning its columns every render.
+  const selectAll = () => {
+    setSelectedKeys((keys) =>
+      keys.size === rowIds.length ? new Set() : new Set(rowIds.map(String)),
+    );
+  };
+  const liveState = {
+    isDisabled,
+    isSelected,
+    selectOnly,
+    selectRange,
+    toggleSelected,
+    rowActions,
+    currentColumn: effectiveCurrent?.column,
+    setCurrent: moveTo,
+    selectAll,
+  };
+  const live = useRef(liveState);
+  live.current = liveState;
+  const wrapperKeyDown = useRef(onWrapperKeyDown);
+  wrapperKeyDown.current = onWrapperKeyDown;
+
   const notePlugin = useMemo(
     (): TablePlugin<NoteRow> => ({
-      transformBodyRow: (props, item) => {
-        if (!item.mute) return props;
-        // Astryx types `xstyle` as `any[]`, which the lint's unsafe-spread rule cannot see through.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const xstyle: typeof props.xstyle = [...props.xstyle, styles.mutedRow];
-        return { ...props, xstyle };
-      },
-      transformBodyCell: (props, _column, item) => ({
+      transformScrollWrapper: (props) => ({
         ...props,
+        htmlProps: {
+          ...props.htmlProps,
+          ref: wrapper,
+          // The cells are the Tab stops; Astryx makes the scroll box one too.
+          tabIndex: -1,
+          role: "grid",
+          "aria-multiselectable": true,
+          onKeyDown: (event) => {
+            wrapperKeyDown.current(event);
+          },
+        },
+      }),
+      transformHeaderCell: (props, column) =>
+        column.key === "__rowIndex"
+          ? {
+              ...props,
+              htmlProps: {
+                ...props.htmlProps,
+                title: "Select all / none",
+                onClick: () => {
+                  if (!live.current.isDisabled) live.current.selectAll();
+                },
+              },
+              xstyle: withStyles(props.xstyle, styles.gutter),
+            }
+          : props,
+      transformBodyRow: (props, item) => {
+        const selected = live.current.isSelected(item.note_id);
+        const xstyle = withStyles(
+          props.xstyle,
+          ...(item.mute ? [styles.mutedRow] : []),
+          ...(selected ? [styles.selectedRow] : []),
+        );
+        return {
+          ...props,
+          xstyle,
+          htmlProps: {
+            ...props.htmlProps,
+            role: "row",
+            "aria-selected": selected,
+            onPointerDown: (event) => {
+              const state = live.current;
+              if (state.isDisabled || event.button !== 0) return;
+              const id = item.note_id;
+              const inGutter =
+                event.target instanceof Element &&
+                event.target.closest("[data-gutter]") !== null;
+              if (inGutter) {
+                event.preventDefault();
+                if (event.shiftKey) state.selectRange(anchor.current ?? id, id);
+                else if (event.metaKey || event.ctrlKey)
+                  state.toggleSelected(id);
+                else {
+                  state.selectOnly(id);
+                  isDragging.current = true;
+                }
+                const column = state.currentColumn ?? BASE_COLUMNS[0];
+                if (column !== undefined)
+                  state.setCurrent({ noteId: id, column });
+              } else if (!state.isSelected(id)) {
+                state.selectOnly(id);
+              }
+            },
+            onPointerEnter: () => {
+              if (isDragging.current && anchor.current !== null)
+                live.current.selectRange(anchor.current, item.note_id);
+            },
+          },
+        };
+      },
+      transformBodyCell: (props, column, item) => ({
+        ...props,
+        htmlProps:
+          column.key === "__rowIndex"
+            ? { ...props.htmlProps, "data-gutter": true }
+            : { ...props.htmlProps, role: "gridcell" },
+        xstyle:
+          column.key === "__rowIndex"
+            ? withStyles(props.xstyle, styles.gutter)
+            : props.xstyle,
         contextMenuActions: () => [
           ...resolveContextActions(props.contextMenuActions),
-          ...rowActionsRef.current(item),
+          ...live.current.rowActions(item),
         ],
       }),
     }),
@@ -332,6 +753,7 @@ export function NoteTable({
         onCommit={(value, mode) => {
           onCommitField(row.note_id, key, value / scale, mode);
         }}
+        {...cellProps({ noteId: row.note_id, column: key })}
       />
     ),
   });
@@ -367,6 +789,7 @@ export function NoteTable({
             isMetaHeld ? "absolute" : "relative",
           );
         }}
+        {...cellProps({ noteId: row.note_id, column: key })}
       />
     ),
   });
@@ -377,18 +800,28 @@ export function NoteTable({
       header: "Mute",
       width: pixel(64),
       align: "center",
-      renderCell: (row) => (
-        <CheckboxInput
-          label={`Mute note ${noteName(row.pitch)}`}
-          isLabelHidden
-          size="sm"
-          isDisabled={isDisabled}
-          value={row.mute}
-          onChange={(checked) => {
-            onToggleMute(row.note_id, checked);
-          }}
-        />
-      ),
+      renderCell: (row) => {
+        const cell = { noteId: row.note_id, column: "mute" as const };
+        const props = cellProps(cell);
+        return (
+          <span
+            data-cell={props.cellId}
+            {...stylex.props(styles.checkboxCell)}
+            onFocus={props.onFocus}
+          >
+            <CheckboxInput
+              label={`Mute note ${noteName(row.pitch)}`}
+              isLabelHidden
+              size="sm"
+              isDisabled={isDisabled}
+              value={row.mute}
+              onChange={(checked) => {
+                onToggleMute(row.note_id, checked);
+              }}
+            />
+          </span>
+        );
+      },
     },
     numberColumn({
       key: "probability",
@@ -412,7 +845,6 @@ export function NoteTable({
       hasHover
       plugins={{
         rowIndex: rowIndexPlugin,
-        selection: selectionPlugin,
         note: notePlugin,
       }}
       columns={[

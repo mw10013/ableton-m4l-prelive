@@ -165,13 +165,15 @@ export function NoteListEditor({
     );
   };
 
-  const addNote = () => {
+  /** Appends a note after the last row (inheriting its pitch, length and velocity) and returns its id. */
+  const addNote = (): number => {
     const last = notes.at(-1);
+    const note_id = nextTempId(notes);
     onNotesChange(
       byMusicalOrder([
         ...notes,
         {
-          note_id: nextTempId(notes),
+          note_id,
           pitch: last?.pitch ?? 60,
           start_time: last === undefined ? 0 : last.start_time + last.duration,
           duration: last?.duration ?? 1,
@@ -183,6 +185,7 @@ export function NoteListEditor({
         },
       ]),
     );
+    return note_id;
   };
 
   const deleteSelected = () => {
@@ -381,6 +384,7 @@ export function NoteListEditor({
         showDetails={showDetails}
         onCommitField={commitField}
         onToggleMute={toggleMute}
+        onAddNote={addNote}
         rowActions={rowActions}
       />
       {writeError !== null && (
