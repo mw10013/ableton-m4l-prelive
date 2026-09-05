@@ -5,8 +5,7 @@ import type {
   TablePlugin,
 } from "@astryxdesign/core/Table";
 
-import type { Note } from "@/lib/Domain";
-import type { EditableField } from "@/lib/noteEdits";
+import type { EditableField, NoteRow } from "@/lib/noteEdits";
 
 import {
   useCallback,
@@ -180,8 +179,8 @@ export const positionLabel = (
   denominator: number,
 ) => formatBeatTime(beats, { numerator, denominator }, "position");
 
-interface NoteRow extends Record<string, unknown> {
-  note_id: number;
+interface TableRow extends Record<string, unknown> {
+  id: number;
   pitch: number;
   start_time: number;
   duration: number;
@@ -399,7 +398,7 @@ function MuteCell({
 }
 
 interface NoteTableProps {
-  notes: readonly Note[];
+  notes: readonly NoteRow[];
   signatureNumerator: number;
   signatureDenominator: number;
   selectedKeys: Set<string>;
@@ -417,7 +416,7 @@ interface NoteTableProps {
   /** Adds a note after the last row and returns its id; Tab past the last cell calls this. */
   onAddNote: () => number;
   /** Right-click actions for a row; the table adds them after the selection plugin's own. */
-  rowActions: (row: Note) => readonly TableContextAction[];
+  rowActions: (row: NoteRow) => readonly TableContextAction[];
 }
 
 /**
@@ -467,13 +466,13 @@ export function NoteTable({
   onAddNote,
   rowActions,
 }: NoteTableProps) {
-  const rows = notes.map((note): NoteRow => ({ ...note }));
-  const getRowKey = useCallback((row: NoteRow) => String(row.note_id), []);
-  const rowIndexPlugin = useTableRowIndex<NoteRow>({ data: rows, getRowKey });
+  const rows = notes.map((note): TableRow => ({ ...note }));
+  const getRowKey = useCallback((row: TableRow) => String(row.id), []);
+  const rowIndexPlugin = useTableRowIndex<TableRow>({ data: rows, getRowKey });
   const columns: readonly Column[] = showDetails
     ? [...BASE_COLUMNS, ...DETAIL_COLUMNS]
     : BASE_COLUMNS;
-  const rowIds = rows.map((row) => row.note_id);
+  const rowIds = rows.map((row) => row.id);
 
   const [current, setCurrent] = useState<CellRef | null>(null);
   const [editing, setEditing] = useState<{
@@ -722,7 +721,7 @@ export function NoteTable({
   wrapperKeyDown.current = onWrapperKeyDown;
 
   const notePlugin = useMemo(
-    (): TablePlugin<NoteRow> => ({
+    (): TablePlugin<TableRow> => ({
       transformScrollWrapper: (props) => ({
         ...props,
         htmlProps: {
@@ -759,7 +758,7 @@ export function NoteTable({
               xstyle: withStyles(props.xstyle, styles.denseHeaderCell),
             },
       transformBodyRow: (props, item) => {
-        const selected = live.current.isSelected(item.note_id);
+        const selected = live.current.isSelected(item.id);
         const xstyle = withStyles(
           props.xstyle,
           ...(selected ? [styles.selectedRow] : []),
@@ -774,7 +773,7 @@ export function NoteTable({
             onPointerDown: (event) => {
               const state = live.current;
               if (state.isDisabled || event.button !== 0) return;
-              const id = item.note_id;
+              const id = item.id;
               const inGutter =
                 event.target instanceof Element &&
                 event.target.closest("[data-gutter]") !== null;
@@ -797,7 +796,7 @@ export function NoteTable({
             },
             onPointerEnter: () => {
               if (isDragging.current && anchor.current !== null)
-                live.current.selectRange(anchor.current, item.note_id);
+                live.current.selectRange(anchor.current, item.id);
             },
           },
         };
@@ -831,7 +830,7 @@ export function NoteTable({
     );
   }
 
-  const rowLabel = (row: NoteRow) =>
+  const rowLabel = (row: TableRow) =>
     `note ${noteName(row.pitch)} at ${positionLabel(row.start_time, signatureNumerator, signatureDenominator)}`;
 
   const numberColumn = ({
@@ -850,7 +849,7 @@ export function NoteTable({
     format?: (value: number) => string;
     /** Display units per stored unit; the cell shows and edits whole display units. */
     scale?: number;
-  }): TableColumn<NoteRow> => ({
+  }): TableColumn<TableRow> => ({
     key,
     header,
     width: pixel(width),
@@ -865,9 +864,9 @@ export function NoteTable({
         isMuted={row.mute}
         format={format}
         onCommit={(value, mode) => {
-          onCommitField(row.note_id, key, value / scale, mode);
+          onCommitField(row.id, key, value / scale, mode);
         }}
-        {...cellProps({ noteId: row.note_id, column: key })}
+        {...cellProps({ noteId: row.id, column: key })}
       />
     ),
   });
@@ -882,7 +881,7 @@ export function NoteTable({
     header: string;
     kind: "position" | "length";
     min: number;
-  }): TableColumn<NoteRow> => ({
+  }): TableColumn<TableRow> => ({
     key,
     header,
     width: pixel(72),
@@ -899,31 +898,31 @@ export function NoteTable({
         isMuted={row.mute}
         onCommit={(value, { isMetaHeld }) => {
           onCommitField(
-            row.note_id,
+            row.id,
             key,
             value,
             isMetaHeld ? "absolute" : "relative",
           );
         }}
-        {...cellProps({ noteId: row.note_id, column: key })}
+        {...cellProps({ noteId: row.id, column: key })}
       />
     ),
   });
 
-  const muteColumn: TableColumn<NoteRow> = {
+  const muteColumn: TableColumn<TableRow> = {
     key: "mute",
     header: "M",
     width: pixel(28),
     align: "center",
     renderCell: (row) => {
-      const props = cellProps({ noteId: row.note_id, column: "mute" });
+      const props = cellProps({ noteId: row.id, column: "mute" });
       return (
         <MuteCell
           label={`Mute ${rowLabel(row)}`}
           value={row.mute}
           isDisabled={isDisabled}
           onToggle={(mute) => {
-            onToggleMute(row.note_id, mute);
+            onToggleMute(row.id, mute);
           }}
           isCurrent={props.isCurrent}
           onFocus={props.onFocus}
@@ -933,7 +932,7 @@ export function NoteTable({
     },
   };
 
-  const detailColumns: TableColumn<NoteRow>[] = [
+  const detailColumns: TableColumn<TableRow>[] = [
     numberColumn({
       key: "probability",
       header: "Chance",

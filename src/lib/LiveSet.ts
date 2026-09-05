@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Duration, Effect, Schema } from "effect";
 
 import * as Domain from "@/lib/Domain";
 import { LiveQL, LiveQLError } from "@/lib/LiveQL";
@@ -203,13 +203,14 @@ export const readClipById = Effect.fn("LiveSet.readClipById")(function* (
  * 4. `add_new_notes` with the full list. Every note gets a new note_id.
  *
  * Phases 2-4 go in one GraphQL document as aliased mutation fields, which
- * the spec executes serially in document order; the last field selects the
- * whole clip, so the readback is in the same request and the write is one
- * round trip after the read, without a composite on the server. Not atomic: nothing over the LOM is.
- * A failure leaves the clip in whichever state it reached; the caller
- * treats every failure as unverified and recovers by reloading, never by
- * retrying. Notes added in Live between the read and the delete survive;
- * concurrent editing is unsupported.
+ * the spec executes serially in document order, so the write is one round
+ * trip after the read, without a composite on the server. Nothing is read
+ * back: the caller autowrites the whole list and never merges Live's answer.
+ * Not atomic: nothing over the LOM is. A failure leaves the clip in whichever
+ * state it reached, and the next write replaces the clip again. Notes added
+ * in Live between the read and the delete survive; concurrent editing is
+ * unsupported. The elapsed time of the mutation is logged so the client
+ * debounce can be tuned from numbers.
  */
 export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
   input: Domain.ReplaceNotesInput,
@@ -268,9 +269,9 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
   }
 
   if (steps.length === 0) {
-    return { clip: current };
+    return { clipId: input.clipId };
   }
-  const data = yield* gqlDecode(
+  const [elapsed] = yield* gqlDecode(
     Schema.Record(Schema.String, Schema.Unknown),
     mutationDocument(steps),
     {
@@ -282,24 +283,15 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
       ),
     },
     { timeout: "60 seconds" },
+  ).pipe(Effect.timed);
+  yield* Effect.logInfo("replaceNotes").pipe(
+    Effect.annotateLogs({
+      clipId: input.clipId,
+      notes: input.notes.length,
+      ms: Duration.toMillis(elapsed),
+    }),
   );
-  const lastIndex = steps.length - 1;
-  const last = data[stepAlias(lastIndex)];
-  const clip = yield* Schema.decodeUnknownEffect(Domain.ClipWithNotes)(
-    steps.at(lastIndex)?.field === "clip_add_new_notes"
-      ? (last as { clip: unknown }).clip
-      : last,
-  ).pipe(
-    Effect.mapError(
-      (cause) =>
-        new LiveQLError({
-          reason: "decode",
-          message: "LiveQL response validation failed",
-          cause,
-        }),
-    ),
-  );
-  return { clip };
+  return { clipId: input.clipId };
 });
 
 interface Step {
@@ -311,17 +303,11 @@ const varName = (arg: string, step: number) => `${arg}${String(step)}`;
 const stepAlias = (step: number) => `s${String(step)}`;
 
 /**
- * What each field selects. Intermediate steps select the minimum; the last
- * step selects the whole clip so the readback rides in the same request.
- * `clip_add_new_notes` returns a payload with the ids Live assigned and the
- * clip nested under `clip`; the others return the clip itself.
+ * What each field selects: the minimum. `clip_add_new_notes` returns a payload
+ * with the clip nested under `clip`; the others return the clip itself.
  */
-const selection = (field: string, isLast: boolean) => {
-  const clip = isLast ? ClipWithNotesFields : "id";
-  return field === "clip_add_new_notes"
-    ? `{ note_ids clip { ${clip} } }`
-    : `{ ${clip} }`;
-};
+const selection = (field: string) =>
+  field === "clip_add_new_notes" ? `{ clip { id } }` : `{ id }`;
 
 const ARG_TYPES: Record<string, string> = {
   properties: "ClipPropertiesInput!",
@@ -335,9 +321,7 @@ const ARG_TYPES: Record<string, string> = {
 /**
  * One mutation document with one aliased root field per step. Variables are
  * suffixed with the step index so the same argument name can appear in
- * several steps. The last field carries the full clip selection, which is the
- * readback: the spec runs mutation fields serially, so it reflects every
- * earlier step.
+ * several steps. The spec runs mutation fields serially in document order.
  */
 const mutationDocument = (steps: readonly Step[]) => {
   const vars = ["$id: Int!"];
@@ -349,7 +333,7 @@ const mutationDocument = (steps: readonly Step[]) => {
       args.push(`${k}: $${varName(k, i)}`);
     }
     fields.push(
-      `${stepAlias(i)}: ${s.field}(${args.join(", ")}) ${selection(s.field, i === steps.length - 1)}`,
+      `${stepAlias(i)}: ${s.field}(${args.join(", ")}) ${selection(s.field)}`,
     );
   });
   return `mutation(${vars.join(", ")}) {\n${fields.join("\n")}\n}`;

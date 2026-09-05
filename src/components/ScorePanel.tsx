@@ -1,4 +1,4 @@
-import type { Note } from "@/lib/Domain";
+import type { NoteRow } from "@/lib/noteEdits";
 
 import { useEffect, useState } from "react";
 
@@ -11,16 +11,19 @@ import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useMutation } from "@tanstack/react-query";
 
 import { renderLilyPondSvg } from "@/lib/lilypond/renderServerFn";
+import { toReplacementNotes } from "@/lib/noteEdits";
 
 interface ScorePanelProps {
-  notes: readonly Note[];
+  notes: readonly NoteRow[];
 }
 
-function ScoreDisplay({ notes }: { notes: readonly Note[] }) {
+function ScoreDisplay({ notes }: { notes: readonly NoteRow[] }) {
   const [lilypondSvg, setLilypondSvg] = useState<string | null>(null);
   const { mutate: renderLilypond } = useMutation({
-    mutationFn: async (noteData: readonly Note[]) => {
-      const response = await renderLilyPondSvg({ data: { notes: noteData } });
+    mutationFn: async (noteData: readonly NoteRow[]) => {
+      const response = await renderLilyPondSvg({
+        data: { notes: toReplacementNotes(noteData) },
+      });
       return await response.text();
     },
     onSuccess: setLilypondSvg,

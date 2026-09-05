@@ -1,4 +1,4 @@
-import type { Note } from "@/lib/Domain";
+import type { ReplacementNote as Note } from "@/lib/Domain";
 
 import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";

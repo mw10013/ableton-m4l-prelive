@@ -3,23 +3,56 @@ import type { Note, ReplacementNote } from "@/lib/Domain";
 import { MIN_DURATION } from "@/lib/beatTime";
 export const TIME_EPSILON = 1e-9;
 
-export const byMusicalOrder = (notes: readonly Note[]): readonly Note[] =>
+/**
+ * A note as the editor holds it. `id` is minted in the browser from a counter
+ * scoped to the loaded clip; Live's `note_id` is read on load and dropped,
+ * because a whole-clip write reassigns every id in Live and so it is not a
+ * stable identity for anything the table holds.
+ */
+export interface NoteRow extends ReplacementNote {
+  readonly id: number;
+}
+
+export const byMusicalOrder = <T extends ReplacementNote>(
+  notes: readonly T[],
+): readonly T[] =>
   notes.toSorted((a, b) => a.start_time - b.start_time || a.pitch - b.pitch);
 
-/**
- * Locally added and duplicated notes carry negative ids allocated below every id
- * in the list. They are row identity for the table only: Live never sees them,
- * because `toReplacementNotes` strips every id, and a write hands back notes
- * with fresh Live ids. Derived from the list rather than a module counter so a
- * clip switch cannot collide with ids left over from the previous clip.
- */
-export const nextTempId = (notes: readonly Note[]): number =>
-  Math.min(0, ...notes.map(({ note_id }) => note_id)) - 1;
+/** Rows for a freshly read clip, numbered from `firstId` in musical order. */
+export const rowsOf = (
+  notes: readonly Note[],
+  firstId: number,
+): { readonly rows: readonly NoteRow[]; readonly nextId: number } => {
+  const rows = byMusicalOrder(notes).map(
+    ({ note_id: _noteId, ...fields }, index) => ({
+      ...fields,
+      id: firstId + index,
+    }),
+  );
+  return { rows, nextId: firstId + rows.length };
+};
 
 export const toReplacementNotes = (
-  notes: readonly Note[],
-): readonly ReplacementNote[] =>
-  notes.map(({ note_id: _noteId, ...note }) => note);
+  notes: readonly NoteRow[],
+): readonly ReplacementNote[] => notes.map(({ id: _id, ...note }) => note);
+
+const REPLACEMENT_FIELDS = [
+  "pitch",
+  "start_time",
+  "duration",
+  "velocity",
+  "mute",
+  "probability",
+  "velocity_deviation",
+  "release_velocity",
+] as const satisfies readonly (keyof ReplacementNote)[];
+
+const sameFields = (x: ReplacementNote, y: ReplacementNote) =>
+  REPLACEMENT_FIELDS.every((field) => x[field] === y[field]);
+
+/** Positional comparison of note fields, ignoring ids. Lists are kept in musical order. */
+export const sameNotes = (x: readonly NoteRow[], y: readonly NoteRow[]) =>
+  x.length === y.length && x.every((row, i) => sameFields(row, y[i]));
 
 /**
  * The first quarter-note boundary at or after the end of the selection. The
@@ -27,7 +60,7 @@ export const toReplacementNotes = (
  * floats lands a hair above it, and a bare `Math.ceil` would then skip a whole
  * quarter note.
  */
-export const defaultDestination = (selected: readonly Note[]): number =>
+export const defaultDestination = (selected: readonly NoteRow[]): number =>
   Math.ceil(
     Math.max(
       ...selected.map(({ start_time, duration }) => start_time + duration),
@@ -38,20 +71,29 @@ export const duplicateNotes = ({
   notes,
   selected,
   destination,
+  firstId,
 }: {
-  readonly notes: readonly Note[];
-  readonly selected: readonly Note[];
+  readonly notes: readonly NoteRow[];
+  readonly selected: readonly NoteRow[];
   readonly destination: number;
-}): { readonly notes: readonly Note[]; readonly copies: readonly Note[] } => {
+  readonly firstId: number;
+}): {
+  readonly notes: readonly NoteRow[];
+  readonly copies: readonly NoteRow[];
+  readonly nextId: number;
+} => {
   const offset =
     destination - Math.min(...selected.map(({ start_time }) => start_time));
-  const firstTempId = nextTempId(notes);
   const copies = selected.map((note, index) => ({
     ...note,
-    note_id: firstTempId - index,
+    id: firstId + index,
     start_time: note.start_time + offset,
   }));
-  return { notes: byMusicalOrder([...notes, ...copies]), copies };
+  return {
+    notes: byMusicalOrder([...notes, ...copies]),
+    copies,
+    nextId: firstId + copies.length,
+  };
 };
 
 export const playbackRegion = ({
@@ -85,7 +127,7 @@ export const requiredPlaybackRegion = ({
   region,
   quartersPerBar: bar,
 }: {
-  readonly notes: readonly Note[];
+  readonly notes: readonly ReplacementNote[];
   readonly region: { readonly start: number; readonly end: number };
   readonly quartersPerBar: number;
 }): { readonly start: number; readonly end: number } =>
@@ -147,14 +189,14 @@ export const clampField = (field: EditableField, value: number): number => {
 
 /** Every target gets `value`. Cubase: "To set all selected events to the same value, press Ctrl/Cmd". */
 export const setField = (
-  notes: readonly Note[],
+  notes: readonly NoteRow[],
   targetIds: ReadonlySet<number>,
   field: EditableField,
   value: number,
-): readonly Note[] =>
+): readonly NoteRow[] =>
   byMusicalOrder(
     notes.map((note) =>
-      targetIds.has(note.note_id)
+      targetIds.has(note.id)
         ? { ...note, [field]: clampField(field, value) }
         : note,
     ),
@@ -169,14 +211,14 @@ export const setField = (
  * are maintained"). Integer fields round the delta first so every member moves by the same amount.
  */
 export const shiftField = (
-  notes: readonly Note[],
+  notes: readonly NoteRow[],
   targetIds: ReadonlySet<number>,
   field: EditableField,
   delta: number,
-): readonly Note[] => {
+): readonly NoteRow[] => {
   const { min, max, isInteger } = FIELD_RANGE[field];
   const values = notes
-    .filter((note) => targetIds.has(note.note_id))
+    .filter((note) => targetIds.has(note.id))
     .map((note) => note[field]);
   const headroom = Math.min(...values.map((value) => max - value));
   const legroom = Math.max(...values.map((value) => min - value));
@@ -186,7 +228,7 @@ export const shiftField = (
     ? notes
     : byMusicalOrder(
         notes.map((note) =>
-          targetIds.has(note.note_id)
+          targetIds.has(note.id)
             ? { ...note, [field]: clampField(field, note[field] + applied) }
             : note,
         ),

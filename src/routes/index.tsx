@@ -1,9 +1,14 @@
 import type { TableColumn } from "@astryxdesign/core/Table";
 
 import type { EditorStatus } from "@/components/NoteListEditor";
-import type { ClipWithNotes, Note } from "@/lib/Domain";
+import type {
+  ClipRegion,
+  ClipWithNotes,
+  ReplaceNotesInput,
+} from "@/lib/Domain";
+import type { NoteRow } from "@/lib/noteEdits";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -32,13 +37,18 @@ import { RefreshCw } from "lucide-react";
 import { NoteListEditor } from "@/components/NoteListEditor";
 import { ScorePanel } from "@/components/ScorePanel";
 import { ScrubbableNumberInput } from "@/components/ScrubbableNumberInput";
+import { useAutowrite } from "@/components/useAutowrite";
 import {
-  byMusicalOrder,
+  activeRowsOf,
+  buffersReducer,
+  EMPTY_BUFFERS,
+  slotSummaryOf,
+} from "@/lib/clipBuffers";
+import {
   isSameRegion,
   playbackRegion,
   quartersPerBar,
   requiredPlaybackRegion,
-  toReplacementNotes,
 } from "@/lib/noteEdits";
 import {
   fireClip,
@@ -107,9 +117,6 @@ const clipInfoOf = (clip: ClipWithNotes): ClipInfo => ({
   playback: playbackRegion(clip),
 });
 
-const notesOf = (clip: ClipWithNotes): readonly Note[] =>
-  byMusicalOrder(clip.get_all_notes_extended?.notes ?? []);
-
 const messageOf = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
@@ -165,7 +172,11 @@ function RouteComponent() {
   const [clipInfo, setClipInfo] = useState<ClipInfo | null>(null);
   const [trackName, setTrackName] = useState<string | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
-  const [notes, setNotes] = useState<readonly Note[]>([]);
+  const [loadId, setLoadId] = useState(0);
+  const [switchCount, setSwitchCount] = useState(0);
+  const [buffers, dispatch] = useReducer(buffersReducer, EMPTY_BUFFERS);
+  const notes = activeRowsOf(buffers);
+  const slots = slotSummaryOf(buffers);
   const [isClipMissing, setIsClipMissing] = useState(false);
   const [scrubPrototypeValue, setScrubPrototypeValue] = useState(64);
   const [scrubPrototypeDuration, setScrubPrototypeDuration] = useState(1);
@@ -180,34 +191,28 @@ function RouteComponent() {
       ? (clipQuery.data?.liveSelectedClipId ?? null)
       : (overview?.view.detail_clip?.id ?? null);
 
-  const refreshClip = useCallback((clip: ClipWithNotes) => {
+  /** Load, reload and clip switch: all three buffers take the clip and the editor remounts. */
+  const loadClip = useCallback((clip: ClipWithNotes) => {
     setClipInfo(clipInfoOf(clip));
-    setNotes(notesOf(clip));
+    dispatch({ type: "load", notes: clip.get_all_notes_extended?.notes ?? [] });
+    setLoadId((prev) => prev + 1);
     setEditorRevision((prev) => prev + 1);
   }, []);
-
-  const replaceMutation = useMutation({
-    mutationFn: replaceNotes,
-    onSuccess: ({ clip }) => {
-      if (clip.id === clipInfo?.id) refreshClip(clip);
-    },
-  });
 
   const reloadMutation = useMutation({
     mutationFn: readClipById,
     onSuccess: ({ clip }) => {
-      replaceMutation.reset();
       if (clip === null) {
         setClipInfo(null);
-        setNotes([]);
+        dispatch({ type: "load", notes: [] });
+        setLoadId((prev) => prev + 1);
         setIsClipMissing(true);
         return;
       }
-      if (clip.id === clipInfo?.id) refreshClip(clip);
+      if (clip.id === clipInfo?.id) loadClip(clip);
     },
   });
 
-  const { reset: resetReplace } = replaceMutation;
   const { reset: resetReload } = reloadMutation;
 
   const applyClip = useCallback(
@@ -218,15 +223,72 @@ function RouteComponent() {
       clip: ClipWithNotes;
       trackName: string | null;
     }) => {
-      resetReplace();
       resetReload();
       setIsClipMissing(false);
       setTrackName(trackName);
-      refreshClip(clip);
+      loadClip(clip);
       setIsNavigatorOpen(false);
     },
-    [refreshClip, resetReplace, resetReload],
+    [loadClip, resetReload],
   );
+
+  /**
+   * Reserves row ids. The range is derived from the state read before the dispatch, and React
+   * batches the `mint` with the `edit` that follows in the same event, so the ids are deterministic.
+   */
+  const mintRowIds = useCallback(
+    (count: number): readonly number[] => {
+      const first = buffers.nextId;
+      dispatch({ type: "mint", count });
+      return Array.from({ length: count }, (_, index) => first + index);
+    },
+    [buffers.nextId],
+  );
+
+  const onNotesChange = useCallback((rows: readonly NoteRow[]) => {
+    dispatch({ type: "edit", rows });
+  }, []);
+
+  /** The playback region a write must set, or `undefined` when the current one already fits. */
+  const writeRegion = useMemo((): ClipRegion | undefined => {
+    if (clipInfo === null) return undefined;
+    const region = requiredPlaybackRegion({
+      notes,
+      region: clipInfo.playback,
+      quartersPerBar: quartersPerBar(
+        clipInfo.signatureNumerator,
+        clipInfo.signatureDenominator,
+      ),
+    });
+    return isSameRegion(region, clipInfo.playback)
+      ? undefined
+      : { looping: clipInfo.looping, ...region };
+  }, [clipInfo, notes]);
+
+  const write = useCallback(
+    (input: ReplaceNotesInput) => replaceNotes({ data: input }),
+    [],
+  );
+
+  const autowrite = useAutowrite({
+    clipId: clipInfo?.id ?? 0,
+    loadId,
+    rows: notes,
+    region: writeRegion,
+    write,
+  });
+  const { flushNow } = autowrite;
+
+  // A slot switch is heard at once: flush after the render that shows the new active rows.
+  useEffect(() => {
+    if (switchCount > 0) flushNow();
+  }, [switchCount, flushNow]);
+
+  const switchSlot = () => {
+    dispatch({ type: "switch" });
+    setEditorRevision((prev) => prev + 1);
+    setSwitchCount((prev) => prev + 1);
+  };
 
   useEffect(() => {
     const result = clipQuery.data;
@@ -237,16 +299,11 @@ function RouteComponent() {
   const editorStatus: EditorStatus =
     (
       [
-        ["writing", replaceMutation.isPending],
         ["reloading", reloadMutation.isPending],
         ["loading", clipQuery.isFetching],
-        ["unverified", replaceMutation.isError],
       ] as const
     ).find(([, isActive]) => isActive)?.[0] ?? "idle";
-  const isClipBusy =
-    editorStatus === "writing" ||
-    editorStatus === "reloading" ||
-    editorStatus === "loading";
+  const isClipBusy = editorStatus !== "idle";
 
   const selectClipSource = (next: ClipSource) => {
     if (clipSource !== null && sameSource(clipSource, next)) {
@@ -595,36 +652,25 @@ function RouteComponent() {
                     playback: clipInfo.playback,
                   }}
                   notes={notes}
-                  onNotesChange={setNotes}
+                  onNotesChange={onNotesChange}
+                  mintRowIds={mintRowIds}
                   status={editorStatus}
-                  writeError={
-                    replaceMutation.isError
-                      ? messageOf(replaceMutation.error, "Write failed.")
-                      : null
-                  }
+                  autowrite={autowrite}
+                  slots={slots}
                   reloadError={
                     reloadMutation.isError
                       ? messageOf(reloadMutation.error, "Reload failed.")
                       : null
                   }
-                  onWrite={() => {
-                    const region = requiredPlaybackRegion({
-                      notes,
-                      region: clipInfo.playback,
-                      quartersPerBar: quartersPerBar(
-                        clipInfo.signatureNumerator,
-                        clipInfo.signatureDenominator,
-                      ),
-                    });
-                    replaceMutation.mutate({
-                      data: {
-                        clipId: clipInfo.id,
-                        notes: toReplacementNotes(notes),
-                        region: isSameRegion(region, clipInfo.playback)
-                          ? undefined
-                          : { looping: clipInfo.looping, ...region },
-                      },
-                    });
+                  onSwitchSlot={switchSlot}
+                  onCopyToOther={() => {
+                    dispatch({ type: "copyToOther" });
+                  }}
+                  onRevert={() => {
+                    dispatch({ type: "revert" });
+                  }}
+                  onSetBaseline={() => {
+                    dispatch({ type: "setBaseline" });
                   }}
                   onReload={() => {
                     reloadMutation.mutate({

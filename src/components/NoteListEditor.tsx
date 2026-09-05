@@ -1,7 +1,8 @@
 import type { TableContextAction } from "@astryxdesign/core/Table";
 
-import type { Note } from "@/lib/Domain";
-import type { EditableField } from "@/lib/noteEdits";
+import type { AutowriteState } from "@/components/useAutowrite";
+import type { SlotName } from "@/lib/clipBuffers";
+import type { EditableField, NoteRow } from "@/lib/noteEdits";
 
 import { useEffect, useState } from "react";
 
@@ -14,6 +15,7 @@ import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { SlidersHorizontal } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DuplicateNotesDialog } from "@/components/DuplicateNotesDialog";
 import { type CommitMode, NoteTable } from "@/components/NoteTable";
 import {
@@ -21,20 +23,27 @@ import {
   type SettableField,
   SetNoteFieldDialog,
 } from "@/components/SetNoteFieldDialog";
+import { otherSlotOf } from "@/lib/clipBuffers";
 import {
   byMusicalOrder,
   duplicateNotes,
-  nextTempId,
   setField,
   shiftField,
 } from "@/lib/noteEdits";
 
-export type EditorStatus =
-  | "idle"
-  | "loading"
-  | "writing"
-  | "reloading"
-  | "unverified";
+export type EditorStatus = "idle" | "loading" | "reloading";
+
+export interface SlotSummary {
+  readonly active: SlotName;
+  readonly activeDiffersFromBaseline: boolean;
+  readonly otherDiffersFromBaseline: boolean;
+  readonly slotsDiffer: boolean;
+  readonly anyDiffersFromBaseline: boolean;
+}
+
+type Confirmation = "copyToOther" | "revert" | "reload";
+
+const slotLabel = (slot: SlotName) => slot.toUpperCase();
 
 export interface EditorClip {
   id: number;
@@ -45,24 +54,57 @@ export interface EditorClip {
 
 interface NoteListEditorProps {
   clip: EditorClip;
-  notes: readonly Note[];
-  onNotesChange: (notes: readonly Note[]) => void;
+  notes: readonly NoteRow[];
+  onNotesChange: (notes: readonly NoteRow[]) => void;
+  /** Reserves `count` row ids and returns them, lowest first. */
+  mintRowIds: (count: number) => readonly number[];
   status: EditorStatus;
-  writeError: string | null;
+  autowrite: AutowriteState;
+  slots: SlotSummary;
   reloadError: string | null;
-  onWrite: () => void;
+  onSwitchSlot: () => void;
+  onCopyToOther: () => void;
+  onRevert: () => void;
+  onSetBaseline: () => void;
   onReload: () => void;
 }
 
 const STATUS_LABEL: Record<EditorStatus, string | null> = {
   idle: null,
   loading: "Loading clip…",
-  writing: "Writing to Live…",
   reloading: "Reloading from Live…",
-  unverified: "Unverified — reload from Live",
 };
 
 const DETAILS_STORAGE_KEY = "prelive.noteList.showDetails";
+
+const CONFIRMATION: Record<
+  Confirmation,
+  (slots: SlotSummary) => {
+    readonly title: string;
+    readonly description: string;
+    readonly confirmLabel: string;
+  }
+> = {
+  copyToOther: ({ active }) => {
+    const other = slotLabel(otherSlotOf(active));
+    return {
+      title: `Copy to ${other}?`,
+      description: `Slot ${other} differs from the baseline. Its notes are replaced by slot ${slotLabel(active)} and cannot be recovered.`,
+      confirmLabel: `Copy to ${other}`,
+    };
+  },
+  revert: ({ active }) => ({
+    title: "Revert to baseline?",
+    description: `Slot ${slotLabel(active)} differs from the baseline. Its edits are discarded and Live plays the baseline.`,
+    confirmLabel: "Revert",
+  }),
+  reload: () => ({
+    title: "Reload from Live?",
+    description:
+      "A slot differs from the baseline. Reloading resets A, B and the baseline to the clip as Live holds it now.",
+    confirmLabel: "Reload",
+  }),
+};
 
 const SETTABLE_FIELDS: readonly SettableField[] = [
   "pitch",
@@ -77,27 +119,37 @@ export function NoteListEditor({
   clip,
   notes,
   onNotesChange,
+  mintRowIds,
   status,
-  writeError,
+  autowrite,
+  slots,
   reloadError,
-  onWrite,
+  onSwitchSlot,
+  onCopyToOther,
+  onRevert,
+  onSetBaseline,
   onReload,
 }: NoteListEditorProps) {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [showDetails, setShowDetails] = useState(false);
   const [duplicateSource, setDuplicateSource] = useState<
-    readonly Note[] | null
+    readonly NoteRow[] | null
   >(null);
   const [setFieldTarget, setSetFieldTarget] = useState<{
     readonly field: SettableField;
-    readonly notes: readonly Note[];
+    readonly notes: readonly NoteRow[];
   } | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const isIdle = status === "idle";
-  const isDialogOpen = duplicateSource !== null || setFieldTarget !== null;
+  const isDialogOpen =
+    duplicateSource !== null ||
+    setFieldTarget !== null ||
+    confirmation !== null;
   const isEditable = isIdle && !isDialogOpen;
   const selectedNotes = notes.filter((note) =>
-    selectedKeys.has(String(note.note_id)),
+    selectedKeys.has(String(note.id)),
   );
+  const otherSlot = otherSlotOf(slots.active);
 
   // Read after mount: the server render has no localStorage, and a differing first client render
   // would be a hydration mismatch.
@@ -120,7 +172,7 @@ export function NoteListEditor({
   /** The edited row plus, when it is part of a multi-row selection, every other selected row. */
   const editTargets = (noteId: number): ReadonlySet<number> =>
     selectedKeys.has(String(noteId)) && selectedKeys.size > 1
-      ? new Set(selectedNotes.map((note) => note.note_id))
+      ? new Set(selectedNotes.map((note) => note.id))
       : new Set([noteId]);
 
   /**
@@ -135,7 +187,7 @@ export function NoteListEditor({
     next: number,
     mode: CommitMode,
   ) => {
-    const current = notes.find((note) => note.note_id === noteId);
+    const current = notes.find((note) => note.id === noteId);
     if (current === undefined) return;
     const targets = editTargets(noteId);
     onNotesChange(
@@ -147,9 +199,7 @@ export function NoteListEditor({
 
   const setMute = (targetIds: ReadonlySet<number>, mute: boolean) => {
     onNotesChange(
-      notes.map((note) =>
-        targetIds.has(note.note_id) ? { ...note, mute } : note,
-      ),
+      notes.map((note) => (targetIds.has(note.id) ? { ...note, mute } : note)),
     );
   };
 
@@ -160,7 +210,7 @@ export function NoteListEditor({
   const toggleSelectedMute = () => {
     if (selectedNotes.length === 0) return;
     setMute(
-      new Set(selectedNotes.map((note) => note.note_id)),
+      new Set(selectedNotes.map((note) => note.id)),
       !selectedNotes.every((note) => note.mute),
     );
   };
@@ -168,12 +218,12 @@ export function NoteListEditor({
   /** Appends a note after the last row (inheriting its pitch, length and velocity) and returns its id. */
   const addNote = (): number => {
     const last = notes.at(-1);
-    const note_id = nextTempId(notes);
+    const [id = 0] = mintRowIds(1);
     onNotesChange(
       byMusicalOrder([
         ...notes,
         {
-          note_id,
+          id,
           pitch: last?.pitch ?? 60,
           start_time: last === undefined ? 0 : last.start_time + last.duration,
           duration: last?.duration ?? 1,
@@ -185,14 +235,12 @@ export function NoteListEditor({
         },
       ]),
     );
-    return note_id;
+    return id;
   };
 
   const deleteSelected = () => {
     if (selectedKeys.size === 0) return;
-    onNotesChange(
-      notes.filter((note) => !selectedKeys.has(String(note.note_id))),
-    );
+    onNotesChange(notes.filter((note) => !selectedKeys.has(String(note.id))));
     setSelectedKeys(new Set());
   };
 
@@ -202,13 +250,15 @@ export function NoteListEditor({
 
   const confirmDuplicate = (destination: number) => {
     if (duplicateSource === null) return;
+    const [firstId = 0] = mintRowIds(duplicateSource.length);
     const { notes: next, copies } = duplicateNotes({
       notes,
       selected: duplicateSource,
       destination,
+      firstId,
     });
     onNotesChange(next);
-    setSelectedKeys(new Set(copies.map(({ note_id }) => String(note_id))));
+    setSelectedKeys(new Set(copies.map(({ id }) => String(id))));
     setDuplicateSource(null);
   };
 
@@ -217,7 +267,7 @@ export function NoteListEditor({
     onNotesChange(
       setField(
         notes,
-        new Set(setFieldTarget.notes.map((note) => note.note_id)),
+        new Set(setFieldTarget.notes.map((note) => note.id)),
         setFieldTarget.field,
         value,
       ),
@@ -226,10 +276,10 @@ export function NoteListEditor({
   };
 
   /** Right-click actions act on the row's edit targets, so a multi-row selection is one command. */
-  const rowActions = (row: Note): readonly TableContextAction[] => {
+  const rowActions = (row: NoteRow): readonly TableContextAction[] => {
     if (!isEditable) return [];
-    const targets = editTargets(row.note_id);
-    const targetNotes = notes.filter((note) => targets.has(note.note_id));
+    const targets = editTargets(row.id);
+    const targetNotes = notes.filter((note) => targets.has(note.id));
     const count = targetNotes.length;
     const noun = count === 1 ? "note" : `${String(count)} notes`;
     const allMuted = targetNotes.every((note) => note.mute);
@@ -265,7 +315,7 @@ export function NoteListEditor({
         group: "edit",
         label: `Delete ${noun}`,
         onSelect: () => {
-          onNotesChange(notes.filter((note) => !targets.has(note.note_id)));
+          onNotesChange(notes.filter((note) => !targets.has(note.id)));
           setSelectedKeys(
             (keys) =>
               new Set([...keys].filter((key) => !targets.has(Number(key)))),
@@ -279,7 +329,7 @@ export function NoteListEditor({
     {
       keys: "mod+a",
       onPress: () => {
-        setSelectedKeys(new Set(notes.map((note) => String(note.note_id))));
+        setSelectedKeys(new Set(notes.map((note) => String(note.id))));
       },
       isDisabled: !isEditable || notes.length === 0,
     },
@@ -321,10 +371,64 @@ export function NoteListEditor({
                 {STATUS_LABEL[status]}
               </Text>
             )}
+            {autowrite.status !== "idle" && (
+              <Text type="supporting" color="secondary">
+                Syncing…
+              </Text>
+            )}
+            {autowrite.lastError !== null && (
+              <Text type="supporting" color="secondary">
+                Last write failed — Live may be behind
+              </Text>
+            )}
           </>
         }
         endContent={
           <>
+            {(["a", "b"] as const).map((slot) => (
+              <ToggleButton
+                key={slot}
+                label={slotLabel(slot)}
+                size="sm"
+                tooltip={
+                  slot === slots.active
+                    ? `Slot ${slotLabel(slot)} is active — Live plays the active slot`
+                    : `Switch to ${slotLabel(slot)} — Live plays the active slot`
+                }
+                isPressed={slot === slots.active}
+                isDisabled={!isEditable}
+                onPressedChange={() => {
+                  if (slot !== slots.active) onSwitchSlot();
+                }}
+              />
+            ))}
+            <Button
+              label={`Copy to ${slotLabel(otherSlot)}`}
+              size="sm"
+              tooltip={`Replace slot ${slotLabel(otherSlot)} with the active list`}
+              isDisabled={!isEditable || !slots.slotsDiffer}
+              onClick={() => {
+                if (slots.otherDiffersFromBaseline)
+                  setConfirmation("copyToOther");
+                else onCopyToOther();
+              }}
+            />
+            <Button
+              label="Revert to baseline"
+              size="sm"
+              tooltip="Replace the active slot with the list captured on load"
+              isDisabled={!isEditable || !slots.activeDiffersFromBaseline}
+              onClick={() => {
+                setConfirmation("revert");
+              }}
+            />
+            <Button
+              label="Set baseline"
+              size="sm"
+              tooltip="Make the active list the new baseline"
+              isDisabled={!isEditable || !slots.activeDiffersFromBaseline}
+              onClick={onSetBaseline}
+            />
             <ToggleButton
               label="Details"
               size="sm"
@@ -360,16 +464,11 @@ export function NoteListEditor({
               label="Reload from Live"
               size="sm"
               isLoading={status === "reloading"}
-              isDisabled={isDialogOpen || !(isIdle || status === "unverified")}
-              onClick={onReload}
-            />
-            <Button
-              label="Write to Live"
-              variant="primary"
-              size="sm"
-              isLoading={status === "writing"}
               isDisabled={!isEditable}
-              onClick={onWrite}
+              onClick={() => {
+                if (slots.anyDiffersFromBaseline) setConfirmation("reload");
+                else onReload();
+              }}
             />
           </>
         }
@@ -387,13 +486,6 @@ export function NoteListEditor({
         onAddNote={addNote}
         rowActions={rowActions}
       />
-      {writeError !== null && (
-        <Banner
-          status="error"
-          title="Write failed — Live may hold an empty or partial clip"
-          description={`${writeError} Reload from Live to see what the clip actually contains.`}
-        />
-      )}
       {reloadError !== null && (
         <Banner
           status="error"
@@ -412,6 +504,22 @@ export function NoteListEditor({
             setDuplicateSource(null);
           }}
           onConfirm={confirmDuplicate}
+        />
+      )}
+      {confirmation !== null && (
+        <ConfirmDialog
+          {...CONFIRMATION[confirmation](slots)}
+          onClose={() => {
+            setConfirmation(null);
+          }}
+          onConfirm={() => {
+            setConfirmation(null);
+            ({
+              copyToOther: onCopyToOther,
+              revert: onRevert,
+              reload: onReload,
+            })[confirmation]();
+          }}
         />
       )}
       {setFieldTarget !== null && (

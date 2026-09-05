@@ -8,7 +8,7 @@ import { runServerFn } from "@/lib/runtime";
 export const renderLilyPondSvg = createServerFn({ method: "POST" })
   .validator(
     Schema.toStandardSchemaV1(
-      Schema.Struct({ notes: Schema.Array(Domain.Note) }),
+      Schema.Struct({ notes: Schema.Array(Domain.ReplacementNote) }),
     ),
   )
   .handler(async ({ data }) => {

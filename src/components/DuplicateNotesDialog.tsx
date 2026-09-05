@@ -1,5 +1,3 @@
-import type { Note } from "@/lib/Domain";
-
 import { useState } from "react";
 
 import { Button } from "@astryxdesign/core/Button";
@@ -13,14 +11,15 @@ import { positionLabel } from "@/components/NoteTable";
 import {
   defaultDestination,
   duplicateNotes,
+  type NoteRow,
   isSameRegion,
   quartersPerBar,
   requiredPlaybackRegion,
 } from "@/lib/noteEdits";
 
 interface DuplicateNotesDialogProps {
-  notes: readonly Note[];
-  selected: readonly Note[];
+  notes: readonly NoteRow[];
+  selected: readonly NoteRow[];
   signatureNumerator: number;
   signatureDenominator: number;
   playback: { readonly start: number; readonly end: number };
@@ -45,7 +44,8 @@ export function DuplicateNotesDialog({
   const bar = quartersPerBar(signatureNumerator, signatureDenominator);
   const region = isValid
     ? requiredPlaybackRegion({
-        notes: duplicateNotes({ notes, selected, destination }).notes,
+        notes: duplicateNotes({ notes, selected, destination, firstId: 0 })
+          .notes,
         region: playback,
         quartersPerBar: bar,
       })

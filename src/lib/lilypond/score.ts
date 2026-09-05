@@ -1,4 +1,4 @@
-import type { Note } from "@/lib/Domain";
+import type { ReplacementNote as Note } from "@/lib/Domain";
 
 import { decideStaffSystem } from "@/lib/score/staffDecision";
 interface LilyPondOptions {
