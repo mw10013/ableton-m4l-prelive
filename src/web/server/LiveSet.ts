@@ -3,8 +3,9 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import * as Domain from "#domain/live.ts";
+import { LiveQLError } from "#web/errors.ts";
 
-import { LiveQL, LiveQLError } from "./LiveQL.ts";
+import { LiveQL } from "./LiveQL.ts";
 
 const ClipFields = `
   id path type name color end_time is_arrangement_clip is_session_clip is_midi_clip

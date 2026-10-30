@@ -1,10 +1,12 @@
-import type * as Effect from "effect/Effect";
-
 import * as Cause from "effect/Cause";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Option from "effect/Option";
+
+import { isBoundaryError } from "#web/errors.ts";
 
 import { LilyPondRenderer } from "./lilypond/renderer.ts";
 import { LiveQL } from "./LiveQL.ts";
@@ -39,16 +41,30 @@ const formatErrorMessage = (error: Error): string => {
 export const causeToErrorMessage = <E>(cause: Cause.Cause<E>): string =>
   Cause.prettyErrors(cause).map(formatErrorMessage).join("\n");
 
+/**
+ * Runs a server function's effect. A typed failure the browser knows ({@link isBoundaryError})
+ * is rethrown as itself, for Start's serialization adapters to carry over; anything else, a defect
+ * or an unknown failure, becomes a plain `Error` with the rendered cause. Every failure's full cause
+ * is logged here, since the browser never receives it.
+ */
 export const runServerFn = <A, E>(
   effect: Effect.Effect<A, E, Layer.Success<typeof appLayer>>,
 ): Promise<A> =>
   runtime
-    .runPromiseExit(effect)
-    .then((exit) =>
-      Exit.isSuccess(exit)
-        ? exit.value
-        : Promise.reject(new Error(causeToErrorMessage(exit.cause))),
-    );
+    .runPromiseExit(
+      effect.pipe(
+        Effect.tapCause((cause) =>
+          Effect.logError("runServerFn: failed", cause),
+        ),
+      ),
+    )
+    .then((exit) => {
+      if (Exit.isSuccess(exit)) return exit.value;
+      const failure = Cause.findErrorOption(exit.cause);
+      throw Option.isSome(failure) && isBoundaryError(failure.value)
+        ? failure.value
+        : new Error(causeToErrorMessage(exit.cause));
+    });
 
 const dispose = () => void runtime.dispose();
 

@@ -8,18 +8,10 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import * as Schema from "effect/Schema";
 
 import { quantizeNotes } from "#domain/lilypond/quantizer.ts";
 import { notesToLilyPond } from "#domain/lilypond/score.ts";
-
-class LilyPondError extends Schema.TaggedError<LilyPondError>()(
-  "LilyPondError",
-  {
-    message: Schema.String,
-    cause: Schema.Defect(),
-  },
-) {}
+import { LilyPondError } from "#web/errors.ts";
 
 export class LilyPondRenderer extends Context.Service<
   LilyPondRenderer,

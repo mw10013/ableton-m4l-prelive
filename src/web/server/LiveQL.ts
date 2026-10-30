@@ -10,14 +10,7 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class LiveQLError extends Schema.TaggedError<LiveQLError>()(
-  "LiveQLError",
-  {
-    reason: Schema.Literals(["transport", "graphql", "decode"]),
-    message: Schema.String,
-    cause: Schema.Defect(),
-  },
-) {}
+import { LiveQLError } from "#web/errors.ts";
 
 const GqlEnvelope = Schema.Struct({
   data: Schema.optional(Schema.Unknown),
