@@ -155,6 +155,7 @@ export function NoteListEditor({
   // would be a hydration mismatch.
   useEffect(() => {
     try {
+      // oxlint-disable-next-line react/set-state-in-effect -- reading storage during render would mismatch the server render
       setShowDetails(localStorage.getItem(DETAILS_STORAGE_KEY) === "true");
     } catch {
       // Storage blocked; keep the default.
@@ -284,16 +285,14 @@ export function NoteListEditor({
     const noun = count === 1 ? "note" : `${String(count)} notes`;
     const allMuted = targetNotes.every((note) => note.mute);
     return [
-      ...SETTABLE_FIELDS.map(
-        (field): TableContextAction => ({
-          id: `set-${field}`,
-          group: "set",
-          label: `Set ${FIELD_LABEL[field]} of ${noun}…`,
-          onSelect: () => {
-            setSetFieldTarget({ field, notes: targetNotes });
-          },
-        }),
-      ),
+      ...SETTABLE_FIELDS.map((field): TableContextAction => ({
+        id: `set-${field}`,
+        group: "set",
+        label: `Set ${FIELD_LABEL[field]} of ${noun}…`,
+        onSelect: () => {
+          setSetFieldTarget({ field, notes: targetNotes });
+        },
+      })),
       {
         id: "mute",
         group: "edit",

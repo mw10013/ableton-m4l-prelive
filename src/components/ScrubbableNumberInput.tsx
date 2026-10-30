@@ -60,6 +60,7 @@ export function ScrubbableNumberInput({
     pointerLock,
     wheel: { step },
   });
+  // oxlint-disable-next-line react/refs -- `bind` returns handlers; its refs are read on pointer events, not during render
   const handlers = scrub.bind({
     step,
     onClick: (event) => {

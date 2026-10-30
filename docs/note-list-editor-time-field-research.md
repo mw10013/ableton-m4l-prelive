@@ -192,7 +192,7 @@ Contract:
 Implementation shape:
 
 1. Extract the gesture from `ScrubbableNumberInput` into `useScrub({ value, step, min, max, onChange,
-onCommit, pointerLock })` returning pointer handlers and an `isScrubbing` flag. Re-wrap
+   onCommit, pointerLock })` returning pointer handlers and an `isScrubbing` flag. Re-wrap
    `ScrubbableNumberInput` on top of it so the home-page prototype stays green.
 2. New component in `src/components/`, composed of Astryx `Text` (rest) and `TextInput` (edit). The
    segment spans need `xstyle` for `cursor: ns-resize` and `user-select: none`; that is a sanctioned

@@ -20,8 +20,8 @@ the local copies.
 
 ## Summary
 
-- **Logic has no keyboard field cursor.** Its Event List keyboard model is *select the event with
-  Left/Right Arrow, then use the mouse on a field*. Values change by dragging (per unit for
+- **Logic has no keyboard field cursor.** Its Event List keyboard model is _select the event with
+  Left/Right Arrow, then use the mouse on a field_. Values change by dragging (per unit for
   position/length) or by double-clicking a field and typing, with Return to exit. The manual documents
   no Tab, no arrow-between-columns, and no "open the field of the selected event" key. Tab in Logic
   is "Cycle Through Window Views".
@@ -39,7 +39,7 @@ the local copies.
 - **Prelive already has half of this by accident.** Every cell is a focusable `spinbutton`, so Tab
   already walks every field; Enter/Space/digit open the editor; Up/Down step; Escape cancels; the
   time field has Left/Right segment hopping and `.`/`,`/space to jump segments. What is missing:
-  arrow keys between cells, Tab that commits *and* moves on, any keyboard selection, Shift-click and
+  arrow keys between cells, Tab that commits _and_ moves on, any keyboard selection, Shift-click and
   drag ranges, Delete on the selection, and grid semantics so the table is one Tab stop rather than
   one per cell.
 - **Recommendation:** adopt the WAI-ARIA grid pattern with Logic's "navigation is selection" twist.
@@ -62,7 +62,7 @@ displayed (except for the Status column, which indicates the event type)."
 For a note: Ch is MIDI channel, Num is pitch, Val is velocity (1..127), Length/Info is the length.
 Release velocity is hidden behind the "Additional Info" button. Lock and Mute are single-glyph
 columns: "Click in the Mute column for the selected events" toggles an `M`; "Click in the Lock column"
-toggles a padlock. Both act on *the selection*, so they double as bulk toggles.
+toggles a padlock. Both act on _the selection_, so they double as bulk toggles.
 
 Columns can be reordered by dragging headers and resized at the dividers; Control-click a header for
 "Reset to Defaults".
@@ -128,11 +128,11 @@ That is the convention `BarBeatSixteenthInput` already implements (partial input
 
 Modifiers while dragging (from "Pointer shortcuts for the Event List"):
 
-| Function | Modifier |
-| --- | --- |
-| Change values in larger increments | Shift while dragging |
-| Override a parameter's max/min limit in a multi-selection | Option while dragging |
-| Set parameter to the same value for all selected events | Option-Shift while dragging |
+| Function                                                  | Modifier                    |
+| --------------------------------------------------------- | --------------------------- |
+| Change values in larger increments                        | Shift while dragging        |
+| Override a parameter's max/min limit in a multi-selection | Option while dragging       |
+| Set parameter to the same value for all selected events   | Option-Shift while dragging |
 
 Group edits are relative by default: "If a parameter of one of several selected events is altered,
 it affects the same parameter in all events within the selection group... the relative differences
@@ -152,7 +152,7 @@ currently selected event remains highlighted." The selection follows the event, 
   (paste asks for a position in "the input box that appears"), or a Select menu command. Value
   editing always begins with the mouse.
 
-Logic's answer to "edit everything from the keyboard" is therefore *not* the Event List. It is
+Logic's answer to "edit everything from the keyboard" is therefore _not_ the Event List. It is
 MIDI-In step entry (the MIDI In button plus a music or computer keyboard) for creating notes, and
 mouse-as-slider for adjusting them.
 
@@ -162,8 +162,8 @@ Digital Performer's Event List (`event_list.md`):
 
 > "**Text box:** Appears when you double-click or Option-click on a field of an event. You can enter a
 > new value for the field by either typing or by dragging up or down."
-> "**Selected Events** Click an event to select it. *Shift-click* to select a range of events.
-> *Command/Win-click* to select non-adjacent events."
+> "**Selected Events** Click an event to select it. _Shift-click_ to select a range of events.
+> _Command/Win-click_ to select non-adjacent events."
 
 And its Event Information window, which is "a single line of the Event List" in the same way as
 Logic's Event Float:
@@ -184,19 +184,19 @@ resorted."
 
 `src/components/NoteTable.tsx` and `src/components/BarBeatSixteenthInput.tsx`:
 
-| Interaction | Today |
-| --- | --- |
-| Tab | Moves to the next focusable thing: every cell is `tabIndex={0}`, so Tab walks all cells of all rows, plus the Astryx scroll wrapper (`role="group" tabIndex={0}`) and the row checkboxes. |
-| Enter / Space on a cell | Opens the editor (`NumberInput` or `TextInput`). |
-| Typed digit on a cell | Opens the editor pre-filled with that digit. |
-| Up / Down on a cell | Steps the value and commits immediately (1 for numbers; a sixteenth, Shift for 1/128, for time). |
-| Left / Right on a cell | Nothing. |
-| Inside the time editor | Left/Right select the previous/next segment; `.`, `,`, space hop to the next segment; Up/Down step the segment under the caret; Enter commits (Cmd for absolute); Escape cancels. |
-| Inside the number editor | Enter commits (Cmd for absolute); Escape cancels; blur commits. |
-| Tab inside an editor | Blur commits and focus goes wherever the browser sends it; the next cell is not re-opened. |
-| Row selection | Astryx `useTableSelection` checkbox column only. No click-on-row, no Shift-click range, no Cmd-click, no drag, no keyboard. |
-| Delete | Toolbar button only. No Delete/Backspace key. |
-| Audition | None. |
+| Interaction              | Today                                                                                                                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tab                      | Moves to the next focusable thing: every cell is `tabIndex={0}`, so Tab walks all cells of all rows, plus the Astryx scroll wrapper (`role="group" tabIndex={0}`) and the row checkboxes. |
+| Enter / Space on a cell  | Opens the editor (`NumberInput` or `TextInput`).                                                                                                                                          |
+| Typed digit on a cell    | Opens the editor pre-filled with that digit.                                                                                                                                              |
+| Up / Down on a cell      | Steps the value and commits immediately (1 for numbers; a sixteenth, Shift for 1/128, for time).                                                                                          |
+| Left / Right on a cell   | Nothing.                                                                                                                                                                                  |
+| Inside the time editor   | Left/Right select the previous/next segment; `.`, `,`, space hop to the next segment; Up/Down step the segment under the caret; Enter commits (Cmd for absolute); Escape cancels.         |
+| Inside the number editor | Enter commits (Cmd for absolute); Escape cancels; blur commits.                                                                                                                           |
+| Tab inside an editor     | Blur commits and focus goes wherever the browser sends it; the next cell is not re-opened.                                                                                                |
+| Row selection            | Astryx `useTableSelection` checkbox column only. No click-on-row, no Shift-click range, no Cmd-click, no drag, no keyboard.                                                               |
+| Delete                   | Toolbar button only. No Delete/Backspace key.                                                                                                                                             |
+| Audition                 | None.                                                                                                                                                                                     |
 
 `useTableSelection` is a synthetic checkbox column (`transformColumns`), with select-all in the
 header and a per-row `CheckboxInput` labelled by `getRowLabel`. It has no shift-range logic and no
@@ -208,25 +208,25 @@ enough to attach `onClick`, `onKeyDown`, `aria-selected`, `role` and `tabIndex` 
 
 Two layers, as in the WAI-ARIA grid pattern: a **navigation layer** where arrow keys move a single
 focused cell, and an **edit layer** you enter on purpose and leave with a commit or cancel. Logic's
-one idea worth stealing is that navigation *is* selection: moving the current row with the arrows
+one idea worth stealing is that navigation _is_ selection: moving the current row with the arrows
 also selects it, so there is no separate "and now select" step for the common case.
 
 ### Navigation layer (table has focus, no editor open)
 
-| Key | Action |
-| --- | --- |
-| Tab / Shift+Tab | Enter or leave the table. One Tab stop, roving `tabIndex` on the current cell. |
-| Up / Down | Move the current row. Selection becomes that single row (Logic: "Left Arrow to select the previous event"). Holding the key auto-repeats through the list. |
-| Shift+Up / Shift+Down | Extend the selection range from the anchor row (Logic: Shift+Arrow). |
-| Cmd+Up / Cmd+Down | Move the current row without touching the selection (Finder-style escape hatch for "look but don't select"). Optional. |
-| Left / Right | Move the current cell across columns within the row. Wraps are not needed. |
-| Home / End | First / last cell in the row. Cmd+Home / Cmd+End: first / last row. |
-| Enter, F2, Space | Open the current cell for editing (all three already open today except F2). |
-| Typed digit | Open the cell pre-filled (already today). For Pitch, a typed letter `A`..`G` could also open pre-filled; not required. |
-| Up / Down with a modifier, or Alt+Up/Down | Step the value in place without opening, since plain Up/Down now moves rows. Alt+Up/Down is the natural choice on macOS. Shift+Alt for the fine step. |
-| Delete / Backspace | Delete the selected rows (Logic: "Select the events, then press Delete"). |
-| Cmd+A | Select all rows. Escape: deselect all, or, if the selection is already empty, leave focus alone. |
-| Cmd+D or Cmd+Shift+D | Duplicate selection. Matches the existing toolbar action; optional. |
+| Key                                       | Action                                                                                                                                                     |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tab / Shift+Tab                           | Enter or leave the table. One Tab stop, roving `tabIndex` on the current cell.                                                                             |
+| Up / Down                                 | Move the current row. Selection becomes that single row (Logic: "Left Arrow to select the previous event"). Holding the key auto-repeats through the list. |
+| Shift+Up / Shift+Down                     | Extend the selection range from the anchor row (Logic: Shift+Arrow).                                                                                       |
+| Cmd+Up / Cmd+Down                         | Move the current row without touching the selection (Finder-style escape hatch for "look but don't select"). Optional.                                     |
+| Left / Right                              | Move the current cell across columns within the row. Wraps are not needed.                                                                                 |
+| Home / End                                | First / last cell in the row. Cmd+Home / Cmd+End: first / last row.                                                                                        |
+| Enter, F2, Space                          | Open the current cell for editing (all three already open today except F2).                                                                                |
+| Typed digit                               | Open the cell pre-filled (already today). For Pitch, a typed letter `A`..`G` could also open pre-filled; not required.                                     |
+| Up / Down with a modifier, or Alt+Up/Down | Step the value in place without opening, since plain Up/Down now moves rows. Alt+Up/Down is the natural choice on macOS. Shift+Alt for the fine step.      |
+| Delete / Backspace                        | Delete the selected rows (Logic: "Select the events, then press Delete").                                                                                  |
+| Cmd+A                                     | Select all rows. Escape: deselect all, or, if the selection is already empty, leave focus alone.                                                           |
+| Cmd+D or Cmd+Shift+D                      | Duplicate selection. Matches the existing toolbar action; optional.                                                                                        |
 
 The value-stepping change is the one real cost. Today plain Up/Down steps the value on a focused
 cell. Under a grid model Up/Down must move rows, so stepping moves to Alt+Up/Down (or opens the
@@ -235,22 +235,22 @@ same trade-off every spreadsheet makes, and Logic makes it too: its arrows never
 
 ### Edit layer (an editor is open in a cell)
 
-| Key | Action |
-| --- | --- |
-| Enter | Commit and stay on the cell in the navigation layer (Cmd+Enter: commit as absolute for a multi-selection, already today). |
+| Key             | Action                                                                                                                                                                                    |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enter           | Commit and stay on the cell in the navigation layer (Cmd+Enter: commit as absolute for a multi-selection, already today).                                                                 |
 | Tab / Shift+Tab | Commit, move to the next / previous editable cell **and open it** (DP's "Tab... to move from field to field"). At the end of a row, Tab wraps to the first editable cell of the next row. |
-| Escape | Cancel, stay on the cell. |
-| Up / Down | Step the value in the editor (already today; the time field steps the segment under the caret). |
-| Left / Right | Time field: move between segments (already today). Number field: caret movement as normal. |
-| `.` `,` space | Time field: hop to the next segment (already today). |
-| Blur by pointer | Commit (already today). |
+| Escape          | Cancel, stay on the cell.                                                                                                                                                                 |
+| Up / Down       | Step the value in the editor (already today; the time field steps the segment under the caret).                                                                                           |
+| Left / Right    | Time field: move between segments (already today). Number field: caret movement as normal.                                                                                                |
+| `.` `,` space   | Time field: hop to the next segment (already today).                                                                                                                                      |
+| Blur by pointer | Commit (already today).                                                                                                                                                                   |
 
 Tab-to-open-next is the piece that turns the table into a keyboard editor: type a pitch, Tab, type
 `3.2`, Tab, type a velocity, Enter. The time field needs no changes for this; its inner Left/Right
 and separator hopping already work, and Tab leaving the field is a normal blur commit.
 
 One subtlety: after a Start edit the list re-sorts. Logic keeps the selected event highlighted after
-re-sort. Prelive should keep the current cell attached to the *note id*, not the row index, so Tab
+re-sort. Prelive should keep the current cell attached to the _note id_, not the row index, so Tab
 after a Start edit moves to the Duration cell of the same note wherever it landed.
 
 ### Selection by pointer

@@ -32,17 +32,16 @@ Downloaded source code of libraries are in `refs/` for reference.
 ## Commands
 
 ```bash
-pnpm dev                # Start dev server (port 4500, logs to logs/server.log)
-pnpm typecheck          # TypeScript type checking (tsc -b)
-pnpm lint               # Run oxlint
-pnpm fmt                # Format with oxfmt
-pnpm fmt:check          # Check formatting without modifying
+vp run dev              # Start dev server (port 4500, logs to logs/server.log)
+vp check                # Format check, lint, and type check (read-only)
+vp check --fix          # Same, applying formatting and safe lint fixes
+vp build                # Production build
 pnpm refs:check         # Report refs/ that drifted from package.json pins
 pnpm refs fetch <name>  # Refetch a ref (see scripts/refs.ts; refs:all fetches all)
 pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this file)
 ```
 
-- Run typecheck and lint after generating code.
+- Run `vp check` after generating code.
 
 ## Server Log Monitoring
 
@@ -67,7 +66,9 @@ pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this fi
 
 ```ts
 import type { Stripe as StripeTypes } from "stripe";
+
 import * as React from "react";
+
 import * as TanStackRouter from "@tanstack/react-router";
 import * as TanStackStart from "@tanstack/react-start";
 import * as z from "zod";
@@ -82,7 +83,7 @@ import * as z from "zod";
 
 ## Linting & Formatting
 
-- Uses **oxlint** (not ESLint) and **oxfmt** (not Prettier). Both are Rust-based and configured in `.oxlintrc.json` and `.oxfmtrc.json`.
+- Uses **Vite+** (`vp`), which bundles **oxlint** (not ESLint) and **oxfmt** (not Prettier). Both are configured in `vite.config.ts` under `lint` and `fmt`.
 - Do not add ESLint or Prettier config.
 - `src/routeTree.gen.ts` is excluded from linting/formatting.
 

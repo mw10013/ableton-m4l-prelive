@@ -1,10 +1,216 @@
 import { astryxStylex } from "@astryxdesign/build/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
+import { defineConfig, lazyPlugins } from "vite-plus";
 
 export default defineConfig({
+  fmt: {
+    printWidth: 80,
+    ignorePatterns: ["src/routeTree.gen.ts"],
+    sortImports: {
+      groups: [
+        "type-builtin",
+        "type-external",
+        "type-internal",
+        ["type-parent", "type-sibling", "type-index"],
+        "react-libs",
+        ["value-builtin", "value-external"],
+        "value-internal",
+        ["value-parent", "value-sibling", "value-index"],
+        "unknown",
+      ],
+      customGroups: [
+        {
+          groupName: "react-libs",
+          elementNamePattern: ["react", "react-**"],
+        },
+      ],
+    },
+  },
+  lint: {
+    plugins: ["eslint", "typescript", "unicorn", "oxc", "react", "jsx-a11y"],
+    settings: {
+      react: {
+        linkComponents: [
+          {
+            name: "Link",
+            attribute: "to",
+          },
+        ],
+      },
+    },
+    categories: {
+      correctness: "error",
+      suspicious: "warn",
+      pedantic: "warn",
+      style: "warn",
+    },
+    env: {
+      builtin: true,
+    },
+    ignorePatterns: [
+      "build/",
+      "dist/",
+      "refs/",
+      "node_modules/",
+      "src/routeTree.gen.ts",
+    ],
+    rules: {
+      "no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        {
+          minimumDescriptionLength: 10,
+        },
+      ],
+      "@typescript-eslint/restrict-plus-operands": [
+        "error",
+        {
+          allowAny: false,
+          allowBoolean: false,
+          allowNullish: false,
+          allowNumberAndString: false,
+          allowRegExp: false,
+        },
+      ],
+      "@typescript-eslint/restrict-template-expressions": [
+        "error",
+        {
+          allowAny: false,
+          allowBoolean: false,
+          allowNever: false,
+          allowNullish: false,
+          allowNumber: false,
+          allowRegExp: false,
+        },
+      ],
+      "@typescript-eslint/return-await": [
+        "error",
+        "error-handling-correctness-only",
+      ],
+      "no-empty": "error",
+      "no-empty-function": "error",
+      "no-regex-spaces": "error",
+      "no-unused-expressions": "error",
+      "@typescript-eslint/no-dynamic-delete": "error",
+      "@typescript-eslint/no-empty-object-type": "error",
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-invalid-void-type": "error",
+      "@typescript-eslint/no-namespace": "error",
+      "@typescript-eslint/no-non-null-asserted-nullish-coalescing": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-require-imports": "error",
+      "@typescript-eslint/non-nullable-type-assertion-style": "error",
+      "@typescript-eslint/prefer-literal-enum-member": "error",
+      "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
+      "react-in-jsx-scope": "off",
+      "no-ternary": "off",
+      "sort-keys": "off",
+      "sort-imports": "off",
+      "func-names": "off",
+      "func-style": "off",
+      "new-cap": "off",
+      "no-magic-numbers": "off",
+      "no-negated-condition": "off",
+      "max-lines": "off",
+      "max-lines-per-function": "off",
+      "max-classes-per-file": "off",
+      "max-statements": "off",
+      "id-length": "off",
+      "no-inline-comments": "off",
+      "no-shadow": "off",
+      "jsx-max-depth": "off",
+      "jsx-props-no-spreading": "off",
+      "capitalized-comments": "off",
+      curly: "off",
+      "arrow-body-style": "off",
+      "no-unescaped-entities": "off",
+      "unicorn/filename-case": "off",
+      "unicorn/no-null": "off",
+      "unicorn/no-array-callback-reference": "off",
+      "unicorn/prefer-global-this": "off",
+      "unicorn/text-encoding-identifier-case": "off",
+      "@typescript-eslint/strict-boolean-expressions": "off",
+      "@typescript-eslint/no-unsafe-type-assertion": "off",
+      "require-await": "off",
+      "init-declarations": "off",
+      "max-params": "off",
+      "no-duplicate-imports": "off",
+      "prefer-destructuring": "off",
+      "no-implicit-coercion": "off",
+      "one-var": "off",
+      "no-continue": "off",
+      "unicorn/max-nested-calls": "off",
+      "unicorn/no-useless-undefined": "off",
+      "unicorn/throw-new-error": "off",
+      "@typescript-eslint/consistent-return": "off",
+      "@typescript-eslint/strict-void-return": "off",
+      "typescript/prefer-readonly-parameter-types": "off",
+      "@tanstack/router/create-route-property-order": "warn",
+      "@tanstack/router/route-param-names": "error",
+      "@tanstack/query/exhaustive-deps": "error",
+      "@tanstack/query/no-rest-destructuring": "warn",
+      "@tanstack/query/stable-query-client": "error",
+      "@tanstack/query/no-unstable-deps": "error",
+      "@tanstack/query/infinite-query-property-order": "error",
+      "@tanstack/query/no-void-query-fn": "error",
+      "@tanstack/query/mutation-property-order": "error",
+      "vite-plus/prefer-vite-plus-imports": "error",
+    },
+    jsPlugins: [
+      "@tanstack/eslint-plugin-router",
+      "@tanstack/eslint-plugin-query",
+      {
+        name: "vite-plus",
+        specifier: "vite-plus/oxlint-plugin",
+      },
+    ],
+    overrides: [
+      {
+        files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+        rules: {
+          "constructor-super": "off",
+          "no-class-assign": "off",
+          "no-const-assign": "off",
+          "no-dupe-class-members": "off",
+          "no-dupe-keys": "off",
+          "no-func-assign": "off",
+          "no-import-assign": "off",
+          "no-new-native-nonconstructor": "off",
+          "no-obj-calls": "off",
+          "no-redeclare": "off",
+          "no-setter-return": "off",
+          "no-this-before-super": "off",
+          "no-unsafe-negation": "off",
+          "no-var": "error",
+          "no-with": "off",
+          "prefer-const": "error",
+          "prefer-rest-params": "error",
+          "prefer-spread": "error",
+        },
+      },
+      {
+        files: ["src/**/*.tsx", "src/**/*.ts"],
+        rules: {
+          "react-hooks/rules-of-hooks": "error",
+          "react-hooks/exhaustive-deps": "warn",
+        },
+      },
+    ],
+    options: {
+      typeAware: true,
+      typeCheck: true,
+    },
+  },
+  resolve: {
+    tsconfigPaths: true,
+  },
   server: {
     port: 4500,
   },
@@ -17,14 +223,11 @@ export default defineConfig({
   build: {
     cssTarget: "chrome123",
   },
-  plugins: [
+  plugins: lazyPlugins(() => [
     ...astryxStylex(),
-    tsconfigPaths({
-      ignoreConfigErrors: true,
-    }),
     tanstackStart({
       srcDirectory: "src",
     }),
     viteReact(),
-  ],
+  ]),
 });

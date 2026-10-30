@@ -310,6 +310,7 @@ function NoteNumberCell({
   const handlers = isDisabled ? {} : scrub.bind({ step: 1, onClick });
   return (
     <span
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- scrubbed cell; an <input> renders only while editing
       role="spinbutton"
       aria-label={label}
       aria-valuenow={shown}

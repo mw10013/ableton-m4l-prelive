@@ -17,7 +17,7 @@ Every name in the schema is a Live Object Model (LOM) name, taken from `refs/m4l
   `Application`.
 - Fields are LOM properties and children under their exact snake*case names. Read-only LOM functions
   are fields too, under the full function name including `get*` (`Clip.get_all_notes_extended`,
-`Application.get_major_version`).
+  `Application.get_major_version`).
 - Mutations are `<object>_<function>` for LOM functions (`clip_duplicate_loop`, `scene_fire`) and
   `<object>_set_<property>` for single property writes (`clip_slot_set_has_stop_button`,
   `song_view_set_detail_clip`).
@@ -323,8 +323,8 @@ all assertions, no manual steps except the one noted below. Prelive can depend o
 7. `clip(id)` with a track id, and `track(id)` with an unknown id, return `null` with no `errors`.
 8. `Clip.get_notes_by_id` with an id that is not in the clip returns `notes: []`.
 9. The composite failure message is literally `liveql: clip_write_notes step <step> failed after
-add_new_notes (ids <n>): liveql: apply_note_modifications on <id>: ignored because these note_ids
-are not in the clip: <ids>`, so matching on the step name is safe.
+   add_new_notes (ids <n>): liveql: apply_note_modifications on <id>: ignored because these note_ids
+   are not in the clip: <ids>`, so matching on the step name is safe.
 
 ### `clip_duplicate_notes_by_id` default placement
 

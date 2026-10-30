@@ -4,16 +4,12 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "dev": "mkdir -p logs && vite dev 2>&1 | tee logs/server.log",
-    "build": "vite build",
-    "start": "vite start",
-    "typecheck": "tsc -b",
-    "lint": "oxlint",
-    "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check",
+    "dev": "mkdir -p logs && vp dev 2>&1 | tee logs/server.log",
+    "build": "vp build",
+    "start": "vp preview",
     "clean": "rm -rf node_modules .tanstack",
     "refs": "node scripts/refs.ts",
-    "liveql:schema": "node scripts/liveql-schema.ts",
+    "liveql:schema": "vpx scripts/liveql-schema.ts",
     "refs:all": "node scripts/refs.ts fetch --all",
     "refs:check": "node scripts/refs.ts check",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
@@ -47,18 +43,27 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "graphql": "16.14.2",
-    "oxfmt": "0.38.0",
-    "oxlint": "1.53.0",
-    "oxlint-tsgolint": "^0.16.0",
-    "typescript": "^5.8.3",
-    "vite": "^7.3.1",
-    "vite-tsconfig-paths": "^6.1.1"
+    "typescript": "7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
   "browserslist": [
     "chrome >= 123",
     "firefox >= 120",
     "safari >= 17.5"
   ],
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.16.1",
+      "onFail": "download"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "24.22.0",
+      "onFail": "download"
+    }
+  },
   "astryx": {
     "theme": "@astryxdesign/theme-neutral"
   }

@@ -1,0 +1,16 @@
+saveExact: true
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.4.0
+allowBuilds:
+  "@astryxdesign/cli": false
+  "@astryxdesign/core": false
+  esbuild: true
+  msgpackr-extract: false
+overrides:
+  vite@*: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"

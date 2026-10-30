@@ -356,6 +356,7 @@ export function BarBeatSixteenthInput({
 
   return (
     <span
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- scrubbed segmented display; an <input> cannot host per-unit drag targets
       role="spinbutton"
       aria-label={label}
       aria-valuenow={beats}

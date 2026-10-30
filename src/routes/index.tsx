@@ -293,6 +293,7 @@ function RouteComponent() {
   useEffect(() => {
     const result = clipQuery.data;
     if (result === undefined || result.clip === null) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- syncs editor state from the fetched clip, the external source
     applyClip({ clip: result.clip, trackName: result.trackName });
   }, [clipQuery.data, applyClip]);
 
@@ -554,13 +555,11 @@ function RouteComponent() {
             >
               {overview && overview.tracks.length > 0 && maxSlots > 0 ? (
                 <Table
-                  data={overview.tracks.map(
-                    (track, trackIndex): TrackRow => ({
-                      trackIndex,
-                      name: track.name,
-                      clipSlots: track.clip_slots,
-                    }),
-                  )}
+                  data={overview.tracks.map((track, trackIndex): TrackRow => ({
+                    trackIndex,
+                    name: track.name,
+                    clipSlots: track.clip_slots,
+                  }))}
                   idKey="trackIndex"
                   density="compact"
                   columns={navigatorColumns}

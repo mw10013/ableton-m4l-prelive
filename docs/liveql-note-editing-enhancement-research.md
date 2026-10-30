@@ -486,29 +486,29 @@ Detail View is what lets a navigator in a client open the clip the user picked.
 
 From `track/index.md`. Add:
 
-| Field                           | Type     | Set |
+| Field | Type | Set |
 | ------------------------------- | -------- | --- | --------------------------- |
-| `type`                          | String!  |     |
-| `arrangement_clips`             | [Clip!]! |     |
-| `arrangement_clip(index: Int!)` | Clip     |     |
-| `arm`                           | Boolean! | yes |
-| `can_be_armed`                  | Boolean! |     |
-| `mute`                          | Boolean! | yes |
-| `solo`                          | Boolean! | yes |
-| `muted_via_solo`                | Boolean! |     |
-| `color`                         | Int!     | yes |
-| `color_index`                   | Int!     | yes |
-| `has_audio_input`               | Boolean! |     |
-| `has_audio_output`              | Boolean! |     |
-| `has_midi_output`               | Boolean! |     |
-| `is_foldable`                   | Boolean! |     |
-| `is_grouped`                    | Boolean! |     |
-| `is_visible`                    | Boolean! |     |
-| `is_frozen`                     | Boolean! |     |
-| `fold_state`                    | Int      | yes | (null unless `is_foldable`) |
-| `group_track`                   | Track    |     |
-| `playing_slot_index`            | Int!     |     |
-| `fired_slot_index`              | Int!     |     |
+| `type` | String! | |
+| `arrangement_clips` | [Clip!]! | |
+| `arrangement_clip(index: Int!)` | Clip | |
+| `arm` | Boolean! | yes |
+| `can_be_armed` | Boolean! | |
+| `mute` | Boolean! | yes |
+| `solo` | Boolean! | yes |
+| `muted_via_solo` | Boolean! | |
+| `color` | Int! | yes |
+| `color_index` | Int! | yes |
+| `has_audio_input` | Boolean! | |
+| `has_audio_output` | Boolean! | |
+| `has_midi_output` | Boolean! | |
+| `is_foldable` | Boolean! | |
+| `is_grouped` | Boolean! | |
+| `is_visible` | Boolean! | |
+| `is_frozen` | Boolean! | |
+| `fold_state` | Int | yes | (null unless `is_foldable`) |
+| `group_track` | Track | |
+| `playing_slot_index` | Int! | |
+| `fired_slot_index` | Int! | |
 
 `arm`, `mute`, `solo`, `playing_slot_index`, `fired_slot_index` are documented as not available on
 return or master tracks. Make them nullable and return `null` when the property read fails, since

@@ -54,6 +54,7 @@ export function useAutowrite({
   const inFlight = useRef(false);
   const dirty = useRef(false);
   const latest = useRef<Sent>({ loadId, clipId, rows, region });
+  // oxlint-disable-next-line react/refs -- latest-value ref: callbacks read the newest render's inputs without re-subscribing
   latest.current = { loadId, clipId, rows, region };
   const lastSent = useRef<Sent>({ loadId, clipId, rows, region });
 
@@ -91,6 +92,7 @@ export function useAutowrite({
       )
       .finally(() => {
         inFlight.current = false;
+        // oxlint-disable-next-line react/immutability -- runs in a settled promise, long after `flush` is initialized
         if (dirty.current && latest.current.loadId === sent.loadId) flush();
       });
   }, [mutateAsync]);

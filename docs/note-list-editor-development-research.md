@@ -521,7 +521,7 @@ Important invariants:
   `refs/cubase-manual/operation-manual/parts-and-events.md`,
   `refs/cubase-manual/operation-manual/preferences.md`
 - Logic Event List: `refs/logic-manual/guide/logicpro/{create-events-in-the-event-list-lgcp2158295a,
-change-event-values-lgcp215851db,change-the-position-and-length-of-events-lgcp215888c6,
-mute-and-delete-regions-and-events-lgcp21583a54,midi-transform-window-presets-lgcp215831be}/12.3_/mac/15.md`
+  change-event-values-lgcp215851db,change-the-position-and-length-of-events-lgcp215888c6,
+  mute-and-delete-regions-and-events-lgcp21583a54,midi-transform-window-presets-lgcp215831be}/12.3_/mac/15.md`
 - Digital Performer: `refs/performer-manual/SIRA/Digital_Performer_Help/pages/{event_list,edit_menu,
-region_menu,searching,snap_info}.md`
+  region_menu,searching,snap_info}.md`
