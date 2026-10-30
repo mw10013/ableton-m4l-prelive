@@ -3,14 +3,14 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { VStack } from "@astryxdesign/core/Stack";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowLeft, FileQuestion, Home } from "lucide-react";
+import { ArrowLeft, FileQuestionMark, House } from "lucide-react";
 
 export function NotFound() {
   const router = useRouter();
   return (
     <VStack minHeight="60vh" hAlign="center" vAlign="center" padding={4}>
       <EmptyState
-        icon={<Icon icon={FileQuestion} size="lg" color="secondary" />}
+        icon={<Icon icon={FileQuestionMark} size="lg" color="secondary" />}
         title="Page Not Found"
         description="The page you're looking for doesn't exist or has been moved. Try checking the URL."
         actions={
@@ -25,7 +25,7 @@ export function NotFound() {
             />
             <Button
               label="Home"
-              icon={<Icon icon={Home} color="inherit" />}
+              icon={<Icon icon={House} color="inherit" />}
               onClick={() => {
                 void router.navigate({ to: "/" });
               }}

@@ -7,7 +7,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { rootRouteId, useMatch, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, Home, Mail, RefreshCw } from "lucide-react";
+import { ArrowLeft, House, Mail, RefreshCw } from "lucide-react";
 
 export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter();
@@ -66,7 +66,7 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
           {isRoot ? (
             <Button
               label="Go to Home"
-              icon={<Icon icon={Home} color="inherit" />}
+              icon={<Icon icon={House} color="inherit" />}
               onClick={() => {
                 void router.navigate({ to: "/" });
               }}
