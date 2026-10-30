@@ -5,7 +5,7 @@ import type {
   TablePlugin,
 } from "@astryxdesign/core/Table";
 
-import type { EditableField, NoteRow } from "@/lib/noteEdits";
+import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
 
 import {
   useCallback,
@@ -32,15 +32,16 @@ import {
 } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
 
+import { formatBeatTime, MIN_DURATION } from "#domain/beatTime.ts";
+import { FIELD_RANGE } from "#domain/noteEdits.ts";
+
 import {
   BarBeatSixteenthInput,
   type CellEditProps,
   type EditEndReason,
-} from "@/components/BarBeatSixteenthInput";
-import { useDoubleClick } from "@/components/useDoubleClick";
-import { useScrub } from "@/components/useScrub";
-import { formatBeatTime, MIN_DURATION } from "@/lib/beatTime";
-import { FIELD_RANGE } from "@/lib/noteEdits";
+} from "./BarBeatSixteenthInput.tsx";
+import { useDoubleClick } from "./useDoubleClick.ts";
+import { useScrub } from "./useScrub.ts";
 
 export type { EditableField };
 

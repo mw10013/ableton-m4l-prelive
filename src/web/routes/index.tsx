@@ -1,12 +1,12 @@
 import type { TableColumn } from "@astryxdesign/core/Table";
 
-import type { EditorStatus } from "@/components/NoteListEditor";
 import type {
   ClipRegion,
   ClipWithNotes,
   ReplaceNotesInput,
-} from "@/lib/Domain";
-import type { NoteRow } from "@/lib/noteEdits";
+} from "#domain/live.ts";
+import type { NoteRow } from "#domain/noteEdits.ts";
+import type { EditorStatus } from "#web/components/NoteListEditor.tsx";
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
@@ -34,22 +34,22 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 
-import { NoteListEditor } from "@/components/NoteListEditor";
-import { ScorePanel } from "@/components/ScorePanel";
-import { ScrubbableNumberInput } from "@/components/ScrubbableNumberInput";
-import { useAutowrite } from "@/components/useAutowrite";
 import {
   activeRowsOf,
   buffersReducer,
   EMPTY_BUFFERS,
   slotSummaryOf,
-} from "@/lib/clipBuffers";
+} from "#domain/clipBuffers.ts";
 import {
   isSameRegion,
   playbackRegion,
   quartersPerBar,
   requiredPlaybackRegion,
-} from "@/lib/noteEdits";
+} from "#domain/noteEdits.ts";
+import { NoteListEditor } from "#web/components/NoteListEditor.tsx";
+import { ScorePanel } from "#web/components/ScorePanel.tsx";
+import { ScrubbableNumberInput } from "#web/components/ScrubbableNumberInput.tsx";
+import { useAutowrite } from "#web/components/useAutowrite.ts";
 import {
   fireClip,
   readClip,
@@ -58,7 +58,7 @@ import {
   readLiveSetOverview,
   replaceNotes,
   togglePlay,
-} from "@/lib/serverFns";
+} from "#web/server/serverFns.ts";
 
 interface ClipInfo {
   id: number;

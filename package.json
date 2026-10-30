@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "type": "module",
+  "imports": {
+    "#domain/*": "./src/domain/*",
+    "#web/*": "./src/web/*",
+    "#scripts/*": "./scripts/*",
+    "#root/*": "./*"
+  },
   "scripts": {
     "dev": "mkdir -p logs && vp dev 2>&1 | tee logs/server.log",
     "build": "vp build",

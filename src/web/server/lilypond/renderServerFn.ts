@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { Effect, Schema } from "effect";
 
-import * as Domain from "@/lib/Domain";
-import { LilyPondRenderer } from "@/lib/lilypond/renderer";
-import { runServerFn } from "@/lib/runtime";
+import * as Domain from "#domain/live.ts";
+import { runServerFn } from "#web/server/runtime.ts";
+
+import { LilyPondRenderer } from "./renderer.ts";
 
 export const renderLilyPondSvg = createServerFn({ method: "POST" })
   .validator(

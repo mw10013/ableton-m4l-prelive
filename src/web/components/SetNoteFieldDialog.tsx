@@ -1,4 +1,4 @@
-import type { EditableField } from "@/lib/noteEdits";
+import type { EditableField } from "#domain/noteEdits.ts";
 
 import { useState } from "react";
 
@@ -9,9 +9,10 @@ import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 
-import { noteName } from "@/components/NoteTable";
-import { formatBeatTime } from "@/lib/beatTime";
-import { FIELD_RANGE } from "@/lib/noteEdits";
+import { formatBeatTime } from "#domain/beatTime.ts";
+import { FIELD_RANGE } from "#domain/noteEdits.ts";
+
+import { noteName } from "./NoteTable.tsx";
 
 export type SettableField = Exclude<EditableField, "start_time">;
 

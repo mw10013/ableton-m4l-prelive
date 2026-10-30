@@ -7,8 +7,8 @@ import {
   ManagedRuntime,
 } from "effect";
 
-import { LilyPondRenderer } from "@/lib/lilypond/renderer";
-import { LiveQL } from "@/lib/LiveQL";
+import { LilyPondRenderer } from "./lilypond/renderer.ts";
+import { LiveQL } from "./LiveQL.ts";
 
 const appLayer = Layer.provideMerge(
   Layer.mergeAll(LilyPondRenderer.layer, LiveQL.layer),

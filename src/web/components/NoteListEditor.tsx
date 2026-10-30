@@ -1,8 +1,9 @@
 import type { TableContextAction } from "@astryxdesign/core/Table";
 
-import type { AutowriteState } from "@/components/useAutowrite";
-import type { SlotName } from "@/lib/clipBuffers";
-import type { EditableField, NoteRow } from "@/lib/noteEdits";
+import type { SlotName } from "#domain/clipBuffers.ts";
+import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
+
+import type { AutowriteState } from "./useAutowrite.ts";
 
 import { useEffect, useState } from "react";
 
@@ -15,21 +16,22 @@ import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { SlidersHorizontal } from "lucide-react";
 
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DuplicateNotesDialog } from "@/components/DuplicateNotesDialog";
-import { type CommitMode, NoteTable } from "@/components/NoteTable";
-import {
-  FIELD_LABEL,
-  type SettableField,
-  SetNoteFieldDialog,
-} from "@/components/SetNoteFieldDialog";
-import { otherSlotOf } from "@/lib/clipBuffers";
+import { otherSlotOf } from "#domain/clipBuffers.ts";
 import {
   byMusicalOrder,
   duplicateNotes,
   setField,
   shiftField,
-} from "@/lib/noteEdits";
+} from "#domain/noteEdits.ts";
+
+import { ConfirmDialog } from "./ConfirmDialog.tsx";
+import { DuplicateNotesDialog } from "./DuplicateNotesDialog.tsx";
+import { type CommitMode, NoteTable } from "./NoteTable.tsx";
+import {
+  FIELD_LABEL,
+  type SettableField,
+  SetNoteFieldDialog,
+} from "./SetNoteFieldDialog.tsx";
 
 export type EditorStatus = "idle" | "loading" | "reloading";
 

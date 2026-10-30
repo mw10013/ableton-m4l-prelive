@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { Schema } from "effect";
 
-import * as Domain from "@/lib/Domain";
-import * as LiveSet from "@/lib/LiveSet";
-import { runServerFn } from "@/lib/runtime";
+import * as Domain from "#domain/live.ts";
+
+import * as LiveSet from "./LiveSet.ts";
+import { runServerFn } from "./runtime.ts";
 
 export const readClip = createServerFn({ method: "GET" }).handler(() =>
   runServerFn(LiveSet.readClip()),

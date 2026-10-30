@@ -7,7 +7,6 @@ import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 
-import { positionLabel } from "@/components/NoteTable";
 import {
   defaultDestination,
   duplicateNotes,
@@ -15,7 +14,9 @@ import {
   isSameRegion,
   quartersPerBar,
   requiredPlaybackRegion,
-} from "@/lib/noteEdits";
+} from "#domain/noteEdits.ts";
+
+import { positionLabel } from "./NoteTable.tsx";
 
 interface DuplicateNotesDialogProps {
   notes: readonly NoteRow[];

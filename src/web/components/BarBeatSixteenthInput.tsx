@@ -4,9 +4,6 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
 
-import { cellTextStyles } from "@/components/NoteTable";
-import { useDoubleClick } from "@/components/useDoubleClick";
-import { type ScrubCommitOptions, useScrub } from "@/components/useScrub";
 import {
   type BeatTimeKind,
   formatBeatTime,
@@ -17,7 +14,11 @@ import {
   parseBeatTime,
   segmentRanges,
   SIXTEENTH,
-} from "@/lib/beatTime";
+} from "#domain/beatTime.ts";
+
+import { cellTextStyles } from "./NoteTable.tsx";
+import { useDoubleClick } from "./useDoubleClick.ts";
+import { type ScrubCommitOptions, useScrub } from "./useScrub.ts";
 
 const styles = stylex.create({
   rest: {

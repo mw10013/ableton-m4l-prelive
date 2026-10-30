@@ -1,4 +1,4 @@
-import type { ReplacementNote as Note } from "@/lib/Domain";
+import type { ReplacementNote as Note } from "#domain/live.ts";
 
 import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
@@ -7,8 +7,8 @@ import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 
-import { quantizeNotes } from "./quantizer";
-import { notesToLilyPond } from "./score";
+import { quantizeNotes } from "#domain/lilypond/quantizer.ts";
+import { notesToLilyPond } from "#domain/lilypond/score.ts";
 
 class LilyPondError extends Schema.TaggedError<LilyPondError>()(
   "LilyPondError",

@@ -1,11 +1,11 @@
-import type { ClipRegion, ReplaceNotesInput } from "@/lib/Domain";
-import type { NoteRow } from "@/lib/noteEdits";
+import type { ClipRegion, ReplaceNotesInput } from "#domain/live.ts";
+import type { NoteRow } from "#domain/noteEdits.ts";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMutation } from "@tanstack/react-query";
 
-import { toReplacementNotes } from "@/lib/noteEdits";
+import { toReplacementNotes } from "#domain/noteEdits.ts";
 
 export const AUTOWRITE_DELAY_MS = 500;
 

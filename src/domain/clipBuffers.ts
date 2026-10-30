@@ -1,6 +1,6 @@
-import type { Note } from "@/lib/Domain";
+import type { Note } from "./live.ts";
 
-import { type NoteRow, rowsOf, sameNotes } from "@/lib/noteEdits";
+import { type NoteRow, rowsOf, sameNotes } from "./noteEdits.ts";
 
 export type SlotName = "a" | "b";
 

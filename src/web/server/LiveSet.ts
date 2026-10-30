@@ -1,7 +1,8 @@
 import { Duration, Effect, Schema } from "effect";
 
-import * as Domain from "@/lib/Domain";
-import { LiveQL, LiveQLError } from "@/lib/LiveQL";
+import * as Domain from "#domain/live.ts";
+
+import { LiveQL, LiveQLError } from "./LiveQL.ts";
 
 const ClipFields = `
   id path type name color end_time is_arrangement_clip is_session_clip is_midi_clip

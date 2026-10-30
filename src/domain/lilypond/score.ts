@@ -1,6 +1,6 @@
-import type { ReplacementNote as Note } from "@/lib/Domain";
+import type { ReplacementNote as Note } from "#domain/live.ts";
 
-import { decideStaffSystem } from "@/lib/score/staffDecision";
+import { decideStaffSystem } from "#domain/score/staffDecision.ts";
 interface LilyPondOptions {
   readonly tempo: number;
   readonly timeSignature: readonly [number, number];

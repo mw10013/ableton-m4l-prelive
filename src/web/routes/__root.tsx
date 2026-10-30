@@ -12,10 +12,9 @@ import {
   useHydrated,
 } from "@tanstack/react-router";
 
-import { DefaultCatchBoundary } from "@/components/default-catch-boundary";
-import { NotFound } from "@/components/not-found";
-
-import appCss from "../styles.css?url";
+import { DefaultCatchBoundary } from "#web/components/default-catch-boundary.tsx";
+import { NotFound } from "#web/components/not-found.tsx";
+import appCss from "#web/styles.css?url";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;

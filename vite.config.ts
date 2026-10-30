@@ -6,7 +6,7 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 export default defineConfig({
   fmt: {
     printWidth: 80,
-    ignorePatterns: ["src/routeTree.gen.ts"],
+    ignorePatterns: ["src/web/routeTree.gen.ts"],
     sortImports: {
       groups: [
         "type-builtin",
@@ -53,7 +53,7 @@ export default defineConfig({
       "dist/",
       "refs/",
       "node_modules/",
-      "src/routeTree.gen.ts",
+      "src/web/routeTree.gen.ts",
     ],
     rules: {
       "no-unused-vars": [
@@ -208,9 +208,6 @@ export default defineConfig({
       typeCheck: true,
     },
   },
-  resolve: {
-    tsconfigPaths: true,
-  },
   server: {
     port: 4500,
   },
@@ -226,7 +223,7 @@ export default defineConfig({
   plugins: lazyPlugins(() => [
     ...astryxStylex(),
     tanstackStart({
-      srcDirectory: "src",
+      srcDirectory: "src/web",
     }),
     viteReact(),
   ]),

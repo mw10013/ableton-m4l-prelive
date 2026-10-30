@@ -1,4 +1,4 @@
-import type { ReplacementNote as Note } from "@/lib/Domain";
+import type { ReplacementNote as Note } from "#domain/live.ts";
 
 import { Effect } from "effect";
 

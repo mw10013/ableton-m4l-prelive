@@ -2,7 +2,7 @@ import { useRef } from "react";
 
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 
-import { precisionOf, useScrub } from "@/components/useScrub";
+import { precisionOf, useScrub } from "./useScrub.ts";
 
 interface ScrubbableNumberInputProps {
   label: string;

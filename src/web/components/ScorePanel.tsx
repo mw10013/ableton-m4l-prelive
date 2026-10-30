@@ -1,4 +1,4 @@
-import type { NoteRow } from "@/lib/noteEdits";
+import type { NoteRow } from "#domain/noteEdits.ts";
 
 import { useEffect, useState } from "react";
 
@@ -10,8 +10,8 @@ import { Text } from "@astryxdesign/core/Text";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useMutation } from "@tanstack/react-query";
 
-import { renderLilyPondSvg } from "@/lib/lilypond/renderServerFn";
-import { toReplacementNotes } from "@/lib/noteEdits";
+import { toReplacementNotes } from "#domain/noteEdits.ts";
+import { renderLilyPondSvg } from "#web/server/lilypond/renderServerFn.ts";
 
 interface ScorePanelProps {
   notes: readonly NoteRow[];
