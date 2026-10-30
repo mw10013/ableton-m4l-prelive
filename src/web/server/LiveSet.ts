@@ -1,4 +1,6 @@
-import { Duration, Effect, Schema } from "effect";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 import * as Domain from "#domain/live.ts";
 

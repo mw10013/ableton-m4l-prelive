@@ -3,9 +3,14 @@ import type { ReplacementNote as Note } from "#domain/live.ts";
 import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as ChildProcess from "effect/process/ChildProcess";
-import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as Schema from "effect/Schema";
 
 import { quantizeNotes } from "#domain/lilypond/quantizer.ts";
 import { notesToLilyPond } from "#domain/lilypond/score.ts";
@@ -31,7 +36,7 @@ export class LilyPondRenderer extends Context.Service<
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const spawner = yield* ChildProcessSpawner;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
       const lyToSvg = Effect.fn("lyToSvg")(function* (lyContent: string) {
         return yield* Effect.scoped(

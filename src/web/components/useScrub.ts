@@ -106,8 +106,8 @@ const roundSymmetric = (value: number) =>
 
 export const precisionOf = (value: number) => {
   const text = String(value);
-  const exponent = /e-(\d+)$/i.exec(text);
-  const [mantissa = ""] = text.split(/e/i);
+  const exponent = /e-(?<digits>\d+)$/iu.exec(text);
+  const [mantissa = ""] = text.split(/e/iu);
   const [, fraction = ""] = mantissa.split(".");
   return fraction.length + (exponent ? Number(exponent[1]) : 0);
 };

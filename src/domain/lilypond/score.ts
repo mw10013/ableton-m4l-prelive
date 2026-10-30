@@ -52,10 +52,10 @@ const durationTable = [
   { beats: 0.25, token: "16" },
   { beats: 0.1875, token: "32." },
   { beats: 0.125, token: "32" },
-  { beats: 0.093_75, token: "64." },
+  { beats: 0.09375, token: "64." },
   { beats: 0.0625, token: "64" },
-  { beats: 0.046_875, token: "128." },
-  { beats: 0.031_25, token: "128" },
+  { beats: 0.046875, token: "128." },
+  { beats: 0.03125, token: "128" },
 ];
 
 const epsilon = 1e-6;

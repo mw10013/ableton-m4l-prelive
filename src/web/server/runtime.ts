@@ -1,11 +1,10 @@
-import {
-  Cause,
-  ConfigProvider,
-  type Effect,
-  Exit,
-  Layer,
-  ManagedRuntime,
-} from "effect";
+import type * as Effect from "effect/Effect";
+
+import * as Cause from "effect/Cause";
+import * as ConfigProvider from "effect/ConfigProvider";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 
 import { LilyPondRenderer } from "./lilypond/renderer.ts";
 import { LiveQL } from "./LiveQL.ts";

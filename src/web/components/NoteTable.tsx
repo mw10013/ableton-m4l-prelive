@@ -43,8 +43,6 @@ import {
 import { useDoubleClick } from "./useDoubleClick.ts";
 import { useScrub } from "./useScrub.ts";
 
-export type { EditableField };
-
 /** How a committed value applies when the edited row is part of a multi-row selection. */
 export type CommitMode = "relative" | "absolute";
 
@@ -329,7 +327,7 @@ function NoteNumberCell({
         if (event.key === "Enter" || event.key === " " || event.key === "F2") {
           event.preventDefault();
           onEditStart();
-        } else if (/^\d$/.test(event.key)) {
+        } else if (/^\d$/u.test(event.key)) {
           event.preventDefault();
           onEditStart(event.key);
         } else if (

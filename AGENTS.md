@@ -82,7 +82,7 @@ import * as z from "zod";
 
 ## Linting & Formatting
 
-- Uses **Vite+** (`vp`), which bundles **oxlint** (not ESLint) and **oxfmt** (not Prettier). Both are configured in `vite.config.ts` under `lint` and `fmt`.
+- Uses **Vite+** (`vp`), which bundles **oxlint** (not ESLint) and **oxfmt** (not Prettier). Both are configured in `vite.config.ts` under `lint` and `fmt`. The lint block is the house rule set shared with other apps: every enabled rule is an error, Effect modules are imported as namespaces by path (`import * as Effect from "effect/Effect"`), and `src/domain` may not import `src/web`. Suppress one site at a time with `// oxlint-disable-next-line <rule> -- <reason>`.
 - Do not add ESLint or Prettier config.
 - `src/web/routeTree.gen.ts` is excluded from linting/formatting.
 

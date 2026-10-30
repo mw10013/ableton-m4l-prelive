@@ -374,7 +374,7 @@ export function BarBeatSixteenthInput({
         if (event.key === "Enter" || event.key === " " || event.key === "F2") {
           event.preventDefault();
           onEditStart();
-        } else if (/^\d$/.test(event.key)) {
+        } else if (/^\d$/u.test(event.key)) {
           event.preventDefault();
           onEditStart(event.key);
         } else if (

@@ -113,8 +113,8 @@ export function ScrubbableNumberInput({
           event.metaKey ||
           event.ctrlKey ||
           event.altKey ||
-          /[0-9+-]/.test(event.key) ||
-          (!Number.isInteger(step) && /[.,]/.test(event.key))
+          /[0-9+-]/u.test(event.key) ||
+          (!Number.isInteger(step) && /[.,]/u.test(event.key))
         )
           return;
         event.preventDefault();

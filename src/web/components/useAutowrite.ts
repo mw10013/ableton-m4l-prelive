@@ -95,6 +95,7 @@ export function useAutowrite({
         // oxlint-disable-next-line react/immutability -- runs in a settled promise, long after `flush` is initialized
         if (dirty.current && latest.current.loadId === sent.loadId) flush();
       });
+    // oxlint-disable-next-line react/memo-dependencies -- `flush` reschedules itself; listing it would be a self-reference
   }, [mutateAsync]);
 
   const flushNow = useCallback(() => {

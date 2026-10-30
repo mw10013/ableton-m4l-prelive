@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * Base schemas define scalar fields only for each GraphQL object type.

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 import * as Domain from "#domain/live.ts";
 import { runServerFn } from "#web/server/runtime.ts";

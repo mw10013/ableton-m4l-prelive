@@ -87,7 +87,7 @@ export const formatBeatTime = (
 /** Formatted segments of `formatBeatTime` with their character ranges in the text. */
 export const segmentRanges = (text: string) => {
   const ranges: { start: number; end: number }[] = [];
-  const pattern = /[^.,\s]+/g;
+  const pattern = /[^.,\s]+/gu;
   let match = pattern.exec(text);
   let count = 0;
   while (match !== null && count < 3) {
@@ -98,7 +98,8 @@ export const segmentRanges = (text: string) => {
   return ranges;
 };
 
-const PATTERN = /^\s*(\d+)(?:[.,\s]+(\d+))?(?:[.,\s]+(\d+(?:\.\d+)?))?\s*$/;
+const PATTERN =
+  /^\s*(?<bar>\d+)(?:[.,\s]+(?<beat>\d+))?(?:[.,\s]+(?<sixteenth>\d+(?:\.\d+)?))?\s*$/u;
 
 /**
  * Parses Live/Logic-style typed input. Segments may be separated by `.`, `,` or spaces; trailing
