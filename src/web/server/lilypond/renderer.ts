@@ -1,8 +1,6 @@
 import type { ReplacementNote as Note } from "#domain/live.ts";
 
-import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
-import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
-import * as NodePath from "@effect/platform-node/NodePath";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -31,14 +29,16 @@ export class LilyPondRenderer extends Context.Service<
     ) => Effect.Effect<Uint8Array, LilyPondError>;
   }
 >()("app/LilyPondRenderer") {
-  static readonly layerNoDeps = Layer.effect(
+  static readonly layer = Layer.effect(
     LilyPondRenderer,
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
-      const lyToSvg = Effect.fn("lyToSvg")(function* (lyContent: string) {
+      const lyToSvg = Effect.fn("LilyPondRenderer.lyToSvg")(function* (
+        lyContent: string,
+      ) {
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const tmpDir = yield* fs.makeTempDirectoryScoped({
@@ -80,13 +80,5 @@ export class LilyPondRenderer extends Context.Service<
 
       return LilyPondRenderer.of({ renderToSvg });
     }),
-  );
-
-  static readonly layer = Layer.provide(
-    Layer.provide(
-      Layer.provide(this.layerNoDeps, NodeChildProcessSpawner.layer),
-      NodePath.layer,
-    ),
-    NodeFileSystem.layer,
-  );
+  ).pipe(Layer.provide(NodeServices.layer));
 }

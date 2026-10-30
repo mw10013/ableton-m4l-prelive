@@ -37,11 +37,7 @@ export class LiveQL extends Context.Service<
     ) => Effect.Effect<A, LiveQLError>;
   }
 >()("app/LiveQL") {
-  static readonly layerNoDeps: Layer.Layer<
-    LiveQL,
-    never,
-    HttpClient.HttpClient
-  > = Layer.effect(
+  static readonly layerConfig: Layer.Layer<LiveQL> = Layer.effect(
     LiveQL,
     Effect.gen(function* () {
       const endpoint = yield* Config.String("LIVEQL_ENDPOINT").pipe(
@@ -98,10 +94,5 @@ export class LiveQL extends Context.Service<
       });
       return LiveQL.of({ gqlDecode });
     }),
-  );
-
-  static readonly layer = Layer.provide(
-    this.layerNoDeps,
-    FetchHttpClient.layer,
-  );
+  ).pipe(Layer.provide(FetchHttpClient.layer));
 }

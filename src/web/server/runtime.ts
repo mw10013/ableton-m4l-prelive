@@ -10,7 +10,7 @@ import { LilyPondRenderer } from "./lilypond/renderer.ts";
 import { LiveQL } from "./LiveQL.ts";
 
 const appLayer = Layer.provideMerge(
-  Layer.mergeAll(LilyPondRenderer.layer, LiveQL.layer),
+  Layer.mergeAll(LilyPondRenderer.layer, LiveQL.layerConfig),
   ConfigProvider.layer(ConfigProvider.fromEnv()),
 );
 

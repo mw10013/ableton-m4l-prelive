@@ -26,7 +26,7 @@ interface QuantizationConfig {
   readonly normalizeGrid: number;
 }
 
-const defaultQuantizationConfig: QuantizationConfig = {
+const DEFAULT_QUANTIZATION_CONFIG: QuantizationConfig = {
   startGrid: 1 / 16,
   startStrongGrids: [1 / 4, 1 / 8],
   startStrongTolerance: 1 / 32,
@@ -189,7 +189,7 @@ export const quantizeNotes = Effect.fn("LilyPondQuantizer.quantizeNotes")(
   (notes: readonly Note[], options?: Partial<QuantizationConfig>) =>
     Effect.sync(() => {
       const config: QuantizationConfig = {
-        ...defaultQuantizationConfig,
+        ...DEFAULT_QUANTIZATION_CONFIG,
         ...options,
       };
       const starts = notes.map((note) =>

@@ -287,11 +287,13 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
     },
     { timeout: "60 seconds" },
   ).pipe(Effect.timed);
-  yield* Effect.logInfo("replaceNotes").pipe(
+  yield* Effect.logInfo(
+    `LiveSet.replaceNotes: clipId=${String(input.clipId)} notes=${String(input.notes.length)}`,
+  ).pipe(
     Effect.annotateLogs({
       clipId: input.clipId,
       notes: input.notes.length,
-      ms: Duration.toMillis(elapsed),
+      elapsed: Duration.format(elapsed),
     }),
   );
   return { clipId: input.clipId };

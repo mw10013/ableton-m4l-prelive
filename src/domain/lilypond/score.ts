@@ -25,7 +25,7 @@ const defaultOptions: LilyPondOptions = {
   splitPoint: 60,
 };
 
-const noteNames = [
+const NOTE_NAMES = [
   "c",
   "cis",
   "d",
@@ -40,7 +40,7 @@ const noteNames = [
   "b",
 ];
 
-const durationTable = [
+const DURATION_TABLE = [
   { beats: 4, token: "1" },
   { beats: 3, token: "2." },
   { beats: 2, token: "2" },
@@ -58,14 +58,14 @@ const durationTable = [
   { beats: 0.03125, token: "128" },
 ];
 
-const epsilon = 1e-6;
+const EPSILON = 1e-6;
 
 const roundToGrid = (value: number, gridSize: number): number =>
   Math.round(value / gridSize) * gridSize;
 
 const pitchToLily = (pitch: number): string => {
   const octave = Math.floor(pitch / 12) - 1;
-  const name = noteNames[pitch % 12] ?? "c";
+  const name = NOTE_NAMES[pitch % 12] ?? "c";
   const marks = octave - 3;
   if (marks > 0) return name + "'".repeat(marks);
   if (marks < 0) return name + ",".repeat(-marks);
@@ -75,12 +75,12 @@ const pitchToLily = (pitch: number): string => {
 const splitDuration = (beats: number): readonly string[] => {
   const tokens: string[] = [];
   let remaining = beats;
-  for (const { beats: value, token } of durationTable) {
-    while (remaining + epsilon >= value) {
+  for (const { beats: value, token } of DURATION_TABLE) {
+    while (remaining + EPSILON >= value) {
       tokens.push(token);
       remaining = roundToGrid(remaining - value, 1 / 1024);
     }
-    if (remaining <= epsilon) break;
+    if (remaining <= EPSILON) break;
   }
   return tokens.length > 0 ? tokens : ["64"];
 };
@@ -94,12 +94,12 @@ const splitRestDuration = (
   const parts: number[] = [];
   let remaining = duration;
   let cursor = roundToGrid(start, gridSize);
-  while (remaining > epsilon) {
-    const beatIndex = Math.floor((cursor + epsilon) / beatLength);
+  while (remaining > EPSILON) {
+    const beatIndex = Math.floor((cursor + EPSILON) / beatLength);
     const nextBeat = roundToGrid((beatIndex + 1) * beatLength, gridSize);
     const untilNextBeat = roundToGrid(nextBeat - cursor, gridSize);
     const segment =
-      untilNextBeat > epsilon ? Math.min(remaining, untilNextBeat) : remaining;
+      untilNextBeat > EPSILON ? Math.min(remaining, untilNextBeat) : remaining;
     parts.push(segment);
     cursor = roundToGrid(cursor + segment, gridSize);
     remaining = roundToGrid(remaining - segment, gridSize);
@@ -154,7 +154,7 @@ const assignVoices = (events: readonly Event[]): readonly VoiceLine[] => {
   for (const event of sorted) {
     let placed = false;
     for (const voice of voices) {
-      if (event.start >= voice.end - epsilon) {
+      if (event.start >= voice.end - EPSILON) {
         voice.events.push(event);
         voice.end = event.start + event.duration;
         placed = true;
@@ -204,7 +204,7 @@ const voiceToTokens = (
   const tokens: string[] = [];
   let cursor = 0;
   for (const event of events) {
-    if (event.start > cursor + epsilon) {
+    if (event.start > cursor + EPSILON) {
       const restDuration = event.start - cursor;
       tokens.push(
         ...tokensForRestDuration(cursor, restDuration, beatLength, gridSize),
@@ -213,7 +213,7 @@ const voiceToTokens = (
     tokens.push(...tokensForDuration(event.duration, event.pitches));
     cursor = event.start + event.duration;
   }
-  if (cursor + epsilon < totalEnd) {
+  if (cursor + EPSILON < totalEnd) {
     tokens.push(
       ...tokensForRestDuration(cursor, totalEnd - cursor, beatLength, gridSize),
     );
