@@ -16,7 +16,7 @@ interface StaffDecisionOptions {
   readonly minGrandSideRatio: number;
 }
 
-const defaultOptions: StaffDecisionOptions = {
+const DEFAULT_OPTIONS: StaffDecisionOptions = {
   splitPoint: 60,
   bassRatioForBass: 0.7,
   trebleRatioForTreble: 0.7,
@@ -63,7 +63,7 @@ export const decideStaffSystem = (
   notes: readonly Note[],
   options?: Partial<StaffDecisionOptions>,
 ): StaffDecision => {
-  const config: StaffDecisionOptions = { ...defaultOptions, ...options };
+  const config: StaffDecisionOptions = { ...DEFAULT_OPTIONS, ...options };
   const pitches = notes
     .map((note) => note.pitch)
     .filter((pitch) => Number.isFinite(pitch));

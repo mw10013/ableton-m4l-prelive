@@ -18,7 +18,7 @@ interface VoiceLine {
   readonly events: readonly Event[];
 }
 
-const defaultOptions: LilyPondOptions = {
+const DEFAULT_OPTIONS: LilyPondOptions = {
   tempo: 120,
   timeSignature: [4, 4],
   gridSize: 1 / 16,
@@ -225,7 +225,7 @@ export const notesToLilyPond = (
   notes: readonly Note[],
   options?: Partial<LilyPondOptions>,
 ): string => {
-  const config: LilyPondOptions = { ...defaultOptions, ...options };
+  const config: LilyPondOptions = { ...DEFAULT_OPTIONS, ...options };
   const [numerator, denominator] = config.timeSignature;
   const beatLength = 4 / denominator;
   const measureLength = numerator * (4 / denominator);

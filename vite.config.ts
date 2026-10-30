@@ -196,7 +196,7 @@ const webOnlyRules = [
   "@tanstack/router/route-param-names",
 ];
 
-export default defineConfig(({ command, isPreview }) => {
+export default defineConfig(({ command, mode, isPreview }) => {
   if (
     command === "serve" &&
     isPreview === false &&
@@ -462,6 +462,9 @@ export default defineConfig(({ command, isPreview }) => {
         reportUnusedDisableDirectives: "error",
       },
     },
+    test: {
+      include: ["test/**/*.test.ts"],
+    },
     server: {
       port: 4500,
     },
@@ -474,12 +477,17 @@ export default defineConfig(({ command, isPreview }) => {
     build: {
       cssTarget: "chrome123",
     },
-    plugins: lazyPlugins(() => [
-      ...astryxStylex(),
-      tanstackStart({
-        srcDirectory: "src/web",
-      }),
-      viteReact(),
-    ]),
+    // Tests exercise the domain only; the app's plugins keep Vite servers alive after a run.
+    plugins: lazyPlugins(() =>
+      mode === "test"
+        ? []
+        : [
+            ...astryxStylex(),
+            tanstackStart({
+              srcDirectory: "src/web",
+            }),
+            viteReact(),
+          ],
+    ),
   };
 });

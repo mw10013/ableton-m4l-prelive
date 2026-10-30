@@ -40,10 +40,11 @@ vp run dev:logs         # Tail .logs/dev/current
 vp check                # Format check, lint, and type check (read-only)
 vp check --fix          # Same, applying formatting and safe lint fixes
 vp build                # Production build
+vp test run             # Domain tests in test/ (@effect/vitest)
 pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this file)
 ```
 
-- Run `vp check` after generating code.
+- Run `vp check` and `vp test run` after generating code. Tests live in `test/`, reach code through `#domain/*`, and assert behavior with `@effect/vitest`.
 
 ## Server Log Monitoring
 

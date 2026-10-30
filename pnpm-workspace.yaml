@@ -2,6 +2,7 @@ saveExact: true
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.4.0
   vite-plus: 1.4.0
+  vitest: 5.0.5
 allowBuilds:
   "@astryxdesign/cli": false
   "@astryxdesign/core": false
@@ -9,8 +10,11 @@ allowBuilds:
   msgpackr-extract: false
 overrides:
   vite@*: "catalog:"
+  vitest@*: "catalog:"
 peerDependencyRules:
   allowAny:
     - vite
+    - vitest
   allowedVersions:
     vite: "*"
+    vitest: "*"
