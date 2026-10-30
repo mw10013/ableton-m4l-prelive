@@ -33,7 +33,10 @@ vpx /Users/mw/projects/tools/refs.ts sync     # Fetch every supported declared d
 ## Commands
 
 ```bash
-vp run dev              # Start dev server (port 4500, logs to logs/server.log)
+vp run dev              # Start the dev server on port 4500, or adopt the running one
+vp run dev:status       # Where it runs and whether it answers (exit 1 when unhealthy)
+vp run dev:stop         # Stop it wherever it runs
+vp run dev:logs         # Tail .logs/dev/current
 vp check                # Format check, lint, and type check (read-only)
 vp check --fix          # Same, applying formatting and safe lint fixes
 vp build                # Production build
@@ -44,7 +47,7 @@ pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this fi
 
 ## Server Log Monitoring
 
-`logs/server.log` is a live, continuously growing log of dev server output. Use `tail` to check for build errors and runtime issues.
+`.logs/dev/current` is the dev server's live log (`s6-log`, timestamped, rotated), with `==== dev start` and `==== dev exit` markers around each run. Read it with `vp run dev:logs` or `tail` to check for build errors and runtime issues. Always start the server with `vp run dev`: a bare `vp dev` is rejected by `vite.config.ts`. With herdr running, the server runs in the checkout's herdr workspace, tab `dev`; otherwise in the caller's terminal or the background.
 
 ## TypeScript Guidelines
 

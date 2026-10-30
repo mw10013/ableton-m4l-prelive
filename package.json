@@ -10,7 +10,11 @@
     "#root/*": "./*"
   },
   "scripts": {
-    "dev": "mkdir -p logs && vp dev 2>&1 | tee logs/server.log",
+    "dev": "vpx scripts/dev.ts start",
+    "dev:stop": "vpx scripts/dev.ts stop",
+    "dev:status": "vpx scripts/dev.ts status",
+    "dev:logs": "vpx scripts/dev.ts logs",
+    "dev:server": "vpx scripts/serve.ts",
     "build": "vp build",
     "start": "vp preview",
     "clean": "rm -rf node_modules .tanstack",

@@ -6,7 +6,7 @@ node_modules
 dist/
 .tanstack/
 /refs
-logs/
+/.logs
 todo.md
 .playwright-cli/
 test-results/
