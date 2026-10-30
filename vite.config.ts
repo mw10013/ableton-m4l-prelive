@@ -1,3 +1,4 @@
+import type { Plugin } from "vite-plus";
 import type { OxlintOverride } from "vite-plus/lint";
 
 import { astryxStylex } from "@astryxdesign/build/vite";
@@ -482,7 +483,18 @@ export default defineConfig(({ command, mode, isPreview }) => {
       mode === "test"
         ? []
         : [
-            ...astryxStylex(),
+            /**
+             * The SSR build emits no stylesheet, so Astryx's layer split, which fails a build whose
+             * StyleX rules it cannot find in a stylesheet, runs on the client build only.
+             */
+            ...astryxStylex().map((plugin): Plugin =>
+              plugin.name === "astryx-build-layer-split"
+                ? {
+                    ...plugin,
+                    applyToEnvironment: ({ name }) => name === "client",
+                  }
+                : plugin,
+            ),
             tanstackStart({
               srcDirectory: "src/web",
             }),

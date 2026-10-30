@@ -103,7 +103,7 @@ const styles = stylex.create({
     cursor: "default",
     minWidth: "1ch",
     width: "100%",
-    background: "none",
+    backgroundColor: "transparent",
     borderWidth: 0,
     padding: 0,
     fontFamily: "inherit",
