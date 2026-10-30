@@ -4,7 +4,7 @@ import {
   HttpClient,
   HttpClientRequest,
   HttpClientResponse,
-} from "effect/unstable/http";
+} from "effect/http";
 
 export class LiveQLError extends Schema.TaggedError<LiveQLError>()(
   "LiveQLError",
@@ -40,7 +40,7 @@ export class LiveQL extends Context.Service<
   > = Layer.effect(
     LiveQL,
     Effect.gen(function* () {
-      const endpoint = yield* Config.string("LIVEQL_ENDPOINT").pipe(
+      const endpoint = yield* Config.String("LIVEQL_ENDPOINT").pipe(
         Config.withDefault("http://localhost:4000/graphql"),
         Effect.orDie,
       );

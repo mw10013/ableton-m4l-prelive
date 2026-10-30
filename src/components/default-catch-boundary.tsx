@@ -18,8 +18,11 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
 
   console.error(error);
 
-  const errorMessage = error.message || "An unexpected error occurred";
-  const errorStack = error.stack ?? "";
+  const errorMessage =
+    error instanceof Error && error.message !== ""
+      ? error.message
+      : "An unexpected error occurred";
+  const errorStack = error instanceof Error ? (error.stack ?? "") : "";
 
   const handleReportError = () => {
     const subject = encodeURIComponent("Error Report");
