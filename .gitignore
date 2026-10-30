@@ -5,7 +5,7 @@ node_modules
 
 dist/
 .tanstack/
-refs/
+/refs
 logs/
 todo.md
 .playwright-cli/
