@@ -61,20 +61,25 @@ pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this fi
 - Inline types when practical instead of introducing extra interfaces or type aliases.
 - Avoid intermediate variables that are not necessary for clarity.
 - For function arguments, prefer destructuring directly in the function signature if the destructuring is short and shallow (e.g., `({ data: { value }, otherArg })`). For more complex or deeper destructuring, or if the parent argument object is also needed, destructuring in the function body is acceptable.
-- Prefer namespace imports for large libraries.
+- Effect modules are imported as namespaces by path (`import * as Effect from "effect/Effect"`), never from the `effect` barrel or a subpackage index; lint enforces it. Other large libraries also take namespace imports.
 - **Strict mode enabled**: All strict TypeScript checks are on
 - **No unused variables/parameters**: Prefix with `_` if intentionally unused
 - **Type imports**: Use `import type` for type-only imports when possible
 - **Imports and layout**: `src/domain/` holds pure concepts (schemas and functions over them) and imports only `effect` and itself. `src/web/` holds the TanStack Start app, its server code under `src/web/server/`. Leaving a file's folder goes through a `package.json` `imports` entry with the extension (`#domain/live.ts`, `#web/server/LiveQL.ts`); within the folder and below, `./`. No `..`, no `@/`.
 
 ```ts
-import type { Stripe as StripeTypes } from "stripe";
+import type { ReplacementNote } from "#domain/live.ts";
 
 import * as React from "react";
 
-import * as TanStackRouter from "@tanstack/react-router";
-import * as TanStackStart from "@tanstack/react-start";
-import * as z from "zod";
+import { createServerFn } from "@tanstack/react-start";
+import * as Effect from "effect/Effect";
+import * as HttpClient from "effect/http/HttpClient";
+import * as Schema from "effect/Schema";
+
+import { LiveQL } from "#web/server/LiveQL.ts";
+
+import { useScrub } from "./useScrub.ts";
 ```
 
 ## TanStack
