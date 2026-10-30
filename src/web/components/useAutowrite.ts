@@ -1,7 +1,13 @@
 import type { ClipRegion, ReplaceNotesInput } from "#domain/live.ts";
 import type { NoteRow } from "#domain/noteEdits.ts";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { useMutation } from "@tanstack/react-query";
 
@@ -54,8 +60,10 @@ export function useAutowrite({
   const inFlight = useRef(false);
   const dirty = useRef(false);
   const latest = useRef<Sent>({ loadId, clipId, rows, region });
-  // oxlint-disable-next-line react/refs -- latest-value ref: callbacks read the newest render's inputs without re-subscribing
-  latest.current = { loadId, clipId, rows, region };
+  // Before any timer or event handler can run, so a write always sends what was last rendered.
+  useLayoutEffect(() => {
+    latest.current = { loadId, clipId, rows, region };
+  });
   const lastSent = useRef<Sent>({ loadId, clipId, rows, region });
 
   const disarm = useCallback(() => {
@@ -66,36 +74,36 @@ export function useAutowrite({
     setIsArmed(false);
   }, []);
 
+  /** Sends the newest list, then again while edits arrived during the write, within one load. */
   const flush = useCallback(() => {
     if (inFlight.current) {
       dirty.current = true;
       return;
     }
-    const sent = latest.current;
-    lastSent.current = sent;
     inFlight.current = true;
-    dirty.current = false;
-    void mutateAsync({
-      clipId: sent.clipId,
-      notes: toReplacementNotes(sent.rows),
-      region: sent.region,
-    })
-      .then(
-        () => {
-          setLastError(null);
-        },
-        (error: unknown) => {
-          setLastError(
-            error instanceof Error ? error.message : "Write failed.",
-          );
-        },
-      )
-      .finally(() => {
-        inFlight.current = false;
-        // oxlint-disable-next-line react/immutability -- runs in a settled promise, long after `flush` is initialized
-        if (dirty.current && latest.current.loadId === sent.loadId) flush();
-      });
-    // oxlint-disable-next-line react/memo-dependencies -- `flush` reschedules itself; listing it would be a self-reference
+    void (async () => {
+      const { loadId: flushedLoad } = latest.current;
+      do {
+        const sent = latest.current;
+        lastSent.current = sent;
+        dirty.current = false;
+        await mutateAsync({
+          clipId: sent.clipId,
+          notes: toReplacementNotes(sent.rows),
+          region: sent.region,
+        }).then(
+          () => {
+            setLastError(null);
+          },
+          (error: unknown) => {
+            setLastError(
+              error instanceof Error ? error.message : "Write failed.",
+            );
+          },
+        );
+      } while (dirty.current && latest.current.loadId === flushedLoad);
+      inFlight.current = false;
+    })();
   }, [mutateAsync]);
 
   const flushNow = useCallback(() => {

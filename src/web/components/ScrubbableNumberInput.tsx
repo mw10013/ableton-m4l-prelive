@@ -50,7 +50,7 @@ export function ScrubbableNumberInput({
   pointerLock = false,
 }: ScrubbableNumberInputProps) {
   const cancelling = useRef(false);
-  const scrub = useScrub({
+  const { bind, ref, track, commit, isScrubbing, rest, revert } = useScrub({
     value,
     min,
     max,
@@ -60,8 +60,7 @@ export function ScrubbableNumberInput({
     pointerLock,
     wheel: { step },
   });
-  // oxlint-disable-next-line react/refs -- `bind` returns handlers; its refs are read on pointer events, not during render
-  const handlers = scrub.bind({
+  const handlers = bind({
     step,
     onClick: (event) => {
       const target = event.currentTarget;
@@ -77,30 +76,30 @@ export function ScrubbableNumberInput({
       value={value}
       onChange={(next) => {
         if (next === null) return;
-        scrub.track(next);
+        track(next);
         onChange(next);
       }}
       onEnter={() => {
-        scrub.commit();
+        commit();
       }}
       onFocus={() => {
-        if (!scrub.isScrubbing()) scrub.rest();
+        if (!isScrubbing()) rest();
       }}
       onBlur={() => {
         if (cancelling.current) {
           // Astryx has just re-committed its pending text; put the resting value back.
           cancelling.current = false;
-          scrub.revert();
+          revert();
           return;
         }
-        scrub.commit();
+        commit();
       }}
       min={min}
       max={max}
       step={step}
       isIntegerOnly={isIntegerOnly ?? Number.isInteger(step)}
       width={width}
-      ref={scrub.ref as React.Ref<HTMLInputElement>}
+      ref={ref as React.Ref<HTMLInputElement>}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();

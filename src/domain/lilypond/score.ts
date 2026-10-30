@@ -134,16 +134,14 @@ const buildEvents = (
   }
   const events: Event[] = [];
   for (const entry of grouped.values()) {
-    // oxlint-disable-next-line unicorn/no-array-sort
-    const pitches = [...new Set(entry.pitches)].sort((a, b) => a - b);
+    const pitches = [...new Set(entry.pitches)].toSorted((a, b) => a - b);
     events.push({ start: entry.start, duration: entry.duration, pitches });
   }
   return events;
 };
 
 const assignVoices = (events: readonly Event[]): readonly VoiceLine[] => {
-  // oxlint-disable-next-line unicorn/no-array-sort
-  const sorted = [...events].sort((a, b) => {
+  const sorted = events.toSorted((a, b) => {
     if (a.start !== b.start) return a.start - b.start;
     const maxA = Math.max(...a.pitches);
     const maxB = Math.max(...b.pitches);

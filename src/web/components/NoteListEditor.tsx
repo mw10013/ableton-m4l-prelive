@@ -5,7 +5,7 @@ import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
 
 import type { AutowriteState } from "./useAutowrite.ts";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -79,6 +79,42 @@ const STATUS_LABEL: Record<EditorStatus, string | null> = {
 
 const DETAILS_STORAGE_KEY = "prelive.noteList.showDetails";
 
+/**
+ * The Details toggle, persisted in `localStorage` and read through `useSyncExternalStore`: the server
+ * snapshot is `false`, so hydration matches, and the client reads storage after. When storage is
+ * blocked, the last toggle still holds for this page.
+ */
+const detailsStore = (() => {
+  const listeners = new Set<() => void>();
+  let fallback = false;
+  return {
+    read: () => {
+      try {
+        return localStorage.getItem(DETAILS_STORAGE_KEY) === "true";
+      } catch {
+        return fallback;
+      }
+    },
+    write: (next: boolean) => {
+      fallback = next;
+      try {
+        localStorage.setItem(DETAILS_STORAGE_KEY, String(next));
+      } catch {
+        // Storage blocked; `fallback` carries the toggle for this page.
+      }
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      window.addEventListener("storage", listener);
+      return () => {
+        listeners.delete(listener);
+        window.removeEventListener("storage", listener);
+      };
+    },
+  };
+})();
+
 const CONFIRMATION: Record<
   Confirmation,
   (slots: SlotSummary) => {
@@ -133,7 +169,11 @@ export function NoteListEditor({
   onReload,
 }: NoteListEditorProps) {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [showDetails, setShowDetails] = useState(false);
+  const showDetails = useSyncExternalStore(
+    detailsStore.subscribe,
+    detailsStore.read,
+    () => false,
+  );
   const [duplicateSource, setDuplicateSource] = useState<
     readonly NoteRow[] | null
   >(null);
@@ -152,25 +192,6 @@ export function NoteListEditor({
     selectedKeys.has(String(note.id)),
   );
   const otherSlot = otherSlotOf(slots.active);
-
-  // Read after mount: the server render has no localStorage, and a differing first client render
-  // would be a hydration mismatch.
-  useEffect(() => {
-    try {
-      // oxlint-disable-next-line react/set-state-in-effect -- reading storage during render would mismatch the server render
-      setShowDetails(localStorage.getItem(DETAILS_STORAGE_KEY) === "true");
-    } catch {
-      // Storage blocked; keep the default.
-    }
-  }, []);
-  const toggleDetails = (next: boolean) => {
-    setShowDetails(next);
-    try {
-      localStorage.setItem(DETAILS_STORAGE_KEY, String(next));
-    } catch {
-      // Storage blocked; the toggle still works for this page.
-    }
-  };
 
   /** The edited row plus, when it is part of a multi-row selection, every other selected row. */
   const editTargets = (noteId: number): ReadonlySet<number> =>
@@ -436,7 +457,7 @@ export function NoteListEditor({
               tooltip="Show mute, chance, velocity deviation and release velocity"
               icon={<Icon icon={SlidersHorizontal} color="inherit" />}
               isPressed={showDetails}
-              onPressedChange={toggleDetails}
+              onPressedChange={detailsStore.write}
             />
             <Button
               label="Add note"
