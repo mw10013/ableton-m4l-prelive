@@ -4,8 +4,41 @@ import type { OxlintOverride } from "vite-plus/lint";
 import { astryxStylex } from "@astryxdesign/build/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
+import { EventEmitter } from "node:events";
 import { dirname, relative } from "node:path";
 import { defineConfig, lazyPlugins } from "vite-plus";
+import { playwright } from "vite-plus/test/browser-playwright";
+
+/**
+ * StyleX's dev plugin polls for CSS changes on an interval it clears only when its HTTP server emits
+ * `close`. Vitest never starts that server listening, so `close` never fires and the interval kept
+ * every test run alive until Vitest's 10 s close timeout. The plugin gets a stand-in that emits
+ * `close` when the Vite server closes.
+ */
+const closingWithServer = (plugin: Plugin): Plugin => {
+  const configure = plugin.configureServer;
+  if (typeof configure !== "function") return plugin;
+  return {
+    ...plugin,
+    configureServer(server) {
+      // oxlint-disable-next-line unicorn/prefer-event-target -- StyleX listens with Node's `once`
+      const httpServer = new EventEmitter();
+      const close = server.close.bind(server);
+      server.close = () => {
+        httpServer.emit("close");
+        return close();
+      };
+      const result: ReturnType<typeof configure> = configure.call(
+        this,
+        new Proxy(server, {
+          get: (target, key): unknown =>
+            key === "httpServer" ? httpServer : Reflect.get(target, key),
+        }),
+      );
+      return result;
+    },
+  };
+};
 
 /**
  * Effect is consumed one module at a time: `import * as Effect from "effect/Effect"`. The root
@@ -464,7 +497,28 @@ export default defineConfig(({ command, mode, isPreview }) => {
       },
     },
     test: {
-      include: ["test/**/*.test.ts"],
+      projects: [
+        { test: { name: "unit", include: ["test/unit/**/*.test.ts"] } },
+        {
+          // Components in Chromium. The unit and browser globs must not overlap: `vitest/browser`
+          // throws in Node. StyleX only works compiled, so this project runs the Astryx build.
+          plugins: [...astryxStylex().map(closingWithServer), viteReact()],
+          // Discovered mid-run, a dependency reloads the test page and fails the file.
+          optimizeDeps: {
+            include: ["react/jsx-dev-runtime", "@tanstack/react-query"],
+          },
+          test: {
+            name: "browser",
+            include: ["test/browser/**/*.test.tsx"],
+            browser: {
+              enabled: true,
+              provider: playwright(),
+              headless: true,
+              instances: [{ browser: "chromium" }],
+            },
+          },
+        },
+      ],
     },
     server: {
       port: 4500,

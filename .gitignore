@@ -10,4 +10,4 @@ dist/
 todo.md
 .playwright-cli/
 test-results/
-als/
+als/.vitest/
