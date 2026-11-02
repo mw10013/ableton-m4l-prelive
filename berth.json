@@ -1,0 +1,6 @@
+{
+  "project": "prelive",
+  "envs": {
+    "dev": { "ports": ["web"] }
+  }
+}

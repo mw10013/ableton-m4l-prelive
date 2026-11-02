@@ -13,17 +13,18 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import process from "node:process";
 
+import { webPort } from "./lib/berth.ts";
+import { runCommand } from "./lib/command.ts";
 import {
   answering,
   describeServer,
   findServer,
   LOG,
   logTail,
-  PORT,
   portListeners,
-  SERVER_URL,
   startServer,
   stopServer,
+  urlOf,
   withLock,
 } from "./lib/server.ts";
 
@@ -31,7 +32,10 @@ const toUserError = (error: { readonly message: string }) =>
   new CliError.UserError({ cause: error, userMessage: error.message });
 
 const startCommand = Command.make("start", {}, () =>
-  startServer.pipe(Effect.mapError(toUserError)),
+  webPort.pipe(
+    Effect.flatMap((port) => startServer(port)),
+    Effect.mapError(toUserError),
+  ),
 ).pipe(
   Command.withDescription(
     "Start the dev server, or adopt the one already running.",
@@ -39,21 +43,38 @@ const startCommand = Command.make("start", {}, () =>
 );
 
 const stopCommand = Command.make("stop", {}, () =>
-  withLock(stopServer).pipe(Effect.mapError(toUserError)),
+  webPort.pipe(
+    Effect.flatMap((port) => withLock(stopServer(port))),
+    Effect.mapError(toUserError),
+  ),
 ).pipe(Command.withDescription("Stop the dev server wherever it runs."));
+
+const openCommand = Command.make("open", {}, () =>
+  webPort.pipe(
+    Effect.flatMap((port) =>
+      startServer(port, runCommand("open", [urlOf(port)])),
+    ),
+    Effect.mapError(toUserError),
+  ),
+).pipe(
+  Command.withDescription(
+    "Start or adopt the dev server, then open it in the default browser.",
+  ),
+);
 
 const statusCommand = Command.make("status", {}, () =>
   Effect.gen(function* () {
+    const port = yield* webPort.pipe(Effect.mapError(toUserError));
     const found = yield* findServer;
-    const listening = (yield* portListeners).length > 0;
-    const serving = listening && (yield* answering);
+    const listening = (yield* portListeners(port)).length > 0;
+    const serving = listening && (yield* answering(port));
     const healthy = found.pids.length > 0 && serving;
     yield* Console.log(
       [
         `healthy: ${healthy ? "yes" : "no"}`,
         `server:  ${describeServer(found)}`,
-        `port:    ${String(PORT)} (${listening ? "listening" : "not listening"}, ${serving ? "answering" : "not answering"})`,
-        `url:     ${SERVER_URL}`,
+        `port:    ${String(port)} (${listening ? "listening" : "not listening"}, ${serving ? "answering" : "not answering"})`,
+        `url:     ${urlOf(port)}`,
         `logs:    ${LOG}`,
       ].join("\n"),
     );
@@ -91,6 +112,7 @@ Command.make("dev").pipe(
   ),
   Command.withSubcommands([
     startCommand,
+    openCommand,
     stopCommand,
     statusCommand,
     logsCommand,

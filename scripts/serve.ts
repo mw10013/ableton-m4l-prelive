@@ -2,8 +2,8 @@
 /**
  * `vp run dev:server`: the dev server in the foreground, which `scripts/dev.ts` starts in a herdr
  * pane, the caller's terminal or the background, and which nothing else should run. It is
- * Vite's dev server on the port `vite.config.ts` names, `--strictPort` so a held port fails instead of
- * drifting.
+ * Vite's dev server on this checkout's port from berth (`lib/berth.ts`), `--strictPort` so a held
+ * port fails instead of drifting.
  *
  * Vite's whole output goes to `.logs/dev/current` through `s6-log`, between a start line and an
  * exit line, and is echoed to stderr. On SIGTERM or SIGINT it stops Vite, and `s6-log`, in its own
@@ -20,6 +20,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { webPort } from "./lib/berth.ts";
 import { runCommand } from "./lib/command.ts";
 import { LOG, ROOT } from "./lib/server.ts";
 
@@ -52,6 +53,7 @@ const LOGGER_DRAIN = "15 seconds";
 
 const serve = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const port = yield* webPort;
   const run = randomUUID().slice(0, 8);
   const log = (line: string) => runCommand("s6-log", S6_LOG_ARGS, `${line}\n`);
 
@@ -59,7 +61,15 @@ const serve = Effect.gen(function* () {
   const vite = yield* spawner.spawn(
     ChildProcess.make(
       process.execPath,
-      [VITE_CLI, "dev", "--clearScreen", "false", "--strictPort"],
+      [
+        VITE_CLI,
+        "dev",
+        "--clearScreen",
+        "false",
+        "--port",
+        String(port),
+        "--strictPort",
+      ],
       {
         cwd: ROOT,
         env: { FORCE_COLOR: undefined, NO_COLOR: "1" },

@@ -33,7 +33,8 @@ vpx /Users/mw/projects/tools/refs.ts sync     # Fetch every supported declared d
 ## Commands
 
 ```bash
-vp run dev              # Start the dev server on port 4500, or adopt the running one
+vp run dev              # Start the dev server on this checkout's port from berth (berth.json), or adopt the running one
+vp run dev:open         # Same, then open it in the browser
 vp run dev:status       # Where it runs and whether it answers (exit 1 when unhealthy)
 vp run dev:stop         # Stop it wherever it runs
 vp run dev:logs         # Tail .logs/dev/current

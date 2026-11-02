@@ -37,7 +37,7 @@ const Response = Schema.Struct({
 
 const introspect = Effect.gen(function* () {
   const endpoint = yield* Config.String("LIVEQL_ENDPOINT").pipe(
-    Config.withDefault("http://localhost:4000/graphql"),
+    Config.withDefault("http://localhost:5100/graphql"),
   );
   const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
   const { data, errors } = yield* HttpClientRequest.post(endpoint).pipe(

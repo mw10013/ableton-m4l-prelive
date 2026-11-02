@@ -30,9 +30,8 @@ export const ROOT = fileURLToPath(new URL("../..", import.meta.url)).replace(
   "",
 );
 
-/** The port `vite.config.ts` serves on; `serve.ts` passes `--strictPort` so Vite never drifts. */
-export const PORT = 4500;
-export const SERVER_URL = `http://localhost:${String(PORT)}/`;
+/** The server's address on its leased port (`berth.ts`); `serve.ts` passes `--strictPort` so Vite never drifts. */
+export const urlOf = (port: number) => `http://localhost:${String(port)}/`;
 export const LOG = ".logs/dev/current";
 const LOCK = ".logs/dev.lock";
 const TAB = "dev";
@@ -60,23 +59,25 @@ const decodePid = Schema.decodeUnknownResult(Pid);
 const pidsFrom = (output: string) =>
   Array.filterMap(output.split("\n"), (line) => decodePid(line.trim()));
 
-export const portListeners = runCommand("lsof", [
-  "-t",
-  `-iTCP:${String(PORT)}`,
-  "-sTCP:LISTEN",
-  "-nP",
-]).pipe(
-  Effect.map(pidsFrom),
-  Effect.orElseSucceed((): number[] => []),
-);
+export const portListeners = (port: number) =>
+  runCommand("lsof", [
+    "-t",
+    `-iTCP:${String(port)}`,
+    "-sTCP:LISTEN",
+    "-nP",
+  ]).pipe(
+    Effect.map(pidsFrom),
+    Effect.orElseSucceed((): number[] => []),
+  );
 
 /** Any HTTP answer counts: the first request after a start waits on Vite's compile. */
-export const answering = Effect.tryPromise(() =>
-  fetch(SERVER_URL, {
-    redirect: "manual",
-    signal: AbortSignal.timeout(10_000),
-  }),
-).pipe(Effect.option, Effect.map(Option.isSome));
+export const answering = (port: number) =>
+  Effect.tryPromise(() =>
+    fetch(urlOf(port), {
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    }),
+  ).pipe(Effect.option, Effect.map(Option.isSome));
 
 /** Polls `check` every `interval` until it is true; false once `timeout` passes first. */
 const waitUntil = <E, R>(
@@ -232,13 +233,15 @@ export const withLock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
  * Otherwise, or when the pane ignores Ctrl-C, it sends SIGTERM to the server's processes, their
  * descendants and whatever listens on the port, then waits for all of them to be gone.
  */
-export const stopServer = Effect.gen(function* () {
+export const stopServer = Effect.fn("Server.stopServer")(function* (
+  port: number,
+) {
   const found = yield* findServer;
-  if (found.pids.length === 0 && (yield* portListeners).length === 0) {
+  if (found.pids.length === 0 && (yield* portListeners(port)).length === 0) {
     yield* Console.log("no dev server running");
     return;
   }
-  const remaining = Effect.all([serverPids, portListeners]);
+  const remaining = Effect.all([serverPids, portListeners(port)]);
   const stopped = remaining.pipe(
     Effect.map(([pids, ports]) => pids.length === 0 && ports.length === 0),
   );
@@ -255,7 +258,7 @@ export const stopServer = Effect.gen(function* () {
   } else yield* terminate;
   if (!(yield* waitUntil(stopped, STOP_TIMEOUT, Duration.millis(250))))
     return yield* fail(
-      `port ${String(PORT)} is still held after SIGTERM; check with lsof -i :${String(PORT)}`,
+      `port ${String(port)} is still held after SIGTERM; check with lsof -i :${String(port)}`,
     );
   yield* Console.log(`ok    stopped (${describeServer(found)})`);
 });
@@ -437,27 +440,24 @@ export const logTail = (lines: number) =>
   );
 
 /** Waits for an answer; on timeout fails with the log's tail, where the startup error is. */
-const waitAnswering = waitUntil(
-  answering,
-  START_TIMEOUT,
-  Duration.millis(500),
-).pipe(
-  Effect.flatMap((ready) =>
-    ready
-      ? Effect.void
-      : logTail(40).pipe(
-          Effect.flatMap((tail) =>
-            fail(
-              `no answer on ${SERVER_URL} after ${String(Duration.toSeconds(START_TIMEOUT))}s\n--- ${LOG} ---\n${tail}\n---`,
+const waitAnswering = (port: number) =>
+  waitUntil(answering(port), START_TIMEOUT, Duration.millis(500)).pipe(
+    Effect.flatMap((ready) =>
+      ready
+        ? Effect.void
+        : logTail(40).pipe(
+            Effect.flatMap((tail) =>
+              fail(
+                `no answer on ${urlOf(port)} after ${String(Duration.toSeconds(START_TIMEOUT))}s\n--- ${LOG} ---\n${tail}\n---`,
+              ),
             ),
           ),
-        ),
-  ),
-);
+    ),
+  );
 
-const summarize = (where: string) =>
+const summarize = (where: string, port: number) =>
   Console.log(
-    ["", `server: ${where}`, `url:    ${SERVER_URL}`, `logs:   ${LOG}`].join(
+    ["", `server: ${where}`, `url:    ${urlOf(port)}`, `logs:   ${LOG}`].join(
       "\n",
     ),
   );
@@ -467,44 +467,56 @@ const summarize = (where: string) =>
  * process and working directory ({@link findServer}), is left running whoever started it. A
  * process of another checkout or program holding the port is refused. Otherwise the server starts
  * where {@link placeServer} says. The whole start holds the lock ({@link withLock}); a foreground
- * server is waited on after the lock is released, so an agent can adopt it.
+ * server is waited on after the lock is released, so an agent can adopt it. `ready` runs once
+ * the server answers, wherever it runs (`vp run dev:open` opens the browser there).
  */
-export const startServer = Effect.gen(function* () {
-  const foreground = yield* withLock(
-    Effect.gen(function* () {
-      const found = yield* findServer;
-      if (found.pids.length > 0) {
-        yield* Console.log(
-          `ok    adopted the running server: ${describeServer(found)}`,
+export const startServer = <
+  E extends { readonly message: string } = never,
+  R = never,
+>(
+  port: number,
+  ready: Effect.Effect<void, E, R> = Effect.void,
+) =>
+  Effect.gen(function* () {
+    const foreground = yield* withLock(
+      Effect.gen(function* () {
+        const found = yield* findServer;
+        if (found.pids.length > 0) {
+          yield* Console.log(
+            `ok    adopted the running server: ${describeServer(found)}`,
+          );
+          yield* waitAnswering(port);
+          yield* summarize(describeServer(found), port);
+          yield* ready;
+          return Option.none<ChildProcessSpawner.ChildProcessHandle>();
+        }
+        if ((yield* portListeners(port)).length > 0)
+          return yield* fail(
+            `port ${String(port)} is held by another process: lsof -nP -iTCP:${String(port)} -sTCP:LISTEN`,
+          );
+        const placement = yield* placeServer;
+        const handle = yield* launchServer(placement);
+        if (Option.isSome(handle)) return handle;
+        yield* waitAnswering(port);
+        yield* summarize(
+          Match.valueTags(placement, {
+            Pane: ({ paneId }) => `herdr tab "${TAB}" (pane ${paneId})`,
+            Background: () => "background",
+            Foreground: () => "this terminal",
+          }),
+          port,
         );
-        yield* waitAnswering;
-        yield* summarize(describeServer(found));
+        yield* ready;
         return Option.none<ChildProcessSpawner.ChildProcessHandle>();
-      }
-      if ((yield* portListeners).length > 0)
-        return yield* fail(
-          `port ${String(PORT)} is held by another process: lsof -nP -iTCP:${String(PORT)} -sTCP:LISTEN`,
-        );
-      const placement = yield* placeServer;
-      const handle = yield* launchServer(placement);
-      if (Option.isSome(handle)) return handle;
-      yield* waitAnswering;
-      yield* summarize(
-        Match.valueTags(placement, {
-          Pane: ({ paneId }) => `herdr tab "${TAB}" (pane ${paneId})`,
-          Background: () => "background",
-          Foreground: () => "this terminal",
-        }),
-      );
-      return Option.none<ChildProcessSpawner.ChildProcessHandle>();
-    }),
-  );
-  if (Option.isSome(foreground)) {
-    yield* waitAnswering.pipe(
-      Effect.flatMap(() => summarize("this terminal")),
-      Effect.catch((error) => Console.error(`dev: ${error.message}`)),
-      Effect.forkChild,
+      }),
     );
-    yield* foreground.value.exitCode;
-  }
-}).pipe(Effect.scoped);
+    if (Option.isSome(foreground)) {
+      yield* waitAnswering(port).pipe(
+        Effect.flatMap(() => summarize("this terminal", port)),
+        Effect.andThen(ready),
+        Effect.catch((error) => Console.error(`dev: ${error.message}`)),
+        Effect.forkChild,
+      );
+      yield* foreground.value.exitCode;
+    }
+  }).pipe(Effect.scoped);
