@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "vpx scripts/dev.ts start",
+    "dev:open": "vpx scripts/dev.ts open",
     "dev:stop": "vpx scripts/dev.ts stop",
     "dev:status": "vpx scripts/dev.ts status",
     "dev:logs": "vpx scripts/dev.ts logs",

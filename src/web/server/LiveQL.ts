@@ -34,7 +34,7 @@ export class LiveQL extends Context.Service<
     LiveQL,
     Effect.gen(function* () {
       const endpoint = yield* Config.String("LIVEQL_ENDPOINT").pipe(
-        Config.withDefault("http://localhost:4000/graphql"),
+        Config.withDefault("http://localhost:5100/graphql"),
         Effect.orDie,
       );
       // No filterStatusOk: a GraphQL server answers a malformed document with

@@ -520,9 +520,6 @@ export default defineConfig(({ command, mode, isPreview }) => {
         },
       ],
     },
-    server: {
-      port: 4500,
-    },
     ssr: {
       noExternal: ["@astryxdesign/core", "@astryxdesign/theme-neutral"],
       optimizeDeps: {
