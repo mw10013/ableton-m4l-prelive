@@ -58,16 +58,18 @@ export const listPanes = herdr(
 ).pipe(Effect.map(({ panes }) => panes));
 
 const ForegroundProcess = Schema.Struct({
-  argv: Schema.Array(Schema.String),
+  argv: Schema.optional(Schema.Array(Schema.String)),
   cwd: Schema.optional(Schema.String),
 });
 
 /**
  * A pane's foreground process group. The shell is at its prompt, with nothing
  * running in front of it, exactly when the foreground group is the shell's
- * own: `foreground_process_group_id` equals `shell_pid`. herdr leaves out
- * `foreground_process_group_id` until a new pane's shell owns its terminal, and
- * `shell_pid` before the shell exists: such a pane is not idle yet.
+ * own: `foreground_process_group_id` equals `shell_pid`. herdr leaves out every
+ * field it has no value for (`skip_serializing_if` in its `PaneProcessInfo`):
+ * `foreground_process_group_id` until a new pane's shell owns its terminal and
+ * `shell_pid` before the shell exists, so such a pane is not idle yet;
+ * `foreground_processes` when empty, and a process's `argv` when unreadable.
  */
 export const processInfo = (paneId: string) =>
   herdr(
@@ -76,7 +78,7 @@ export const processInfo = (paneId: string) =>
       process_info: Schema.Struct({
         shell_pid: Schema.optional(Schema.Number),
         foreground_process_group_id: Schema.optional(Schema.Number),
-        foreground_processes: Schema.Array(ForegroundProcess),
+        foreground_processes: Schema.optional(Schema.Array(ForegroundProcess)),
       }),
     }),
   ).pipe(
@@ -84,7 +86,10 @@ export const processInfo = (paneId: string) =>
       idle:
         info.shell_pid !== undefined &&
         info.foreground_process_group_id === info.shell_pid,
-      processes: info.foreground_processes,
+      processes: (info.foreground_processes ?? []).map((process) => ({
+        argv: process.argv ?? [],
+        cwd: process.cwd,
+      })),
     })),
   );
 
