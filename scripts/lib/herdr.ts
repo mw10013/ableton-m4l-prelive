@@ -65,21 +65,25 @@ const ForegroundProcess = Schema.Struct({
 /**
  * A pane's foreground process group. The shell is at its prompt, with nothing
  * running in front of it, exactly when the foreground group is the shell's
- * own: `foreground_process_group_id` equals `shell_pid`.
+ * own: `foreground_process_group_id` equals `shell_pid`. herdr leaves out
+ * `foreground_process_group_id` until a new pane's shell owns its terminal, and
+ * `shell_pid` before the shell exists: such a pane is not idle yet.
  */
 export const processInfo = (paneId: string) =>
   herdr(
     ["pane", "process-info", "--pane", paneId],
     Schema.Struct({
       process_info: Schema.Struct({
-        shell_pid: Schema.Number,
-        foreground_process_group_id: Schema.Number,
+        shell_pid: Schema.optional(Schema.Number),
+        foreground_process_group_id: Schema.optional(Schema.Number),
         foreground_processes: Schema.Array(ForegroundProcess),
       }),
     }),
   ).pipe(
     Effect.map(({ process_info: info }) => ({
-      idle: info.foreground_process_group_id === info.shell_pid,
+      idle:
+        info.shell_pid !== undefined &&
+        info.foreground_process_group_id === info.shell_pid,
       processes: info.foreground_processes,
     })),
   );
