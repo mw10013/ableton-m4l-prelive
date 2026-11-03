@@ -168,28 +168,45 @@ const signal = (pid: number, sig: NodeJS.Signals | 0) =>
 
 /**
  * Runs `effect` holding `.logs/dev.lock`, so parallel agents cannot start two servers or stop one
- * while another starts it. The lock holds the holder's pid; a lock whose holder is gone is taken
- * over.
+ * while another starts it. The lock file is created exclusively, so of two commands at once only
+ * one gets it. It holds the holder's pid, which the other may read before it is written; a lock
+ * whose holder is gone is taken over.
  */
 export const withLock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      yield* fs.makeDirectory(path.join(ROOT, ".logs"), { recursive: true });
-      const holder = yield* fs.readFileString(path.join(ROOT, LOCK)).pipe(
-        Effect.map((text) =>
-          Option.filter(
-            Result.getSuccess(decodePid(text.trim())),
-            (pid) => pid !== process.pid,
+      const lock = path.join(ROOT, LOCK);
+      const create = fs
+        .writeFileString(lock, String(process.pid), { flag: "wx" })
+        .pipe(
+          Effect.as(true),
+          Effect.catchTag("PlatformError", (error) =>
+            error.reason._tag === "AlreadyExists"
+              ? Effect.succeed(false)
+              : Effect.fail(error),
           ),
-        ),
+        );
+      const held = (holder: Option.Option<number>) =>
+        fail(
+          Option.match(holder, {
+            onSome: (pid) =>
+              `another dev command (pid ${String(pid)}) holds ${LOCK}; wait for it to finish`,
+            onNone: () =>
+              `another dev command holds ${LOCK}, its pid not yet written; wait for it, or delete the file if no dev command runs`,
+          }),
+        );
+      yield* fs.makeDirectory(path.join(ROOT, ".logs"), { recursive: true });
+      if (yield* create) return;
+      const holder = yield* fs.readFileString(lock).pipe(
+        Effect.map((text) => Result.getSuccess(decodePid(text.trim()))),
         Effect.orElseSucceed(() => Option.none<number>()),
       );
-      if (Option.isSome(holder) && (yield* signal(holder.value, 0)))
-        return yield* fail(
-          `another dev command (pid ${String(holder.value)}) holds ${LOCK}; wait for it to finish`,
-        );
-      yield* fs.writeFileString(path.join(ROOT, LOCK), String(process.pid));
+      if (Option.contains(holder, process.pid)) return;
+      if (Option.isNone(holder) || (yield* signal(holder.value, 0)))
+        return yield* held(holder);
+      yield* fs.remove(lock, { force: true });
+      if (!(yield* create)) return yield* held(Option.none());
     }),
     () => effect,
     () =>
