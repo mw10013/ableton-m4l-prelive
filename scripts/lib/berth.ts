@@ -32,7 +32,6 @@ const AcquireOutput = Schema.fromJsonString(
   Schema.Union([LeaseJson, ErrorJson]),
 );
 
-/** `berth show`: the lease, or null when the checkout holds none. */
 const ShowOutput = Schema.fromJsonString(
   Schema.Union([Schema.Struct({ lease: Schema.NullOr(LeaseJson) }), ErrorJson]),
 );
@@ -45,7 +44,6 @@ const notRun = new BerthError({
     "berth did not run: install its shim, ~/.local/bin/berth running `vpx ~/projects/tools/berth.ts`",
 });
 
-/** `berth <args>`'s stdout, run in this checkout. berth's own lines go to stderr. */
 const runBerth = (args: readonly string[]) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;

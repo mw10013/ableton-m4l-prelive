@@ -104,7 +104,6 @@ const cwdOf = (pid: number) =>
     Effect.orElseSucceed(() => Option.none<string>()),
   );
 
-/** The processes `pgrep -f pattern` finds whose working directory is this checkout. */
 const checkoutPids = (pattern: string) =>
   runCommand("pgrep", ["-f", pattern]).pipe(
     Effect.map(pidsFrom),
@@ -120,17 +119,16 @@ const checkoutPids = (pattern: string) =>
   );
 
 /**
- * The server's process: the Vite dev CLI that `scripts/serve.ts` runs, whose command line is
- * `node …/vite/bin/vite.js dev`. Another checkout runs the same command, so it must also work in
- * this checkout. A stop signals this alone: `serve.ts` sees it exit, lets `s6-log` write its last
- * lines, then writes the exit marker.
+ * The server's process, Vite's dev CLI. A stop signals it alone, so `serve.ts`'s `s6-log` reads
+ * Vite's output to the end before `serve.ts` writes the exit marker.
  */
 export const findServer = checkoutPids(String.raw`/vite/bin/vite\.js dev`);
 
 /**
- * `vp run dev:serve` and the `node … scripts/serve.ts` it runs, alive from launch until the exit
- * marker is written: before Vite starts and after it exits, the server is still starting or
- * stopping. Anchored at the end so an editor or shell open on `scripts/serve.ts` is not matched.
+ * `vp run dev:serve` and the `serve.ts` it runs, alive from launch until the exit marker is written:
+ * before Vite starts and after it exits, the server is still starting or stopping. The pattern
+ * wants node's `….js scripts/serve.ts` at the end of the command line, so an editor open on the
+ * file, or a shell whose command mentions it, is not taken for the server.
  */
 const findServe = checkoutPids(
   String.raw`bin/vp run dev:serve$|\.js scripts/serve\.ts$`,
@@ -169,8 +167,7 @@ const signal = (pid: number, sig: NodeJS.Signals | 0) =>
 /**
  * Runs `effect` holding `.logs/dev.lock`, so parallel agents cannot start two servers or stop one
  * while another starts it. The lock file is created exclusively, so of two commands at once only
- * one gets it. It holds the holder's pid, which the other may read before it is written; a lock
- * whose holder is gone is taken over.
+ * one gets it, unless both are taking over a lock whose holder is gone. It holds the holder's pid.
  */
 export const withLock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
@@ -326,10 +323,9 @@ const summarize = (port: number) =>
 
 /**
  * Starts the server, or adopts the one running: a server already serving this checkout, found by
- * process and working directory ({@link findServer}), or a `serve.ts` whose Vite has not started
- * yet, is left running whoever started it. A
- * process of another checkout or program holding the port is refused. Otherwise the server starts
- * detached and outlives this command until `dev:stop`. The whole start holds the lock
+ * process and working directory ({@link findServer}), or a `serve.ts` still starting or stopping,
+ * is left running whoever started it. A process of another checkout or program holding the port is
+ * refused. Otherwise the server starts detached and outlives this command until `dev:stop`. The whole start holds the lock
  * ({@link withLock}). `ready` runs once the server answers (`vp run dev:open` opens the browser).
  */
 export const startServer = <
