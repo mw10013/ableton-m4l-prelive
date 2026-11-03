@@ -1,13 +1,12 @@
 #!/usr/bin/env vpx
 /**
- * `vp run dev:server`: the dev server in the foreground, which `scripts/dev.ts` starts in a herdr
- * pane, the caller's terminal or the background, and which nothing else should run. It is
- * Vite's dev server on this checkout's port from berth (`lib/berth.ts`), `--strictPort` so a held
+ * `vp run dev:serve`: the dev server in the foreground, which `scripts/dev.ts` launches detached
+ * and which nothing else should run. It is Vite's dev server on this checkout's port from berth (`lib/berth.ts`), `--strictPort` so a held
  * port fails instead of drifting.
  *
  * Vite's whole output goes to `.logs/dev/current` through `s6-log`, between a start line and an
- * exit line, and is echoed to stderr. On SIGTERM or SIGINT it stops Vite, and `s6-log`, in its own
- * process group, writes everything Vite wrote before it stops.
+ * exit line. On SIGTERM or SIGINT it stops Vite, and `s6-log` writes everything Vite wrote before
+ * it stops.
  */
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as Effect from "effect/Effect";
@@ -77,9 +76,6 @@ const serve = Effect.gen(function* () {
         stdin: "ignore",
         stdout: "pipe",
         stderr: "pipe",
-        // In this script's process group, so the herdr pane running it shows Vite in its foreground
-        // (how the server's pane is found) and a Ctrl-C there reaches Vite too.
-        detached: false,
       },
     ),
   );
@@ -87,18 +83,13 @@ const serve = Effect.gen(function* () {
     ChildProcess.make("s6-log", S6_LOG_ARGS, {
       cwd: ROOT,
       stdin: {
-        stream: Stream.merge(vite.stdout, vite.stderr).pipe(
-          Stream.tap((chunk) => Effect.sync(() => process.stderr.write(chunk))),
-        ),
+        stream: Stream.merge(vite.stdout, vite.stderr),
       },
       stdout: "inherit",
       stderr: "inherit",
-      // Its own process group: a Ctrl-C's SIGINT would kill `s6-log` at once, losing Vite's last
-      // lines and leaving `current` unfinished. It stops when Vite's output ends.
-      detached: true,
     }),
   );
-  // A Ctrl-C reaches Vite and this script together, and Vite usually exits first: only the wait
+  // `dev:stop` signals Vite and this script together, and Vite usually exits first: only the wait
   // for Vite is interruptible, so the exit marker is still written when the interrupt lands after.
   const exitCode = yield* Effect.uninterruptibleMask((restore) =>
     restore(

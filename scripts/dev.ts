@@ -1,9 +1,8 @@
 #!/usr/bin/env vpx
 /**
  * `vp run dev | dev:stop | dev:status | dev:logs`: one command that an agent and a person both use
- * to get this checkout's dev server running, and to find it again. Where it runs, how a running one
- * is adopted, and the lock are {@link startServer}'s rules; its output always goes to
- * `.logs/dev/current`.
+ * to get this checkout's dev server running, and to find it again. How a running one is adopted,
+ * and the lock, are {@link startServer}'s rules; its output always goes to `.logs/dev/current`.
  */
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as CliError from "effect/cli/CliError";
@@ -19,6 +18,7 @@ import {
   answering,
   describeServer,
   findServer,
+  followLog,
   LOG,
   logTail,
   portListeners,
@@ -47,7 +47,7 @@ const stopCommand = Command.make("stop", {}, () =>
     Effect.flatMap((port) => withLock(stopServer(port))),
     Effect.mapError(toUserError),
   ),
-).pipe(Command.withDescription("Stop the dev server wherever it runs."));
+).pipe(Command.withDescription("Stop the dev server."));
 
 const openCommand = Command.make("open", {}, () =>
   webPort.pipe(
@@ -65,14 +65,14 @@ const openCommand = Command.make("open", {}, () =>
 const statusCommand = Command.make("status", {}, () =>
   Effect.gen(function* () {
     const port = yield* webPort.pipe(Effect.mapError(toUserError));
-    const found = yield* findServer;
+    const pids = yield* findServer;
     const listening = (yield* portListeners(port)).length > 0;
     const serving = listening && (yield* answering(port));
-    const healthy = found.pids.length > 0 && serving;
+    const healthy = pids.length > 0 && serving;
     yield* Console.log(
       [
         `healthy: ${healthy ? "yes" : "no"}`,
-        `server:  ${describeServer(found)}`,
+        `server:  ${describeServer(pids)}`,
         `port:    ${String(port)} (${listening ? "listening" : "not listening"}, ${serving ? "answering" : "not answering"})`,
         `url:     ${urlOf(port)}`,
         `logs:    ${LOG}`,
@@ -93,21 +93,30 @@ const logsCommand = Command.make(
       Flag.withDescription("Lines from the end of the log"),
       Flag.withDefault(80),
     ),
+    follow: Flag.Boolean("follow").pipe(
+      Flag.withDescription(
+        "Keep printing new lines, through log rotation, until interrupted",
+      ),
+      Flag.withDefault(false),
+    ),
   },
-  ({ lines }) => logTail(lines).pipe(Effect.flatMap(Console.log)),
-).pipe(Command.withDescription(`Print the tail of ${LOG}.`));
+  ({ lines, follow }) =>
+    Effect.gen(function* () {
+      if (follow) return yield* followLog(lines);
+      yield* Console.log(yield* logTail(lines));
+    }),
+).pipe(
+  Command.withDescription(
+    `Print the tail of ${LOG}; with --follow, keep following it.`,
+  ),
+);
 
 Command.make("dev").pipe(
   Command.withDescription(
     [
-      "Run this checkout's dev server (vp run dev:server: Vite behind s6-log) for an agent or a person.",
-      "Where it runs, first match wins:",
-      "  1. a server already running for this checkout is adopted;",
-      '  2. with herdr running: the checkout\'s workspace, tab "dev" (opened if needed);',
-      "     typed by a person in that tab, this terminal; otherwise an idle pane there;",
-      "  3. without herdr, typed in a terminal: this terminal;",
-      "  4. otherwise: in the background.",
-      `Output always goes to ${LOG}.`,
+      "Run this checkout's dev server (Vite behind s6-log), the same for an agent and a person.",
+      "start adopts a server already running for this checkout, or starts one detached, waits until it answers, and exits; the server keeps running until dev:stop.",
+      `Output goes to ${LOG}; dev:logs --follow follows it.`,
     ].join("\n"),
   ),
   Command.withSubcommands([
