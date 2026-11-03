@@ -1,6 +1,6 @@
 /**
  * This checkout's dev server: `scripts/serve.ts` running Vite behind `s6-log`. Here is how it
- * is found, probed, started where it belongs ({@link startServer}) and stopped
+ * is found, probed, started detached ({@link startServer}) and stopped
  * ({@link stopServer}).
  *
  * @module
@@ -10,7 +10,6 @@ import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
@@ -22,7 +21,6 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { runCommand } from "./command.ts";
-import * as Herdr from "./herdr.ts";
 
 /** This checkout's root, where the server runs and every path below is relative to. */
 export const ROOT = fileURLToPath(new URL("../..", import.meta.url)).replace(
@@ -34,9 +32,8 @@ export const ROOT = fileURLToPath(new URL("../..", import.meta.url)).replace(
 export const urlOf = (port: number) => `http://localhost:${String(port)}/`;
 export const LOG = ".logs/dev/current";
 const LOCK = ".logs/dev.lock";
-const TAB = "dev";
 /** The package script that runs the server in the foreground: `scripts/serve.ts`. */
-const SCRIPT = "dev:server";
+const SCRIPT = "dev:serve";
 
 const START_TIMEOUT = Duration.minutes(1);
 const STOP_TIMEOUT = Duration.seconds(15);
@@ -107,27 +104,34 @@ const cwdOf = (pid: number) =>
     Effect.orElseSucceed(() => Option.none<string>()),
   );
 
-/**
- * The server's processes, as `pgrep -f` matches them: `scripts/serve.ts` and the Vite dev CLI it
- * runs, whose command line is `node …/vite/bin/vite.js dev`.
- * Another checkout runs the same commands, so each match must also work in this checkout.
- */
-const SERVER_PROCESS = String.raw`scripts/serve\.ts|/vite/bin/vite\.js dev`;
-const isServerCommand = Schema.is(
-  Schema.String.check(Schema.isPattern(new RegExp(SERVER_PROCESS, "u"))),
-);
-
-export const serverPids = runCommand("pgrep", ["-f", SERVER_PROCESS]).pipe(
-  Effect.map(pidsFrom),
-  Effect.orElseSucceed((): number[] => []),
-  Effect.flatMap((pids) =>
-    Effect.forEach(pids, (pid) =>
-      cwdOf(pid).pipe(
-        Effect.map((cwd) => (Option.contains(cwd, ROOT) ? [pid] : [])),
+const checkoutPids = (pattern: string) =>
+  runCommand("pgrep", ["-f", pattern]).pipe(
+    Effect.map(pidsFrom),
+    Effect.orElseSucceed((): number[] => []),
+    Effect.flatMap((pids) =>
+      Effect.forEach(pids, (pid) =>
+        cwdOf(pid).pipe(
+          Effect.map((cwd) => (Option.contains(cwd, ROOT) ? [pid] : [])),
+        ),
       ),
     ),
-  ),
-  Effect.map((pids) => pids.flat()),
+    Effect.map((pids) => pids.flat()),
+  );
+
+/**
+ * The server's process, Vite's dev CLI. A stop signals it alone, so `serve.ts`'s `s6-log` reads
+ * Vite's output to the end before `serve.ts` writes the exit marker.
+ */
+export const findServer = checkoutPids(String.raw`/vite/bin/vite\.js dev`);
+
+/**
+ * `vp run dev:serve` and the `serve.ts` it runs, alive from launch until the exit marker is written:
+ * before Vite starts and after it exits, the server is still starting or stopping. The pattern
+ * wants node's `….js scripts/serve.ts` at the end of the command line, so an editor open on the
+ * file, or a shell whose command mentions it, is not taken for the server.
+ */
+const findServe = checkoutPids(
+  String.raw`bin/vp run dev:serve$|\.js scripts/serve\.ts$`,
 );
 
 /** `pids` and every process below them. */
@@ -151,41 +155,8 @@ const withDescendants = (pids: readonly number[]) =>
     }),
   );
 
-/** The herdr pane whose foreground process is this checkout's server. */
-const serverPane = Effect.gen(function* () {
-  if (!(yield* Herdr.running)) return Option.none<Herdr.Pane>();
-  const hosting = yield* Effect.forEach(
-    yield* Herdr.listPanes,
-    (pane) =>
-      Herdr.processInfo(pane.pane_id).pipe(
-        Effect.map(({ processes }) =>
-          processes.some(
-            (candidate) =>
-              isServerCommand(candidate.argv.join(" ")) &&
-              (candidate.cwd === undefined || candidate.cwd === ROOT),
-          )
-            ? [pane]
-            : [],
-        ),
-        Effect.orElseSucceed((): Herdr.Pane[] => []),
-      ),
-    { concurrency: 4 },
-  );
-  return Array.head(hosting.flat());
-}).pipe(Effect.orElseSucceed(() => Option.none<Herdr.Pane>()));
-
-/** The server's processes and, in herdr, the pane it runs in. */
-export const findServer = Effect.all({ pids: serverPids, pane: serverPane });
-export type FoundServer = Effect.Success<typeof findServer>;
-
-export const describeServer = (found: FoundServer) =>
-  Option.match(found.pane, {
-    onSome: (pane) => `herdr pane ${pane.pane_id}`,
-    onNone: () =>
-      found.pids.length > 0
-        ? `pid ${found.pids.join(", ")} (background, or a terminal outside herdr)`
-        : "not running",
-  });
+export const describeServer = (pids: readonly number[]) =>
+  pids.length > 0 ? `pid ${pids.join(", ")}` : "not running";
 
 const signal = (pid: number, sig: NodeJS.Signals | 0) =>
   Effect.try(() => process.kill(pid, sig)).pipe(
@@ -195,28 +166,44 @@ const signal = (pid: number, sig: NodeJS.Signals | 0) =>
 
 /**
  * Runs `effect` holding `.logs/dev.lock`, so parallel agents cannot start two servers or stop one
- * while another starts it. The lock holds the holder's pid; a lock whose holder is gone is taken
- * over.
+ * while another starts it. The lock file is created exclusively, so of two commands at once only
+ * one gets it, unless both are taking over a lock whose holder is gone. It holds the holder's pid.
  */
 export const withLock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      yield* fs.makeDirectory(path.join(ROOT, ".logs"), { recursive: true });
-      const holder = yield* fs.readFileString(path.join(ROOT, LOCK)).pipe(
-        Effect.map((text) =>
-          Option.filter(
-            Result.getSuccess(decodePid(text.trim())),
-            (pid) => pid !== process.pid,
+      const lock = path.join(ROOT, LOCK);
+      const create = fs
+        .writeFileString(lock, String(process.pid), { flag: "wx" })
+        .pipe(
+          Effect.as(true),
+          Effect.catchTag("PlatformError", (error) =>
+            error.reason._tag === "AlreadyExists"
+              ? Effect.succeed(false)
+              : Effect.fail(error),
           ),
-        ),
+        );
+      const held = (holder: Option.Option<number>) =>
+        fail(
+          Option.match(holder, {
+            onSome: (pid) =>
+              `another dev command (pid ${String(pid)}) holds ${LOCK}; wait for it to finish`,
+            onNone: () =>
+              `another dev command holds ${LOCK}, its pid not yet written; wait for it, or delete the file if no dev command runs`,
+          }),
+        );
+      yield* fs.makeDirectory(path.join(ROOT, ".logs"), { recursive: true });
+      if (yield* create) return;
+      const holder = yield* fs.readFileString(lock).pipe(
+        Effect.map((text) => Result.getSuccess(decodePid(text.trim()))),
         Effect.orElseSucceed(() => Option.none<number>()),
       );
-      if (Option.isSome(holder) && (yield* signal(holder.value, 0)))
-        return yield* fail(
-          `another dev command (pid ${String(holder.value)}) holds ${LOCK}; wait for it to finish`,
-        );
-      yield* fs.writeFileString(path.join(ROOT, LOCK), String(process.pid));
+      if (Option.contains(holder, process.pid)) return;
+      if (Option.isNone(holder) || (yield* signal(holder.value, 0)))
+        return yield* held(holder);
+      yield* fs.remove(lock, { force: true });
+      if (!(yield* create)) return yield* held(Option.none());
     }),
     () => effect,
     () =>
@@ -229,201 +216,47 @@ export const withLock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 /**
- * Stops the server wherever it runs. In a pane it presses Ctrl-C, leaving the pane at its prompt.
- * Otherwise, or when the pane ignores Ctrl-C, it sends SIGTERM to the server's processes, their
- * descendants and whatever listens on the port, then waits for all of them to be gone.
+ * Sends SIGTERM to Vite, its descendants and whatever listens on the port, then waits for them and
+ * `serve.ts` to be gone, so the log holds the exit marker when this returns.
  */
 export const stopServer = Effect.fn("Server.stopServer")(function* (
   port: number,
 ) {
-  const found = yield* findServer;
-  if (found.pids.length === 0 && (yield* portListeners(port)).length === 0) {
+  const remaining = Effect.all([findServer, portListeners(port), findServe]);
+  const [pids, listeners, serve] = yield* remaining;
+  if ([...pids, ...listeners, ...serve].length === 0) {
     yield* Console.log("no dev server running");
     return;
   }
-  const remaining = Effect.all([serverPids, portListeners(port)]);
-  const stopped = remaining.pipe(
-    Effect.map(([pids, ports]) => pids.length === 0 && ports.length === 0),
-  );
-  const terminate = remaining.pipe(
-    Effect.flatMap(([pids, ports]) => withDescendants([...pids, ...ports])),
-    Effect.flatMap((pids) =>
-      Effect.forEach(pids, (pid) => signal(pid, "SIGTERM"), { discard: true }),
+  yield* withDescendants([...pids, ...listeners]).pipe(
+    Effect.flatMap((all) =>
+      Effect.forEach(all, (pid) => signal(pid, "SIGTERM"), { discard: true }),
     ),
   );
-  if (Option.isSome(found.pane)) {
-    yield* Herdr.sendKeys(found.pane.value.pane_id, "ctrl+c");
-    if (!(yield* waitUntil(stopped, STOP_TIMEOUT, Duration.millis(250))))
-      yield* terminate;
-  } else yield* terminate;
+  const stopped = remaining.pipe(
+    Effect.map((left) => left.every((found) => found.length === 0)),
+  );
   if (!(yield* waitUntil(stopped, STOP_TIMEOUT, Duration.millis(250))))
     return yield* fail(
-      `port ${String(port)} is still held after SIGTERM; check with lsof -i :${String(port)}`,
+      `the dev server is still running ${String(Duration.toSeconds(STOP_TIMEOUT))}s after SIGTERM: ${describeServer((yield* remaining).flat())}; check with lsof -i :${String(port)}`,
     );
-  yield* Console.log(`ok    stopped (${describeServer(found)})`);
+  yield* Console.log(`ok    stopped (${describeServer([...pids, ...serve])})`);
 });
 
-const Placement = {
-  Foreground: { _tag: "Foreground" } as const,
-  Background: { _tag: "Background" } as const,
-  Pane: (paneId: string) => ({ _tag: "Pane", paneId }) as const,
-};
-type Placement =
-  | typeof Placement.Foreground
-  | typeof Placement.Background
-  | ReturnType<typeof Placement.Pane>;
-
-const isTty = () => process.stdin.isTTY && process.stdout.isTTY;
-
-const gitOutput = (args: readonly string[]) =>
-  runCommand("git", args).pipe(Effect.map((output) => output.trim()));
-
-/**
- * The workspace herdr has open on this checkout, opened if needed. A linked worktree's workspace is
- * grouped under the main checkout's, so that one is opened first.
- */
-const checkoutWorkspace = Effect.gen(function* () {
-  const open = yield* Herdr.checkoutWorkspace(ROOT);
-  if (Option.isSome(open)) return open.value;
-  const [gitDir, commonDir] = yield* Effect.all([
-    gitOutput(["rev-parse", "--path-format=absolute", "--git-dir"]),
-    gitOutput(["rev-parse", "--path-format=absolute", "--git-common-dir"]),
-  ]);
-  const openMain = (checkout: string) =>
-    Herdr.openMainCheckout(checkout, path.basename(checkout)).pipe(
-      Effect.tap(() =>
-        Console.log(`ok    opened herdr workspace ${path.basename(checkout)}`),
-      ),
-    );
-  if (gitDir === commonDir) return yield* openMain(ROOT);
-  const mainCheckout = path.dirname(commonDir);
-  const mainWorkspaceId = yield* Herdr.checkoutWorkspace(mainCheckout).pipe(
-    Effect.flatMap(
-      Option.match({
-        onSome: Effect.succeed,
-        onNone: () => openMain(mainCheckout),
-      }),
-    ),
-  );
-  const label = yield* gitOutput(["branch", "--show-current"]);
-  yield* Herdr.openLinkedWorktree({ mainWorkspaceId, path: ROOT, label });
-  yield* Console.log(`ok    opened herdr workspace ${label}`);
-  return yield* Herdr.checkoutWorkspace(ROOT).pipe(
-    Effect.flatMap(Effect.fromOption),
-    Effect.mapError(() => fail(`herdr opened no workspace on ${ROOT}`)),
-  );
-});
-
-/** An idle pane of `tabId` in layout order, or a new split. */
-const idlePaneIn = Effect.fn("Server.idlePaneIn")(function* (tabId: string) {
-  const first = yield* Effect.fromOption(
-    Array.findFirst(yield* Herdr.listPanes, (pane) => pane.tab_id === tabId),
-  ).pipe(Effect.mapError(() => fail(`the "${TAB}" tab has no panes`)));
-  const ordered = yield* Herdr.panesInLayoutOrder(first.pane_id);
-  const idle = yield* Effect.findFirst(ordered, (pane) =>
-    Herdr.processInfo(pane).pipe(Effect.map(({ idle }) => idle)),
-  );
-  return yield* Option.match(idle, {
-    onSome: Effect.succeed,
-    onNone: () => Herdr.splitPane(ordered[0] ?? first.pane_id, ROOT),
-  });
-});
-
-/**
- * Where a new server runs; the first rule that applies wins:
- *
- * 1. With herdr running, in the checkout's workspace (opened if needed), in its `dev` tab: the
- *    caller's terminal when a person typed the command in that tab; otherwise an idle pane of the
- *    tab, a new split when none is idle, or a new tab. It never types into a busy pane.
- * 2. Without herdr, typed by a person: the caller's terminal, in the foreground.
- * 3. Otherwise: a detached background process.
- *
- * herdr is asked whether it runs (`herdr status`), never `HERDR_ENV`: agents outside herdr can
- * still drive it over its socket.
- */
-const placeServer = Effect.gen(function* () {
-  if (!(yield* Herdr.running))
-    return isTty() ? Placement.Foreground : Placement.Background;
-  const workspaceId = yield* checkoutWorkspace;
-  const tab = Array.findFirst(
-    yield* Herdr.listTabs(workspaceId),
-    (candidate) => candidate.label === TAB,
-  );
-  if (
-    isTty() &&
-    Option.isSome(tab) &&
-    Option.contains(Herdr.callerTabId(), tab.value.tab_id)
-  )
-    return Placement.Foreground;
-  return Placement.Pane(
-    yield* Option.match(tab, {
-      onNone: () => Herdr.createTab({ workspaceId, cwd: ROOT, label: TAB }),
-      onSome: (found) => idlePaneIn(found.tab_id),
+const launchServer = Effect.gen(function* () {
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const handle = yield* spawner.spawn(
+    ChildProcess.make("vp", ["run", SCRIPT], {
+      cwd: ROOT,
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+      detached: true,
     }),
   );
-});
-
-const shellQuote = (value: string) =>
-  `'${value.replaceAll("'", String.raw`'\''`)}'`;
-
-const runServer = (options: ChildProcess.CommandOptions) =>
-  ChildProcess.make("vp", ["run", SCRIPT], { cwd: ROOT, ...options });
-
-/**
- * Starts the server where {@link placeServer} says. A foreground start returns the handle of
- * `vp run dev:server`, which owns the caller's terminal until it exits; the other placements
- * return once the server is launched and outlive the command.
- */
-const launchServer = Effect.fn("Server.launchServer")(function* (
-  placement: Placement,
-) {
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  return yield* Match.valueTags(placement, {
-    Pane: ({ paneId }) =>
-      Effect.gen(function* () {
-        yield* waitUntil(
-          Herdr.processInfo(paneId).pipe(Effect.map(({ idle }) => idle)),
-          Duration.seconds(10),
-          Duration.millis(250),
-        );
-        yield* Herdr.runInPane(
-          paneId,
-          `cd ${shellQuote(ROOT)} && vp run ${SCRIPT}`,
-        );
-        yield* Console.log(
-          `ok    started in herdr tab "${TAB}" (pane ${paneId})`,
-        );
-        return Option.none<ChildProcessSpawner.ChildProcessHandle>();
-      }),
-    Background: () =>
-      Effect.gen(function* () {
-        const handle = yield* spawner.spawn(
-          runServer({
-            stdin: "ignore",
-            stdout: "ignore",
-            stderr: "ignore",
-            detached: true,
-          }),
-        );
-        // Unreferenced, the process survives this command's scope closing.
-        yield* handle.unref;
-        yield* Console.log(
-          `ok    started in the background (pid ${String(handle.pid)})`,
-        );
-        return Option.none<ChildProcessSpawner.ChildProcessHandle>();
-      }),
-    Foreground: () =>
-      spawner
-        .spawn(
-          runServer({
-            stdin: "inherit",
-            stdout: "inherit",
-            stderr: "inherit",
-            detached: false,
-          }),
-        )
-        .pipe(Effect.map(Option.some)),
-  });
+  // Effect's spawner kills a still-referenced child when the scope closes; unref skips that.
+  yield* handle.unref;
+  yield* Console.log(`ok    started detached (pid ${String(handle.pid)})`);
 });
 
 /** The tail of the server's log, `lines` long. */
@@ -455,20 +288,45 @@ const waitAnswering = (port: number) =>
     ),
   );
 
-const summarize = (where: string, port: number) =>
-  Console.log(
-    ["", `server: ${where}`, `url:    ${urlOf(port)}`, `logs:   ${LOG}`].join(
-      "\n",
+/** `s6-log` rotates by renaming `current`; `tail -F` reopens it by name. */
+export const followLog = (lines: number) =>
+  ChildProcessSpawner.ChildProcessSpawner.pipe(
+    Effect.flatMap((spawner) =>
+      spawner.exitCode(
+        ChildProcess.make(
+          "tail",
+          ["-F", "-n", String(lines), path.join(ROOT, LOG)],
+          {
+            stdin: "ignore",
+            stdout: "inherit",
+            stderr: "inherit",
+          },
+        ),
+      ),
+    ),
+    Effect.asVoid,
+  );
+
+const summarize = (port: number) =>
+  findServer.pipe(
+    Effect.flatMap((pids) =>
+      Console.log(
+        [
+          "",
+          `server: ${describeServer(pids)}`,
+          `url:    ${urlOf(port)}`,
+          `logs:   ${LOG}`,
+        ].join("\n"),
+      ),
     ),
   );
 
 /**
  * Starts the server, or adopts the one running: a server already serving this checkout, found by
- * process and working directory ({@link findServer}), is left running whoever started it. A
- * process of another checkout or program holding the port is refused. Otherwise the server starts
- * where {@link placeServer} says. The whole start holds the lock ({@link withLock}); a foreground
- * server is waited on after the lock is released, so an agent can adopt it. `ready` runs once
- * the server answers, wherever it runs (`vp run dev:open` opens the browser there).
+ * process and working directory ({@link findServer}), or a `serve.ts` still starting or stopping,
+ * is left running whoever started it. A process of another checkout or program holding the port is
+ * refused. Otherwise the server starts detached and outlives this command until `dev:stop`. The whole start holds the lock
+ * ({@link withLock}). `ready` runs once the server answers (`vp run dev:open` opens the browser).
  */
 export const startServer = <
   E extends { readonly message: string } = never,
@@ -477,46 +335,20 @@ export const startServer = <
   port: number,
   ready: Effect.Effect<void, E, R> = Effect.void,
 ) =>
-  Effect.gen(function* () {
-    const foreground = yield* withLock(
-      Effect.gen(function* () {
-        const found = yield* findServer;
-        if (found.pids.length > 0) {
-          yield* Console.log(
-            `ok    adopted the running server: ${describeServer(found)}`,
-          );
-          yield* waitAnswering(port);
-          yield* summarize(describeServer(found), port);
-          yield* ready;
-          return Option.none<ChildProcessSpawner.ChildProcessHandle>();
-        }
-        if ((yield* portListeners(port)).length > 0)
-          return yield* fail(
-            `port ${String(port)} is held by another process: lsof -nP -iTCP:${String(port)} -sTCP:LISTEN`,
-          );
-        const placement = yield* placeServer;
-        const handle = yield* launchServer(placement);
-        if (Option.isSome(handle)) return handle;
-        yield* waitAnswering(port);
-        yield* summarize(
-          Match.valueTags(placement, {
-            Pane: ({ paneId }) => `herdr tab "${TAB}" (pane ${paneId})`,
-            Background: () => "background",
-            Foreground: () => "this terminal",
-          }),
-          port,
+  withLock(
+    Effect.gen(function* () {
+      const found = [...(yield* findServer), ...(yield* findServe)];
+      if (found.length > 0)
+        yield* Console.log(
+          `ok    adopted the running server: ${describeServer(found)}`,
         );
-        yield* ready;
-        return Option.none<ChildProcessSpawner.ChildProcessHandle>();
-      }),
-    );
-    if (Option.isSome(foreground)) {
-      yield* waitAnswering(port).pipe(
-        Effect.flatMap(() => summarize("this terminal", port)),
-        Effect.andThen(ready),
-        Effect.catch((error) => Console.error(`dev: ${error.message}`)),
-        Effect.forkChild,
-      );
-      yield* foreground.value.exitCode;
-    }
-  }).pipe(Effect.scoped);
+      else if ((yield* portListeners(port)).length > 0)
+        return yield* fail(
+          `port ${String(port)} is held by another process: lsof -nP -iTCP:${String(port)} -sTCP:LISTEN`,
+        );
+      else yield* launchServer;
+      yield* waitAnswering(port);
+      yield* summarize(port);
+      yield* ready;
+    }),
+  ).pipe(Effect.scoped);
