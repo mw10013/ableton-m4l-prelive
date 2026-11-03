@@ -89,8 +89,8 @@ const serve = Effect.gen(function* () {
       stderr: "inherit",
     }),
   );
-  // `dev:stop` signals Vite and this script together, and Vite usually exits first: only the wait
-  // for Vite is interruptible, so the exit marker is still written when the interrupt lands after.
+  // `dev:stop` signals Vite alone, so its exit ends the race. A SIGTERM or SIGINT to this script
+  // interrupts only the wait for Vite, so the exit marker is still written when it lands after.
   const exitCode = yield* Effect.uninterruptibleMask((restore) =>
     restore(
       Effect.raceFirst(

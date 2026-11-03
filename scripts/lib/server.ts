@@ -104,24 +104,36 @@ const cwdOf = (pid: number) =>
     Effect.orElseSucceed(() => Option.none<string>()),
   );
 
-/**
- * The server's processes, as `pgrep -f` matches them: `scripts/serve.ts` and the Vite dev CLI it
- * runs, whose command line is `node …/vite/bin/vite.js dev`.
- * Another checkout runs the same commands, so each match must also work in this checkout.
- */
-const SERVER_PROCESS = String.raw`scripts/serve\.ts|/vite/bin/vite\.js dev`;
-
-export const findServer = runCommand("pgrep", ["-f", SERVER_PROCESS]).pipe(
-  Effect.map(pidsFrom),
-  Effect.orElseSucceed((): number[] => []),
-  Effect.flatMap((pids) =>
-    Effect.forEach(pids, (pid) =>
-      cwdOf(pid).pipe(
-        Effect.map((cwd) => (Option.contains(cwd, ROOT) ? [pid] : [])),
+/** The processes `pgrep -f pattern` finds whose working directory is this checkout. */
+const checkoutPids = (pattern: string) =>
+  runCommand("pgrep", ["-f", pattern]).pipe(
+    Effect.map(pidsFrom),
+    Effect.orElseSucceed((): number[] => []),
+    Effect.flatMap((pids) =>
+      Effect.forEach(pids, (pid) =>
+        cwdOf(pid).pipe(
+          Effect.map((cwd) => (Option.contains(cwd, ROOT) ? [pid] : [])),
+        ),
       ),
     ),
-  ),
-  Effect.map((pids) => pids.flat()),
+    Effect.map((pids) => pids.flat()),
+  );
+
+/**
+ * The server's process: the Vite dev CLI that `scripts/serve.ts` runs, whose command line is
+ * `node …/vite/bin/vite.js dev`. Another checkout runs the same command, so it must also work in
+ * this checkout. A stop signals this alone: `serve.ts` sees it exit, lets `s6-log` write its last
+ * lines, then writes the exit marker.
+ */
+export const findServer = checkoutPids(String.raw`/vite/bin/vite\.js dev`);
+
+/**
+ * `vp run dev:serve` and the `node … scripts/serve.ts` it runs, alive from launch until the exit
+ * marker is written: before Vite starts and after it exits, the server is still starting or
+ * stopping. Anchored at the end so an editor or shell open on `scripts/serve.ts` is not matched.
+ */
+const findServe = checkoutPids(
+  String.raw`bin/vp run dev:serve$|\.js scripts/serve\.ts$`,
 );
 
 /** `pids` and every process below them. */
@@ -190,15 +202,15 @@ export const withLock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 /**
- * Sends SIGTERM to the server's processes, their descendants and whatever listens on the port,
- * then waits for all of them to be gone.
+ * Sends SIGTERM to Vite, its descendants and whatever listens on the port, then waits for them and
+ * `serve.ts` to be gone, so the log holds the exit marker when this returns.
  */
 export const stopServer = Effect.fn("Server.stopServer")(function* (
   port: number,
 ) {
-  const remaining = Effect.all([findServer, portListeners(port)]);
-  const [pids, listeners] = yield* remaining;
-  if (pids.length === 0 && listeners.length === 0) {
+  const remaining = Effect.all([findServer, portListeners(port), findServe]);
+  const [pids, listeners, serve] = yield* remaining;
+  if ([...pids, ...listeners, ...serve].length === 0) {
     yield* Console.log("no dev server running");
     return;
   }
@@ -208,13 +220,13 @@ export const stopServer = Effect.fn("Server.stopServer")(function* (
     ),
   );
   const stopped = remaining.pipe(
-    Effect.map(([left, ports]) => left.length === 0 && ports.length === 0),
+    Effect.map((left) => left.every((found) => found.length === 0)),
   );
   if (!(yield* waitUntil(stopped, STOP_TIMEOUT, Duration.millis(250))))
     return yield* fail(
-      `port ${String(port)} is still held after SIGTERM; check with lsof -i :${String(port)}`,
+      `the dev server is still running ${String(Duration.toSeconds(STOP_TIMEOUT))}s after SIGTERM: ${describeServer((yield* remaining).flat())}; check with lsof -i :${String(port)}`,
     );
-  yield* Console.log(`ok    stopped (${describeServer(pids)})`);
+  yield* Console.log(`ok    stopped (${describeServer([...pids, ...serve])})`);
 });
 
 const launchServer = Effect.gen(function* () {
@@ -297,7 +309,8 @@ const summarize = (port: number) =>
 
 /**
  * Starts the server, or adopts the one running: a server already serving this checkout, found by
- * process and working directory ({@link findServer}), is left running whoever started it. A
+ * process and working directory ({@link findServer}), or a `serve.ts` whose Vite has not started
+ * yet, is left running whoever started it. A
  * process of another checkout or program holding the port is refused. Otherwise the server starts
  * detached and outlives this command until `dev:stop`. The whole start holds the lock
  * ({@link withLock}). `ready` runs once the server answers (`vp run dev:open` opens the browser).
@@ -311,7 +324,7 @@ export const startServer = <
 ) =>
   withLock(
     Effect.gen(function* () {
-      const found = yield* findServer;
+      const found = [...(yield* findServer), ...(yield* findServe)];
       if (found.length > 0)
         yield* Console.log(
           `ok    adopted the running server: ${describeServer(found)}`,
