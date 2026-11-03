@@ -300,8 +300,7 @@ const summarize = (port: number) =>
  * process and working directory ({@link findServer}), is left running whoever started it. A
  * process of another checkout or program holding the port is refused. Otherwise the server starts
  * detached and outlives this command until `dev:stop`. The whole start holds the lock
- * ({@link withLock}). `ready` runs once the server answers (`vp run dev:open` opens the browser
- * there).
+ * ({@link withLock}). `ready` runs once the server answers (`vp run dev:open` opens the browser).
  */
 export const startServer = <
   E extends { readonly message: string } = never,

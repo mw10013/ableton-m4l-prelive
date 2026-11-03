@@ -1,8 +1,8 @@
 #!/usr/bin/env vpx
 /**
  * `vp run dev:serve`: the dev server in the foreground, which `scripts/dev.ts` launches detached
- * and which nothing else should run. It is Vite's dev server on this checkout's port from berth (`lib/berth.ts`), `--strictPort` so a held
- * port fails instead of drifting.
+ * and which nothing else should run. It is Vite's dev server on this checkout's port from berth
+ * (`lib/berth.ts`), `--strictPort` so a held port fails instead of drifting.
  *
  * Vite's whole output goes to `.logs/dev/current` through `s6-log`, between a start line and an
  * exit line. On SIGTERM or SIGINT it stops Vite, and `s6-log` writes everything Vite wrote before
