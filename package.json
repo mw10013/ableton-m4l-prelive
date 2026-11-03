@@ -17,6 +17,7 @@
     "dev:status": "vpx scripts/dev.ts status",
     "dev:logs": "vpx scripts/dev.ts logs",
     "dev:serve": "vpx scripts/serve.ts",
+    "worktree:teardown": "vp run dev:stop",
     "build": "vp build",
     "test": "vp test run",
     "start": "vp preview",

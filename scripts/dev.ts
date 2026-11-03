@@ -10,9 +10,10 @@ import * as Command from "effect/cli/Command";
 import * as Flag from "effect/cli/Flag";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import process from "node:process";
 
-import { webPort } from "./lib/berth.ts";
+import { heldWebPort, webPort } from "./lib/berth.ts";
 import { runCommand } from "./lib/command.ts";
 import {
   answering,
@@ -43,11 +44,19 @@ const startCommand = Command.make("start", {}, () =>
 );
 
 const stopCommand = Command.make("stop", {}, () =>
-  webPort.pipe(
-    Effect.flatMap((port) => withLock(stopServer(port))),
-    Effect.mapError(toUserError),
+  Effect.gen(function* () {
+    const port = yield* heldWebPort;
+    if (Option.isNone(port))
+      return yield* Console.log(
+        "no dev lease, so no dev server of this checkout runs",
+      );
+    yield* withLock(stopServer(port.value));
+  }).pipe(Effect.mapError(toUserError)),
+).pipe(
+  Command.withDescription(
+    "Stop the dev server. A checkout without a dev lease has none, and gets no lease.",
   ),
-).pipe(Command.withDescription("Stop the dev server."));
+);
 
 const openCommand = Command.make("open", {}, () =>
   webPort.pipe(

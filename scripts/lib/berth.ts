@@ -8,6 +8,7 @@
  * @module
  */
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Schema from "effect/Schema";
@@ -22,11 +23,18 @@ const Port = Schema.Int.check(
   Schema.isBetween({ minimum: 1, maximum: 65_535 }),
 );
 
+const ErrorJson = Schema.Struct({
+  error: Schema.Struct({ message: Schema.String }),
+});
+const LeaseJson = Schema.Struct({ ports: Schema.Struct({ web: Port }) });
+
 const AcquireOutput = Schema.fromJsonString(
-  Schema.Union([
-    Schema.Struct({ ports: Schema.Struct({ web: Port }) }),
-    Schema.Struct({ error: Schema.Struct({ message: Schema.String }) }),
-  ]),
+  Schema.Union([LeaseJson, ErrorJson]),
+);
+
+/** `berth show`: the lease, or null when the checkout holds none. */
+const ShowOutput = Schema.fromJsonString(
+  Schema.Union([Schema.Struct({ lease: Schema.NullOr(LeaseJson) }), ErrorJson]),
 );
 
 /** The checkout's root, where berth finds `berth.json`. */
@@ -37,31 +45,55 @@ const notRun = new BerthError({
     "berth did not run: install its shim, ~/.local/bin/berth running `vpx ~/projects/tools/berth.ts`",
 });
 
-/** `berth acquire dev`'s `web` port, leased on first use. berth's own lines go to stderr. */
-export const webPort = Effect.gen(function* () {
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const handle = yield* spawner
-    .spawn(
-      ChildProcess.make("berth", ["acquire", "dev"], {
+/** `berth <args>`'s stdout, run in this checkout. berth's own lines go to stderr. */
+const runBerth = (args: readonly string[]) =>
+  Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const handle = yield* spawner.spawn(
+      ChildProcess.make("berth", [...args], {
         cwd: ROOT,
         stdin: "ignore",
         stderr: "inherit",
       }),
-    )
-    .pipe(Effect.mapError(() => notRun));
-  const stdout = yield* Stream.mkString(Stream.decodeText(handle.stdout)).pipe(
+    );
+    const stdout = yield* Stream.mkString(Stream.decodeText(handle.stdout));
+    yield* handle.exitCode;
+    return stdout;
+  }).pipe(
+    Effect.scoped,
     Effect.mapError(() => notRun),
   );
-  yield* handle.exitCode.pipe(Effect.mapError(() => notRun));
-  const output = yield* Schema.decodeUnknownEffect(AcquireOutput)(stdout).pipe(
-    Effect.mapError(
-      () =>
-        new BerthError({
-          message: "berth acquire dev printed no lease; its stderr says why",
-        }),
+
+const noLease = (command: string) =>
+  new BerthError({
+    message: `berth ${command} dev printed no lease; its stderr says why`,
+  });
+
+/** `berth acquire dev`'s `web` port, leased on first use. */
+export const webPort = Effect.gen(function* () {
+  const output = yield* runBerth(["acquire", "dev"]).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(AcquireOutput)),
+    Effect.mapError((error) =>
+      error._tag === "BerthError" ? error : noLease("acquire"),
     ),
   );
   return "error" in output
     ? yield* new BerthError({ message: output.error.message })
     : output.ports.web;
-}).pipe(Effect.scoped);
+});
+
+/**
+ * `berth show dev`'s `web` port, or none when this checkout holds no lease; never makes one. A
+ * stop asks this, so a checkout that `wt rm` tears down is not handed a lease on its way out.
+ */
+export const heldWebPort = Effect.gen(function* () {
+  const output = yield* runBerth(["show", "dev"]).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(ShowOutput)),
+    Effect.mapError((error) =>
+      error._tag === "BerthError" ? error : noLease("show"),
+    ),
+  );
+  return "error" in output
+    ? yield* new BerthError({ message: output.error.message })
+    : Option.map(Option.fromNullOr(output.lease), (lease) => lease.ports.web);
+});

@@ -36,7 +36,8 @@ vpx /Users/mw/projects/tools/refs.ts sync     # Fetch every supported declared d
 vp run dev              # Start the dev server on this checkout's port from berth (berth.json), or adopt the running one
 vp run dev:open         # Same, then open it in the browser
 vp run dev:status       # Where it runs and whether it answers (exit 1 when unhealthy)
-vp run dev:stop         # Stop it
+vp run dev:stop         # Stop it; never takes a berth lease
+vp run worktree:teardown # `wt rm` runs it: dev:stop
 vp run dev:logs         # Tail .logs/dev/current; --follow keeps following it
 vp check                # Format check, lint, and type check (read-only)
 vp check --fix          # Same, applying formatting and safe lint fixes
