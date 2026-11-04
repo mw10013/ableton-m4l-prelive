@@ -10,8 +10,8 @@ import { Text } from "@astryxdesign/core/Text";
 import {
   defaultDestination,
   duplicateNotes,
-  type NoteRow,
   isSameRegion,
+  type NoteRow,
   quartersPerBar,
   requiredPlaybackRegion,
 } from "#domain/noteEdits.ts";
