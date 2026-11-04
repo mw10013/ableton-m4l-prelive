@@ -3,6 +3,7 @@
  * `vp run liveql:schema`: introspects a running liveql server and writes its schema as SDL to
  * `refs/liveql-schema.graphql`, the reference for the GraphQL documents in `src/web/server`.
  */
+
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";

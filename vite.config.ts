@@ -296,6 +296,11 @@ export default defineConfig(({ command, mode, isPreview }) => {
       ],
       rules: {
         // Options on enabled rules, and opt-ins beyond the categories.
+        // The formatter orders import statements; this orders the names inside one.
+        "sort-imports": [
+          "error",
+          { ignoreDeclarationSort: true, ignoreCase: true },
+        ],
         "no-underscore-dangle": [
           "error",
           {
@@ -434,7 +439,6 @@ export default defineConfig(({ command, mode, isPreview }) => {
         "jsx-handler-names": "off",
 
         // Off: the formatter or the JSX transform owns it.
-        "sort-imports": "off",
         "no-duplicate-imports": "off",
         curly: "off",
         "unicorn/number-literal-case": "off",

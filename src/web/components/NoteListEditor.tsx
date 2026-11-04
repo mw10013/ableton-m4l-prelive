@@ -29,8 +29,8 @@ import { DuplicateNotesDialog } from "./DuplicateNotesDialog.tsx";
 import { type CommitMode, NoteTable } from "./NoteTable.tsx";
 import {
   FIELD_LABEL,
-  type SettableField,
   SetNoteFieldDialog,
+  type SettableField,
 } from "./SetNoteFieldDialog.tsx";
 
 export type EditorStatus = "idle" | "loading" | "reloading";
