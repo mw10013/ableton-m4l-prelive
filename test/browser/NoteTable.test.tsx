@@ -1,14 +1,12 @@
 import "#web/styles.css";
-import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
-
-import { useState } from "react";
-
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import { useState } from "react";
 import { describe, expect, it } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser/context";
 import { render } from "vitest-browser-react";
 
+import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
 import { NoteTable } from "#web/components/NoteTable.tsx";
 
 const row = (id: number, fields: Partial<NoteRow>): NoteRow => ({

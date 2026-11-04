@@ -1,10 +1,9 @@
-import type { ReplacementNote } from "#domain/live.ts";
-
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
 import { quantizeNotes } from "#domain/lilypond/quantizer.ts";
 import { notesToLilyPond } from "#domain/lilypond/score.ts";
+import type { ReplacementNote } from "#domain/live.ts";
 
 const note = (
   pitch: number,

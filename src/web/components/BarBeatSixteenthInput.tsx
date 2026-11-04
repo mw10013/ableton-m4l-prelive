@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { colorVars } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
+import { useEffect, useRef, useState } from "react";
 
 import {
   type BeatTimeKind,

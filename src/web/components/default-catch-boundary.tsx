@@ -1,11 +1,10 @@
-import type { ErrorComponentProps } from "@tanstack/react-router";
-
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Icon } from "@astryxdesign/core/Icon";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import { rootRouteId, useMatch, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, House, Mail, RefreshCw } from "lucide-react";
 

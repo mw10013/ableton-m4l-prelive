@@ -1,6 +1,6 @@
-import type { ReplacementNote as Note } from "#domain/live.ts";
-
 import * as Effect from "effect/Effect";
+
+import type { ReplacementNote as Note } from "#domain/live.ts";
 
 interface QuantizationConfig {
   readonly startGrid: number;

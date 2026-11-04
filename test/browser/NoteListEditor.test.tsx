@@ -1,12 +1,11 @@
 import "#web/styles.css";
-import type { NoteRow } from "#domain/noteEdits.ts";
-
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import * as Function from "effect/Function";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { render } from "vitest-browser-react";
 
+import type { NoteRow } from "#domain/noteEdits.ts";
 import { NoteListEditor } from "#web/components/NoteListEditor.tsx";
 
 const NOTE: NoteRow = {

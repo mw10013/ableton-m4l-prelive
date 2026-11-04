@@ -1,9 +1,6 @@
-import type { QueryClient } from "@tanstack/react-query";
-
-import type { ReactNode } from "react";
-
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -11,9 +8,11 @@ import {
   Scripts,
   useHydrated,
 } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { DefaultCatchBoundary } from "#web/components/default-catch-boundary.tsx";
 import { NotFound } from "#web/components/not-found.tsx";
+
 import appCss from "#web/styles.css?url";
 
 export const Route = createRootRouteWithContext<{

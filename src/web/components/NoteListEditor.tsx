@@ -1,22 +1,17 @@
-import type { TableContextAction } from "@astryxdesign/core/Table";
-
-import type { SlotName } from "#domain/clipBuffers.ts";
-import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
-
-import type { AutowriteState } from "./useAutowrite.ts";
-
-import { useState, useSyncExternalStore } from "react";
-
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { useHotkeys } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
+import type { TableContextAction } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { SlidersHorizontal } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
 
+import type { SlotName } from "#domain/clipBuffers.ts";
 import { otherSlotOf } from "#domain/clipBuffers.ts";
+import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
 import {
   byMusicalOrder,
   duplicateNotes,
@@ -32,6 +27,7 @@ import {
   SetNoteFieldDialog,
   type SettableField,
 } from "./SetNoteFieldDialog.tsx";
+import type { AutowriteState } from "./useAutowrite.ts";
 
 export type EditorStatus = "idle" | "loading" | "reloading";
 

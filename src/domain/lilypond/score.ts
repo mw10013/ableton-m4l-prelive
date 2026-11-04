@@ -1,5 +1,4 @@
 import type { ReplacementNote as Note } from "#domain/live.ts";
-
 import { decideStaffSystem } from "#domain/score/staffDecision.ts";
 interface LilyPondOptions {
   readonly tempo: number;

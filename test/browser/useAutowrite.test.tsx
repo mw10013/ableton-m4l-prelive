@@ -1,12 +1,10 @@
-import type { ReplaceNotesInput } from "#domain/live.ts";
-import type { NoteRow } from "#domain/noteEdits.ts";
-
-import type { ReactNode } from "react";
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vite-plus/test";
 import { renderHook } from "vitest-browser-react";
 
+import type { ReplaceNotesInput } from "#domain/live.ts";
+import type { NoteRow } from "#domain/noteEdits.ts";
 import {
   AUTOWRITE_DELAY_MS,
   useAutowrite,

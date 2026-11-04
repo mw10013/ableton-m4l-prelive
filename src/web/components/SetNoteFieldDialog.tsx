@@ -1,15 +1,13 @@
-import type { EditableField } from "#domain/noteEdits.ts";
-
-import { useState } from "react";
-
 import { Button } from "@astryxdesign/core/Button";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { useState } from "react";
 
 import { formatBeatTime } from "#domain/beatTime.ts";
+import type { EditableField } from "#domain/noteEdits.ts";
 import { FIELD_RANGE } from "#domain/noteEdits.ts";
 
 import { noteName } from "./NoteTable.tsx";
