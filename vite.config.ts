@@ -1,12 +1,12 @@
-import type { Plugin } from "vite-plus";
-import type { OxlintOverride } from "vite-plus/lint";
+import { EventEmitter } from "node:events";
+import { dirname, relative } from "node:path";
 
 import { astryxStylex } from "@astryxdesign/build/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { EventEmitter } from "node:events";
-import { dirname, relative } from "node:path";
+import type { Plugin } from "vite-plus";
 import { defineConfig, lazyPlugins } from "vite-plus";
+import type { OxlintOverride } from "vite-plus/lint";
 import { playwright } from "vite-plus/test/browser-playwright";
 
 import { bosunEndpoint } from "#devkit/core/bosun-endpoint.ts";
@@ -245,25 +245,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
     fmt: {
       printWidth: 80,
       ignorePatterns: ["src/web/routeTree.gen.ts", "vendor/**"],
-      sortImports: {
-        groups: [
-          "type-builtin",
-          "type-external",
-          "type-internal",
-          ["type-parent", "type-sibling", "type-index"],
-          "react-libs",
-          ["value-builtin", "value-external"],
-          "value-internal",
-          ["value-parent", "value-sibling", "value-index"],
-          "unknown",
-        ],
-        customGroups: [
-          {
-            groupName: "react-libs",
-            elementNamePattern: ["react", "react-**"],
-          },
-        ],
-      },
+      sortImports: true,
     },
     lint: {
       plugins: ["eslint", "typescript", "unicorn", "oxc", "react", "jsx-a11y"],

@@ -1,6 +1,5 @@
-import { useRef } from "react";
-
 import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { useRef } from "react";
 
 import { precisionOf, useScrub } from "./useScrub.ts";
 

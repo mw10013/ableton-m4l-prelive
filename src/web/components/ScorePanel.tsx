@@ -1,7 +1,3 @@
-import type { NoteRow } from "#domain/noteEdits.ts";
-
-import { useEffect, useState } from "react";
-
 import { Button } from "@astryxdesign/core/Button";
 import { Section } from "@astryxdesign/core/Section";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -9,7 +5,9 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
+import type { NoteRow } from "#domain/noteEdits.ts";
 import { toReplacementNotes } from "#domain/noteEdits.ts";
 import { renderLilyPondSvg } from "#web/server/lilypond/renderServerFn.ts";
 

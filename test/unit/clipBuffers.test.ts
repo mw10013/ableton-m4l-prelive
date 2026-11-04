@@ -1,5 +1,3 @@
-import type { Note } from "#domain/live.ts";
-
 import { assert, describe, it } from "@effect/vitest";
 
 import {
@@ -9,6 +7,7 @@ import {
   EMPTY_BUFFERS,
   slotSummaryOf,
 } from "#domain/clipBuffers.ts";
+import type { Note } from "#domain/live.ts";
 
 const note = (note_id: number, pitch: number, start_time: number): Note => ({
   note_id,

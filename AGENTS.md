@@ -70,15 +70,13 @@ pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this fi
 - **Imports and layout**: `src/domain/` holds pure concepts (schemas and functions over them) and imports only `effect` and itself. `src/web/` holds the TanStack Start app, its server code under `src/web/server/`. Leaving a file's folder goes through a `package.json` `imports` entry with the extension (`#domain/live.ts`, `#web/server/LiveQL.ts`); within the folder and below, `./`. No `..`, no `@/`.
 
 ```ts
-import type { ReplacementNote } from "#domain/live.ts";
-
-import * as React from "react";
-
 import { createServerFn } from "@tanstack/react-start";
 import * as Effect from "effect/Effect";
 import * as HttpClient from "effect/http/HttpClient";
 import * as Schema from "effect/Schema";
+import * as React from "react";
 
+import type { ReplacementNote } from "#domain/live.ts";
 import { LiveQL } from "#web/server/LiveQL.ts";
 
 import { useScrub } from "./useScrub.ts";

@@ -1,6 +1,5 @@
-import type { Note, ReplacementNote } from "./live.ts";
-
 import { MIN_DURATION } from "./beatTime.ts";
+import type { Note, ReplacementNote } from "./live.ts";
 export const TIME_EPSILON = 1e-9;
 
 /**

@@ -1,5 +1,3 @@
-import type { ReplacementNote as Note } from "#domain/live.ts";
-
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -11,6 +9,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import { quantizeNotes } from "#domain/lilypond/quantizer.ts";
 import { notesToLilyPond } from "#domain/lilypond/score.ts";
+import type { ReplacementNote as Note } from "#domain/live.ts";
 import { LilyPondError } from "#web/errors.ts";
 
 export class LilyPondRenderer extends Context.Service<

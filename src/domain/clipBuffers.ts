@@ -1,5 +1,4 @@
 import type { Note } from "./live.ts";
-
 import { type NoteRow, rowsOf, sameNotes } from "./noteEdits.ts";
 
 export type SlotName = "a" | "b";

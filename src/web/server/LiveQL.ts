@@ -1,7 +1,6 @@
-import type * as Duration from "effect/Duration";
-
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
+import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";

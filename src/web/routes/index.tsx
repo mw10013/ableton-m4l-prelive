@@ -1,15 +1,3 @@
-import type { TableColumn } from "@astryxdesign/core/Table";
-
-import type {
-  ClipRegion,
-  ClipWithNotes,
-  ReplaceNotesInput,
-} from "#domain/live.ts";
-import type { NoteRow } from "#domain/noteEdits.ts";
-import type { EditorStatus } from "#web/components/NoteListEditor.tsx";
-
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -19,6 +7,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Section } from "@astryxdesign/core/Section";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
+import type { TableColumn } from "@astryxdesign/core/Table";
 import { pixel, Table } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
@@ -33,6 +22,7 @@ import {
 } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
 import {
   activeRowsOf,
@@ -40,12 +30,19 @@ import {
   EMPTY_BUFFERS,
   slotSummaryOf,
 } from "#domain/clipBuffers.ts";
+import type {
+  ClipRegion,
+  ClipWithNotes,
+  ReplaceNotesInput,
+} from "#domain/live.ts";
+import type { NoteRow } from "#domain/noteEdits.ts";
 import {
   isSameRegion,
   playbackRegion,
   quartersPerBar,
   requiredPlaybackRegion,
 } from "#domain/noteEdits.ts";
+import type { EditorStatus } from "#web/components/NoteListEditor.tsx";
 import { NoteListEditor } from "#web/components/NoteListEditor.tsx";
 import { ScorePanel } from "#web/components/ScorePanel.tsx";
 import { ScrubbableNumberInput } from "#web/components/ScrubbableNumberInput.tsx";

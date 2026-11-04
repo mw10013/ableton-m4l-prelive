@@ -1,23 +1,11 @@
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
 import type {
   BodyRowRenderProps,
   TableColumn,
   TableContextAction,
   TablePlugin,
 } from "@astryxdesign/core/Table";
-
-import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
-
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-
-import { EmptyState } from "@astryxdesign/core/EmptyState";
-import { NumberInput } from "@astryxdesign/core/NumberInput";
 import {
   pixel,
   proportional,
@@ -31,8 +19,17 @@ import {
   typeScaleVars,
 } from "@astryxdesign/core/theme/tokens.stylex";
 import * as stylex from "@stylexjs/stylex";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { formatBeatTime, MIN_DURATION } from "#domain/beatTime.ts";
+import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
 import { FIELD_RANGE } from "#domain/noteEdits.ts";
 
 import {
