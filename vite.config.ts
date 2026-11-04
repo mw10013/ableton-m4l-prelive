@@ -9,6 +9,8 @@ import { dirname, relative } from "node:path";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import { playwright } from "vite-plus/test/browser-playwright";
 
+import { bosunEndpoint } from "#devkit/core/bosun-endpoint.ts";
+
 /**
  * StyleX's dev plugin polls for CSS changes on an interval it clears only when its HTTP server emits
  * `close`. Vitest never starts that server listening, so `close` never fires and the interval kept
@@ -242,7 +244,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
   return {
     fmt: {
       printWidth: 80,
-      ignorePatterns: ["src/web/routeTree.gen.ts"],
+      ignorePatterns: ["src/web/routeTree.gen.ts", "vendor/**"],
       sortImports: {
         groups: [
           "type-builtin",
@@ -444,7 +446,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
           name: "vite-plus",
           specifier: "vite-plus/oxlint-plugin",
         },
-        "./scripts/lint/conventions.ts",
+        "./vendor/devkit/core/lint/conventions.ts",
       ],
       overrides: [
         {
@@ -546,6 +548,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
                   }
                 : plugin,
             ),
+            bosunEndpoint(),
             tanstackStart({
               srcDirectory: "src/web",
             }),
