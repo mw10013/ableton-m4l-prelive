@@ -1,16 +1,14 @@
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
-import type {
-  BodyRowRenderProps,
-  TableColumn,
-  TableContextAction,
-  TablePlugin,
-} from "@astryxdesign/core/Table";
 import {
+  type BodyRowRenderProps,
   pixel,
   proportional,
   resolveContextActions,
   Table,
+  type TableColumn,
+  type TableContextAction,
+  type TablePlugin,
   useTableRowIndex,
 } from "@astryxdesign/core/Table";
 import {
@@ -29,8 +27,11 @@ import {
 } from "react";
 
 import { formatBeatTime, MIN_DURATION } from "#domain/beatTime.ts";
-import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
-import { FIELD_RANGE } from "#domain/noteEdits.ts";
+import {
+  type EditableField,
+  FIELD_RANGE,
+  type NoteRow,
+} from "#domain/noteEdits.ts";
 
 import {
   BarBeatSixteenthInput,

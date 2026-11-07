@@ -8,7 +8,6 @@
     "#web/*": "./src/web/*",
     "#test/*": "./test/*",
     "#scripts/*": "./scripts/*",
-    "#devkit/*": "./vendor/devkit/*",
     "#root/*": "./*"
   },
   "scripts": {
@@ -22,7 +21,8 @@
     "start": "vp preview",
     "clean": "rm -rf node_modules .tanstack",
     "liveql:schema": "vpx scripts/liveql-schema.ts",
-    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
+    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
+    "check:pin": "devkit check-pin"
   },
   "dependencies": {
     "@astryxdesign/core": "0.7.4",
@@ -43,6 +43,7 @@
     "@astryxdesign/cli": "0.7.4",
     "@babel/core": "8.0.9",
     "@effect/vitest": "4.1.0",
+    "@mw10013/devkit": "catalog:",
     "@stylexjs/babel-plugin": "0.19.1",
     "@stylexjs/unplugin": "0.19.1",
     "@tanstack/eslint-plugin-router": "1.162.0",

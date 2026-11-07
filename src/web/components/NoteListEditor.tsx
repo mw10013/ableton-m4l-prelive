@@ -9,12 +9,12 @@ import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { SlidersHorizontal } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
-import type { SlotName } from "#domain/clipBuffers.ts";
-import { otherSlotOf } from "#domain/clipBuffers.ts";
-import type { EditableField, NoteRow } from "#domain/noteEdits.ts";
+import { otherSlotOf, type SlotName } from "#domain/clipBuffers.ts";
 import {
   byMusicalOrder,
   duplicateNotes,
+  type EditableField,
+  type NoteRow,
   setField,
   shiftField,
 } from "#domain/noteEdits.ts";

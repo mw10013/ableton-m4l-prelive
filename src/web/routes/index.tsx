@@ -7,8 +7,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Section } from "@astryxdesign/core/Section";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
-import type { TableColumn } from "@astryxdesign/core/Table";
-import { pixel, Table } from "@astryxdesign/core/Table";
+import { pixel, Table, type TableColumn } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
@@ -35,15 +34,17 @@ import type {
   ClipWithNotes,
   ReplaceNotesInput,
 } from "#domain/live.ts";
-import type { NoteRow } from "#domain/noteEdits.ts";
 import {
   isSameRegion,
+  type NoteRow,
   playbackRegion,
   quartersPerBar,
   requiredPlaybackRegion,
 } from "#domain/noteEdits.ts";
-import type { EditorStatus } from "#web/components/NoteListEditor.tsx";
-import { NoteListEditor } from "#web/components/NoteListEditor.tsx";
+import {
+  type EditorStatus,
+  NoteListEditor,
+} from "#web/components/NoteListEditor.tsx";
 import { ScorePanel } from "#web/components/ScorePanel.tsx";
 import { ScrubbableNumberInput } from "#web/components/ScrubbableNumberInput.tsx";
 import { useAutowrite } from "#web/components/useAutowrite.ts";

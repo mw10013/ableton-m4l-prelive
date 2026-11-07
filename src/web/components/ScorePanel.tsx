@@ -7,8 +7,7 @@ import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import type { NoteRow } from "#domain/noteEdits.ts";
-import { toReplacementNotes } from "#domain/noteEdits.ts";
+import { type NoteRow, toReplacementNotes } from "#domain/noteEdits.ts";
 import { renderLilyPondSvg } from "#web/server/lilypond/renderServerFn.ts";
 
 interface ScorePanelProps {

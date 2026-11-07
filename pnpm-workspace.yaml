@@ -1,5 +1,6 @@
 saveExact: true
 catalog:
+  "@mw10013/devkit": github:mw10013/tools#devkit-v0.1.0
   "@vitest/browser-playwright": 5.0.5
   vite: npm:@voidzero-dev/vite-plus-core@1.4.0
   vite-plus: 1.4.0
