@@ -7,8 +7,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { useState } from "react";
 
 import { formatBeatTime } from "#domain/beatTime.ts";
-import type { EditableField } from "#domain/noteEdits.ts";
-import { FIELD_RANGE } from "#domain/noteEdits.ts";
+import { type EditableField, FIELD_RANGE } from "#domain/noteEdits.ts";
 
 import { noteName } from "./NoteTable.tsx";
 
