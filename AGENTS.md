@@ -37,7 +37,6 @@ vp run dev              # Start the dev server under bosun (Vite picks the port)
 vp run dev:open         # Same, then open it in the browser
 vp run dev:status       # bosun's status JSON: port, URL, log (exit 3 when it does not answer)
 vp run dev:stop         # Stop it
-vp run worktree:teardown # `wt rm` runs it: dev:stop
 vp run dev:logs         # Tail .bosun/dev/log/current; -f keeps following it
 vp check                # Format check, lint, and type check (read-only)
 vp check --fix          # Same, applying formatting and safe lint fixes
