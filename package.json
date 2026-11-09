@@ -11,18 +11,17 @@
     "#root/*": "./*"
   },
   "scripts": {
-    "dev": "bosun start dev -- env -u FORCE_COLOR NO_COLOR=1 vp dev --clearScreen false",
-    "dev:open": "vp run dev && open \"$(bosun status dev | node -p 'JSON.parse(fs.readFileSync(0)).url')\"",
-    "dev:stop": "bosun stop dev",
-    "dev:status": "bosun status dev",
-    "dev:logs": "bosun logs dev",
+    "dev": "rigging server start dev -- env -u FORCE_COLOR NO_COLOR=1 vp dev --clearScreen false",
+    "dev:open": "vp run dev && open \"$(rigging server status dev | node -p 'JSON.parse(fs.readFileSync(0)).url')\"",
+    "dev:stop": "rigging server stop dev",
+    "dev:status": "rigging server status dev",
+    "dev:logs": "rigging server logs dev",
     "build": "vp build",
     "test": "vp test run",
     "start": "vp preview",
     "clean": "rm -rf node_modules .tanstack",
     "liveql:schema": "vpx scripts/liveql-schema.ts",
-    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
-    "check:pin": "devkit check-pin"
+    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
   },
   "dependencies": {
     "@astryxdesign/core": "0.7.4",
@@ -43,7 +42,7 @@
     "@astryxdesign/cli": "0.7.4",
     "@babel/core": "8.0.9",
     "@effect/vitest": "4.1.0",
-    "@mw10013/devkit": "catalog:",
+    "@mw10013/rigging": "catalog:",
     "@stylexjs/babel-plugin": "0.19.1",
     "@stylexjs/unplugin": "0.19.1",
     "@tanstack/eslint-plugin-router": "1.162.0",

@@ -2,8 +2,8 @@ import { EventEmitter } from "node:events";
 import { dirname, relative } from "node:path";
 
 import { astryxStylex } from "@astryxdesign/build/vite";
-import { bosunEndpoint } from "@mw10013/devkit/core/bosun-endpoint";
-import { baseRestrictions, lint } from "@mw10013/devkit/core/lint/rules";
+import { baseRestrictions, lint } from "@mw10013/rigging/core/lint/rules";
+import { serverEndpoint } from "@mw10013/rigging/core/server-endpoint";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, lazyPlugins, type Plugin } from "vite-plus";
@@ -306,7 +306,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
                   }
                 : plugin,
             ),
-            bosunEndpoint(),
+            serverEndpoint(),
             tanstackStart({
               srcDirectory: "src/web",
             }),
