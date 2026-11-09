@@ -33,11 +33,11 @@ vpx /Users/mw/projects/tools/refs.ts sync     # Fetch every supported declared d
 ## Commands
 
 ```bash
-vp run dev              # Start the dev server under bosun (Vite picks the port), or adopt the running one
+vp run dev              # Start the dev server under rigging server (Vite picks the port), or adopt the running one
 vp run dev:open         # Same, then open it in the browser
-vp run dev:status       # bosun's status JSON: port, URL, log (exit 3 when it does not answer)
+vp run dev:status       # rigging server's status JSON: port, URL, log (exit 3 when it does not answer)
 vp run dev:stop         # Stop it
-vp run dev:logs         # Tail .bosun/dev/log/current; -f keeps following it
+vp run dev:logs         # Tail .rigging/servers/dev/log/current; -f keeps following it
 vp check                # Format check, lint, and type check (read-only)
 vp check --fix          # Same, applying formatting and safe lint fixes
 vp build                # Production build
@@ -49,7 +49,7 @@ pnpm astryx <cmd>       # Astryx CLI (see the ASTRYX block at the end of this fi
 
 ## Server Log Monitoring
 
-`.bosun/dev/log/current` is the dev server's live log (`s6-log`, timestamped, rotated), with `==== dev start` and `==== dev exit` markers around each run. Read it with `vp run dev:logs` or `tail` to check for build errors and runtime issues. Always start the server with `vp run dev`: a bare `vp dev` is rejected by `vite.config.ts`. `vp run dev` starts it detached (or adopts the running one) and returns once it answers; it keeps running until `vp run dev:stop`.
+`.rigging/servers/dev/log/current` is the dev server's live log (`s6-log`, timestamped, rotated), with `==== dev start` and `==== dev exit` markers around each run. Read it with `vp run dev:logs` or `tail` to check for build errors and runtime issues. Always start the server with `vp run dev`: a bare `vp dev` is rejected by `vite.config.ts`. `vp run dev` starts it detached (or adopts the running one) and returns once it answers; it keeps running until `vp run dev:stop`.
 
 ## TypeScript Guidelines
 
