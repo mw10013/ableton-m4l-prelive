@@ -11,7 +11,7 @@
     "#root/*": "./*"
   },
   "scripts": {
-    "dev": "rigging server start dev -- env -u FORCE_COLOR NO_COLOR=1 vp dev --clearScreen false",
+    "dev": "rigging server start dev -- vp dev --clearScreen false",
     "dev:open": "vp run dev && open \"$(rigging server status dev | node -p 'JSON.parse(fs.readFileSync(0)).url')\"",
     "dev:stop": "rigging server stop dev",
     "dev:status": "rigging server status dev",
