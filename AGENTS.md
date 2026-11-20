@@ -16,8 +16,8 @@
 Version-matched library sources live in `refs/`, managed by the shared refs CLI. `package.json` pins are the version authority; after a dependency bump, re-run sync.
 
 ```bash
-vpx /Users/mw/projects/tools/refs.ts status   # Compare refs/ against package.json pins
-vpx /Users/mw/projects/tools/refs.ts sync     # Fetch every supported declared dependency
+vpx ~/Projects/tools/refs.ts status   # Compare refs/ against package.json pins
+vpx ~/Projects/tools/refs.ts sync     # Fetch every supported declared dependency
 ```
 
 `refs` is ignored as `/refs` (no trailing slash) so a linked worktree's `refs` symlink to the main checkout is ignored too. Never edit inside `refs/`; sync replaces it.
