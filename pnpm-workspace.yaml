@@ -1,6 +1,6 @@
 saveExact: true
 catalog:
-  "@mw10013/rigging": 0.8.0
+  "@mw10013/rigging": 0.9.0
   "@vitest/browser-playwright": 5.1.0
   vite: npm:@voidzero-dev/vite-plus-core@1.6.0
   vite-plus: 1.6.0
@@ -21,4 +21,4 @@ peerDependencyRules:
     vite: "*"
     vitest: "*"
 minimumReleaseAgeExclude:
-  - "@mw10013/rigging@0.8.0"
+  - "@mw10013/rigging@0.9.0"
