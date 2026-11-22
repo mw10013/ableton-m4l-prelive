@@ -239,12 +239,12 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
       ? (["loop_start", "loop_end"] as const)
       : (["start_marker", "end_marker"] as const);
     const startStep = {
-      field: "clip_set_properties",
-      args: { properties: { [startKey]: start } },
+      field: "clip_set",
+      args: { properties: [{ [startKey]: start }] },
     };
     const endStep = {
-      field: "clip_set_properties",
-      args: { properties: { [endKey]: end } },
+      field: "clip_set",
+      args: { properties: [{ [endKey]: end }] },
     };
     const grows = end > current[endKey];
     steps.push(...(grows ? [endStep, startStep] : [startStep, endStep]));
@@ -316,7 +316,7 @@ const selection = (field: string) =>
   field === "clip_add_new_notes" ? `{ clip { id } }` : `{ id }`;
 
 const ARG_TYPES: Record<string, string> = {
-  properties: "ClipPropertiesInput!",
+  properties: "[ClipSetInput!]!",
   from_pitch: "Int!",
   pitch_span: "Int!",
   from_time: "Float!",
