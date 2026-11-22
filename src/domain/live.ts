@@ -62,7 +62,7 @@ export const Clip = Schema.Struct({
   color: Schema.Number,
   end_time: Schema.Number,
   is_arrangement_clip: Schema.Boolean,
-  is_session_clip: Schema.Boolean,
+  is_session_clip: Schema.NullOr(Schema.Boolean),
   is_midi_clip: Schema.Boolean,
   length: Schema.Number,
   looping: Schema.Boolean,
