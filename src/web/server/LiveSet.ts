@@ -195,7 +195,7 @@ export const readClipById = Effect.fn("LiveSet.readClipById")(function* (
  *
  * 1. A fresh read of the clip: the current markers decide the order of the
  *    marker writes, and the current notes decide the deletion window.
- * 2. Markers, one `set` per property. Live silently drops a start_marker set
+ * 2. Markers, one `clip_set` whose list LiveQL applies in order. Live silently drops a start_marker set
  *    past the end marker (and an end set before the start), so when the
  *    region grows the end is written before the start, otherwise the start
  *    before the end. loop_start/loop_end for a looping clip,
@@ -238,16 +238,15 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
     const [startKey, endKey] = looping
       ? (["loop_start", "loop_end"] as const)
       : (["start_marker", "end_marker"] as const);
-    const startStep = {
+    const startItem = { [startKey]: start };
+    const endItem = { [endKey]: end };
+    steps.push({
       field: "clip_set",
-      args: { properties: [{ [startKey]: start }] },
-    };
-    const endStep = {
-      field: "clip_set",
-      args: { properties: [{ [endKey]: end }] },
-    };
-    const grows = end > current[endKey];
-    steps.push(...(grows ? [endStep, startStep] : [startStep, endStep]));
+      args: {
+        properties:
+          end > current[endKey] ? [endItem, startItem] : [startItem, endItem],
+      },
+    });
   }
 
   const existing = current.get_all_notes_extended?.notes ?? [];
