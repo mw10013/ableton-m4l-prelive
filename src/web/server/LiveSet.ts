@@ -8,10 +8,10 @@ import { LiveQLError } from "#web/errors.ts";
 import { LiveQL } from "./LiveQL.ts";
 
 const ClipFields = `
-  id path type name color end_time is_arrangement_clip is_session_clip is_midi_clip
+  id path name color end_time is_arrangement_clip is_session_clip is_midi_clip
   length looping loop_start loop_end start_marker end_marker position muted
   signature_denominator signature_numerator start_time
-  view { id path type grid_quantization grid_is_triplet }
+  view { id path grid_quantization grid_is_triplet }
 `;
 
 const ClipWithNotesFields = `

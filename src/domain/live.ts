@@ -34,7 +34,6 @@ export const ClipSlot = Schema.Struct({
 export const ClipView = Schema.Struct({
   id: Schema.Number,
   path: Schema.String,
-  type: Schema.String,
   grid_quantization: Schema.Number,
   grid_is_triplet: Schema.Boolean,
 });
@@ -58,7 +57,6 @@ export const ClipView = Schema.Struct({
 export const Clip = Schema.Struct({
   id: Schema.Number,
   path: Schema.String,
-  type: Schema.String,
   color: Schema.Number,
   end_time: Schema.Number,
   is_arrangement_clip: Schema.Boolean,
