@@ -195,8 +195,8 @@ importers:
         specifier: 0.7.4
         version: 0.7.4(@astryxdesign/core@0.7.4(@stylexjs/stylex@0.19.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@effect/platform-node':
-        specifier: 4.1.0
-        version: 4.1.0(effect@4.1.0)(redis@6.2.1)
+        specifier: 4.1.5
+        version: 4.1.5(effect@4.1.5)(redis@6.2.1)
       '@stylexjs/stylex':
         specifier: 0.19.1
         version: 0.19.1
@@ -213,8 +213,8 @@ importers:
         specifier: 1.169.4
         version: 1.169.4(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(esbuild@0.27.4)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rollup@4.60.0)(supports-color@7.2.0)
       effect:
-        specifier: 4.1.0
-        version: 4.1.0
+        specifier: 4.1.5
+        version: 4.1.5
       lucide-react:
         specifier: 1.63.0
         version: 1.63.0(@types/react@19.3.0)(react@19.3.1)
@@ -235,11 +235,11 @@ importers:
         specifier: 8.0.9
         version: 8.0.9
       '@effect/vitest':
-        specifier: 4.1.0
-        version: 4.1.0(effect@4.1.0)(vitest@5.1.0)
+        specifier: 4.1.5
+        version: 4.1.5(effect@4.1.5)(vitest@5.1.0)
       '@mw10013/rigging':
         specifier: 'catalog:'
-        version: 0.9.0(@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.2.1))(@vitest/browser-playwright@5.1.0)(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(effect@4.1.0)(vite-plus@1.6.0(@types/node@24.19.2)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.27.4)(jiti@2.7.0)(playwright@1.64.1)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(vitest@5.1.0)
+        version: 0.9.0(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(@vitest/browser-playwright@5.1.0)(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(effect@4.1.5)(vite-plus@1.6.0(@types/node@24.19.2)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.27.4)(jiti@2.7.0)(playwright@1.64.1)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(vitest@5.1.0)
       '@stylexjs/babel-plugin':
         specifier: 0.19.1
         version: 0.19.1(supports-color@7.2.0)
@@ -653,23 +653,23 @@ packages:
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
 
-  '@effect/platform-node-shared@4.1.0':
-    resolution: {integrity: sha512-uYQfFRoxWLo8fIhiSeBcmz/R1ooOfE3HF3cWHFgxz82tZMk2Wn02BGABcdLmaAch9VpDLbtWnuhSxNyBsGMUFg==}
+  '@effect/platform-node-shared@4.1.5':
+    resolution: {integrity: sha512-JzlrYe4uKaBFTWihBRXo2pDjkUVB39kQpKdGfXdbp7Co5sKT8hbcjOmdB5pg/WOYESdGTddd3fxD4lwlZELbZQ==}
     engines: {node: '>=22.19.0'}
     peerDependencies:
-      effect: ^4.1.0
+      effect: ^4.1.5
 
-  '@effect/platform-node@4.1.0':
-    resolution: {integrity: sha512-v+X7moGVF9k5oMVvz0slA+NgtEod+W+oygeI285MDJgSlUCW3JcqElj+cD3rlijFZtpKhC7RLkU1GuCxjGHTpA==}
+  '@effect/platform-node@4.1.5':
+    resolution: {integrity: sha512-tFnRvxF9EKc3oU17sDHj1JeLP+TL/IkaOEl3IUk2EjgMS0x7AWs0ioUXjdNKLb3Z1LdjVfMf/DxsNh9PW5FFAg==}
     engines: {node: '>=22.19.0'}
     peerDependencies:
-      effect: ^4.1.0
-      redis: '>=5.0.0 <7.0.0'
+      effect: ^4.1.5
+      redis: '>=5.1.0 <7.0.0'
 
-  '@effect/vitest@4.1.0':
-    resolution: {integrity: sha512-+APF69oTYgGj5WCewowk1/udepH74xz4ONyH7d+UfcK0SrF3osiSwsWEyODUpJvWd6MIk5F5PcFJiE4evMuG2A==}
+  '@effect/vitest@4.1.5':
+    resolution: {integrity: sha512-18u1013wkJtSelk1ZYLc/5aUnluTQyDfi2hAemkJW1GQ9qXw4mtPSiSf0AXZPhesmGCvG1Dk2C4JYD2sz+R72w==}
     peerDependencies:
-      effect: ^4.1.0
+      effect: ^4.1.5
       vitest: 5.1.0
 
   '@esbuild/aix-ppc64@0.27.4':
@@ -2267,8 +2267,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  effect@4.1.0:
-    resolution: {integrity: sha512-lGx2MJJyrXA8RZb2UpQ/0Nkb5Utaimby7oD92+18noBxLPE85IFOvptdzau8dvcxAOwfwHo9iqapbKeFzqQM/Q==}
+  effect@4.1.5:
+    resolution: {integrity: sha512-xyR20KhQI0vg2gD8ILUSQRTTESEYJ0JKdP+QD8J37xbwPTqXRxFM/l0+vUVD9fuSvoYruoTqyt33C4FZv1s4TQ==}
 
   electron-to-chromium@1.5.321:
     resolution: {integrity: sha512-L2C7Q279W2D/J4PLZLk7sebOILDSWos7bMsMNN06rK482umHUrh/3lM8G7IlHFOYip2oAg5nha1rCMxr/rs6ZQ==}
@@ -3206,8 +3206,8 @@ packages:
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
-  undici@8.12.3:
-    resolution: {integrity: sha512-+fdndUTwBP86cVjihTp21hZHo7d6oj1c/47XPA3lL8mM0XHs+C4EkcjmgRsFnFk2f/UONGDy9ItBItmXsLOQHw==}
+  undici@8.13.1:
+    resolution: {integrity: sha512-Kt7EaPjh0s93lJH/PmW3d5rhkcpUa6fS3jqZ7+YGxNd9L7Xy/i827xe4C2uhhq+pJebM4tQOl5AgHmW11G5Skg==}
     engines: {node: '>=22.19.0'}
 
   unplugin@2.3.11:
@@ -3376,6 +3376,18 @@ packages:
 
   ws@8.22.0:
     resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
+  ws@8.23.0:
+    resolution: {integrity: sha512-wCkmX8QMOrKjgO8HW2WyDbTSGeqkocxgDzS9iR79rEAexty6/2qzilx3Ag8Tqf9ykop3irLKle0MtVn5qjVnoQ==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -3903,28 +3915,28 @@ snapshots:
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
-  '@effect/platform-node-shared@4.1.0(effect@4.1.0)':
+  '@effect/platform-node-shared@4.1.5(effect@4.1.5)':
     dependencies:
       '@types/ws': 8.18.2
-      effect: 4.1.0
-      ws: 8.22.0
+      effect: 4.1.5
+      ws: 8.23.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.2.1)':
+  '@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.1.0(effect@4.1.0)
-      effect: 4.1.0
+      '@effect/platform-node-shared': 4.1.5(effect@4.1.5)
+      effect: 4.1.5
       redis: 6.2.1
-      undici: 8.12.3
+      undici: 8.13.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.1.0(effect@4.1.0)(vitest@5.1.0)':
+  '@effect/vitest@4.1.5(effect@4.1.5)(vitest@5.1.0)':
     dependencies:
-      effect: 4.1.0
+      effect: 4.1.5
       vitest: 5.1.0(@types/node@24.19.2)(@vitest/browser-playwright@5.1.0)(@vitest/browser-preview@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))
 
   '@esbuild/aix-ppc64@0.27.4':
@@ -4106,12 +4118,12 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@mw10013/rigging@0.9.0(@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.2.1))(@vitest/browser-playwright@5.1.0)(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(effect@4.1.0)(vite-plus@1.6.0(@types/node@24.19.2)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.27.4)(jiti@2.7.0)(playwright@1.64.1)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(vitest@5.1.0)':
+  '@mw10013/rigging@0.9.0(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(@vitest/browser-playwright@5.1.0)(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(effect@4.1.5)(vite-plus@1.6.0(@types/node@24.19.2)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.27.4)(jiti@2.7.0)(playwright@1.64.1)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(vitest@5.1.0)':
     dependencies:
-      effect: 4.1.0
+      effect: 4.1.5
       vite-plus: 1.6.0(@types/node@24.19.2)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.27.4)(jiti@2.7.0)(playwright@1.64.1)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3)
     optionalDependencies:
-      '@effect/platform-node': 4.1.0(effect@4.1.0)(redis@6.2.1)
+      '@effect/platform-node': 4.1.5(effect@4.1.5)(redis@6.2.1)
       '@vitest/browser-playwright': 5.1.0(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(playwright@1.64.1)(vitest@5.1.0)
       vite: '@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3)'
       vitest: 5.1.0(@types/node@24.19.2)(@vitest/browser-playwright@5.1.0)(@vitest/browser-preview@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))
@@ -5153,7 +5165,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  effect@4.1.0: {}
+  effect@4.1.5: {}
 
   electron-to-chromium@1.5.321: {}
 
@@ -5940,7 +5952,7 @@ snapshots:
 
   undici-types@7.24.6: {}
 
-  undici@8.12.3: {}
+  undici@8.13.1: {}
 
   unplugin@2.3.11:
     dependencies:
@@ -6099,6 +6111,8 @@ snapshots:
       signal-exit: 4.1.0
 
   ws@8.22.0: {}
+
+  ws@8.23.0: {}
 
   xmlbuilder2@4.0.3:
     dependencies:
