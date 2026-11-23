@@ -9,10 +9,13 @@
  * macOS attributes these calls to the app that launched the shell (T3 Code), which needs
  * Accessibility and Screen Recording. A sandboxed shell cannot capture at all.
  */
+import * as Arr from "effect/Array";
 import * as CliError from "effect/cli/CliError";
 import * as Data from "effect/Data";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Num from "effect/Number";
 import type * as PlatformError from "effect/PlatformError";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
@@ -183,6 +186,72 @@ export const pixel = Effect.fnUntraced(function* (
   );
   const [r = 0, g = 0, b = 0] = bytes.flatMap((chunk) => [...chunk]);
   return { r, g, b };
+}, Effect.scoped);
+
+/** A line of text read from a window, in that window's points. */
+export interface TextLine {
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+const OCR_SCALE = 3;
+
+/**
+ * The lines of text in part of a window, read with Homebrew's `tesseract`. The capture is
+ * scaled up and thresholded so only pixels brighter than `threshold` (0-255) count as text, which
+ * reads light text on dark and on highlighted rows alike.
+ */
+export const readText = Effect.fnUntraced(function* (
+  window: LiveWindow,
+  crop: readonly [number, number, number, number],
+  threshold = 150,
+) {
+  // Not under /tmp: launched by vpx, tesseract cannot open a path that starts with /tmp.
+  const dir = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped();
+  const path = `${dir}/capture.png`;
+  const prepared = `${dir}/prepared.png`;
+  yield* capture(window, path, crop);
+  yield* run("ffmpeg", [
+    "-v",
+    "error",
+    "-y",
+    "-i",
+    path,
+    "-vf",
+    `scale=iw*${String(OCR_SCALE)}:ih*${String(OCR_SCALE)},format=gray,lut=y='if(gt(val,${String(threshold)}),0,255)'`,
+    prepared,
+  ]);
+  const tsv = yield* run("tesseract", [prepared, "-", "--psm", "6", "tsv"]);
+  const words = tsv
+    .split("\n")
+    .slice(1)
+    .map((row) => row.split("\t"))
+    .filter((c) => c[0] === "5" && (c[11] ?? "").trim() !== "")
+    .map((c) => ({
+      line: `${c[2] ?? ""}-${c[3] ?? ""}-${c[4] ?? ""}`,
+      left: Number(c[6]),
+      top: Number(c[7]),
+      right: Number(c[6]) + Number(c[8]),
+      bottom: Number(c[7]) + Number(c[9]),
+      text: (c[11] ?? "").trim(),
+    }));
+  const lines = Object.values(Arr.groupBy(words, (w) => w.line)).map(
+    (group): TextLine => {
+      const left = Math.min(...group.map((w) => w.left));
+      const top = Math.min(...group.map((w) => w.top));
+      return {
+        text: group.map((w) => w.text).join(" "),
+        x: crop[0] + left / OCR_SCALE,
+        y: crop[1] + top / OCR_SCALE,
+        width: (Math.max(...group.map((w) => w.right)) - left) / OCR_SCALE,
+        height: (Math.max(...group.map((w) => w.bottom)) - top) / OCR_SCALE,
+      };
+    },
+  );
+  return Arr.sortWith(lines, (l) => l.y, Num.Order);
 }, Effect.scoped);
 
 const AX_SOURCE = `${import.meta.dirname}/ax.swift`;
