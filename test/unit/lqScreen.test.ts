@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { findWindow, keySteps } from "#scripts/lq/screen.ts";
+import { findWindow, keySteps, latin, textKey } from "#scripts/lq/screen.ts";
 
 describe("lq screen", () => {
   it("sends shortcuts and text through System Events, key names through cliclick", () => {
@@ -23,5 +23,17 @@ describe("lq screen", () => {
     ];
     expect(findWindow(all, "")?.id).toBe(2);
     expect(findWindow(all, "omni")?.id).toBe(1);
+  });
+
+  it("reads Cyrillic lookalikes as Latin and matches names through OCR's confusions", () => {
+    expect(latin("МОРНО - Bargain Bin")).toBe("MOPHO - Bargain Bin");
+    expect(textKey("Cllcky Cool JP Organ")).toBe(
+      textKey("Clicky Cool JP Organ"),
+    );
+    expect(textKey("SHO1A - Stained Pluck")).toBe(
+      textKey("SH01A - Stained Pluck"),
+    );
+    expect(textKey("JUNO -Pluckin'")).toBe(textKey("JUNO - Pluckin’"));
+    expect(textKey("Synth Bass")).not.toBe(textKey("Synth Base"));
   });
 });

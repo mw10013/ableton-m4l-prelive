@@ -3,11 +3,13 @@
 //   ax tree <window>                 indented lines: role, label, value
 //   ax press <window> <label>        AXPress the first element with that label
 //   ax set <window> <label> <value>  set a slider's or text field's value
+//   ax ocr <png>                     lines of text Apple Vision reads: x, y, width, height, text
 //
 // <window> is part of a window's title; "" is Live's main window. A label is an element's
 // description, or its title when it has none. `Group/Label` scopes the search to a group.
 import AppKit
 import ApplicationServices
+import Vision
 
 func attr(_ e: AXUIElement, _ name: String) -> AnyObject? {
   var value: AnyObject?
@@ -35,8 +37,29 @@ func fail(_ message: String) -> Never {
   exit(1)
 }
 
-guard AXIsProcessTrusted() else { fail("no Accessibility permission") }
 let args = CommandLine.arguments
+
+// Lines of text in an image, in its pixels from the top-left corner. Accurate recognition: the fast
+// level garbles Omnisphere's light-on-dark text. No language correction: patch names are not words.
+if args.count == 3 && args[1] == "ocr" {
+  let request = VNRecognizeTextRequest()
+  request.recognitionLevel = .accurate
+  request.usesLanguageCorrection = false
+  guard let image = NSImage(contentsOfFile: args[2]),
+    let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+  else { fail("cannot read \(args[2])") }
+  do { try VNImageRequestHandler(cgImage: cg).perform([request]) } catch { fail("ocr failed: \(error)") }
+  let (w, h) = (Double(cg.width), Double(cg.height))
+  for o in request.results ?? [] {
+    guard let text = o.topCandidates(1).first?.string else { continue }
+    let b = o.boundingBox
+    let box = [b.minX * w, (1 - b.maxY) * h, b.width * w, b.height * h].map { String(format: "%.1f", $0) }
+    print((box + [text]).joined(separator: "\t"))
+  }
+  exit(0)
+}
+
+guard AXIsProcessTrusted() else { fail("no Accessibility permission") }
 guard args.count >= 3 else { fail("usage: ax tree|press|set <window> [label] [value]") }
 
 let live = NSWorkspace.shared.runningApplications.first { $0.localizedName == "Live" }
