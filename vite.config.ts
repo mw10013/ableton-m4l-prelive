@@ -198,7 +198,10 @@ export default defineConfig(({ command, mode, isPreview }) => {
   return {
     fmt: {
       printWidth: 80,
-      ignorePatterns: ["src/web/routeTree.gen.ts"],
+      ignorePatterns: [
+        "src/web/routeTree.gen.ts",
+        "src/web/server/liveql/liveql.graphql",
+      ],
       sortImports: true,
     },
     lint: {

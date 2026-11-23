@@ -12,7 +12,7 @@ Use coder skill.
 - **TanStack Router**: `refs/tanstack-start/docs/router/` (same repository archive as Start)
 - **Astryx**: `refs/astryx/` (component source in `packages/core/src/`, build plugin in `packages/build/`)
 - **Effect Docs**: `refs/effect/ai-docs/src/`
-- **liveql schema**: `refs/liveql-schema.graphql`, written by `vp run liveql:schema` from a running liveql server
+- **liveql schema**: `src/web/server/liveql/liveql.graphql`, LiveQL's committed `schema.graphql` pinned to the commit on its first line. `vp run liveql:schema [ref]` refreshes it from a LiveQL branch, tag or commit (default `main`)
 
 <!-- ASTRYX:START -->
 
