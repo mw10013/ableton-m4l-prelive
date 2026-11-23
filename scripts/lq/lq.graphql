@@ -219,3 +219,24 @@ mutation LqEditor($id: Int!, $open: Boolean!) {
     is_editor_open
   }
 }
+
+query LqSongTime {
+  live_set {
+    current_song_time
+    is_playing
+  }
+}
+
+mutation LqSongSet($song: Int!, $properties: [SongSetInput!]!) {
+  song_set(id: $song, properties: $properties) {
+    current_song_time
+    record_mode
+  }
+}
+
+query LqParamState($id: Int!) {
+  device_parameter(id: $id) {
+    value
+    automation_state
+  }
+}

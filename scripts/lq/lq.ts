@@ -542,13 +542,25 @@ const shotCommand = Command.make(
   {
     window: windowArgument,
     out: Flag.String("out").pipe(Flag.withAlias("o"), Flag.optional),
+    crop: Flag.String("crop").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription("x,y,width,height in points"),
+      Flag.optional,
+    ),
   },
-  ({ window: ref, out }) =>
+  ({ window: ref, out, crop }) =>
     Effect.gen(function* () {
       const window = yield* getWindow(ref);
       const slug = window.name.replaceAll(/[^A-Za-z0-9]+/gu, "-");
       const path = Option.getOrElse(out, () => `/tmp/lq-${slug}.png`);
-      yield* Screen.capture(window, path);
+      const box = Option.getOrUndefined(crop)?.split(",").map(Number);
+      if (box !== undefined && (box.length !== 4 || box.some(Number.isNaN)))
+        return yield* fail("--crop takes x,y,width,height");
+      yield* Screen.capture(
+        window,
+        path,
+        box as [number, number, number, number] | undefined,
+      );
       yield* Console.log(`${path} ${windowLine(window)}`);
     }),
 ).pipe(Command.withDescription("Capture a Live window as a PNG"));
@@ -689,6 +701,143 @@ const arrangeCommand = Command.make(
   ),
 );
 
+/**
+ * Live's accessibility tree: every labeled control in a window with its value, as text.
+ * `press` and `set` act on a control by label; `Group/Label` narrows the search.
+ */
+const axCommand = Command.make(
+  "ax",
+  {
+    action: Argument.ChoiceWithValue("action", [
+      ["tree", "tree"],
+      ["press", "press"],
+      ["set", "set"],
+    ] as const),
+    window: Argument.String("window"),
+    label: Argument.String("label").pipe(Argument.optional),
+    value: Argument.String("value").pipe(Argument.optional),
+    filter: Flag.String("filter").pipe(
+      Flag.withAlias("f"),
+      Flag.withDescription("Only tree lines containing this text"),
+      Flag.optional,
+    ),
+  },
+  ({ action, window, label, value, filter }) =>
+    Effect.gen(function* () {
+      const args = [
+        action,
+        window,
+        ...Option.toArray(label),
+        ...Option.toArray(value),
+      ];
+      const text = yield* Screen.ax(args);
+      const wanted = Option.map(filter, (f) => f.toLowerCase());
+      yield* Console.log(
+        Option.match(wanted, {
+          onNone: () => text.trimEnd(),
+          onSome: (f) =>
+            text
+              .split("\n")
+              .filter((l) => l.toLowerCase().includes(f))
+              .join("\n"),
+        }),
+      );
+    }),
+).pipe(
+  Command.withDescription(
+    'Read or drive Live\'s controls by label: ax tree "" -f volume, ax press "" "Automation Mode"',
+  ),
+);
+
+/**
+ * Experimental: records a parameter ramp into the Arrangement by moving the parameter while Live
+ * records, since the LOM cannot write automation envelopes.
+ */
+const sweepCommand = Command.make(
+  "sweep",
+  {
+    track: trackArg,
+    param: Argument.String("param"),
+    from: Argument.Finite("from"),
+    to: Argument.Finite("to"),
+    bars: Argument.String("bars").pipe(
+      Argument.withDescription("start-end bars, as 17-25"),
+    ),
+    device: deviceFlag,
+    curve: Flag.Finite("curve").pipe(
+      Flag.withDescription("Exponent on the ramp; 2 starts slow"),
+      Flag.withDefault(1),
+    ),
+    before: Flag.Finite("before").pipe(
+      Flag.withDescription(
+        "Value before the ramp, written in the pre-roll bar; default is the current value",
+      ),
+      Flag.optional,
+    ),
+  },
+  ({ track: ref, param: name, from, to, bars, device, curve, before }) =>
+    Effect.gen(function* () {
+      const lq = yield* Lq;
+      const set = yield* show;
+      const d = yield* findDevice(yield* findTrack(set, ref), device);
+      const params = (yield* lq.LqDeviceParams({ id: d.id })).device
+        ?.parameters;
+      const param = params?.find(
+        (p) => p.name?.toLowerCase() === name.toLowerCase(),
+      );
+      if (param === undefined) return yield* fail(`no parameter ${name}`);
+      const [startBar = Number.NaN, endBar = Number.NaN] = bars
+        .split("-")
+        .map(Number);
+      if (Number.isNaN(startBar) || Number.isNaN(endBar) || endBar <= startBar)
+        return yield* fail("bars must be start-end, as 17-25");
+      const start = (startBar - 1) * 4;
+      const end = (endBar - 1) * 4;
+      const song = set.id;
+
+      // Recording writes the parameter's value where it starts, and automation holds its
+      // first point back to the start of the song, so the pre-roll bar keeps `held`.
+      const held = Option.getOrElse(before, () => param.value ?? from);
+      yield* lq.LqSetParam({ id: param.id, value: held });
+      yield* lq.LqSongSet({
+        song,
+        properties: [{ start_time: Math.max(0, start - 4) }],
+      });
+      yield* lq.LqSongSet({ song, properties: [{ record_mode: true }] });
+      yield* lq.LqPlay({ song });
+
+      let writes = 0;
+      let last = Number.NaN;
+      const began = Date.now();
+      for (;;) {
+        const time = (yield* lq.LqSongTime()).live_set.current_song_time ?? 0;
+        if (time >= end) break;
+        if (time >= start) {
+          const t = ((time - start) / (end - start)) ** curve;
+          const value = from + (to - from) * t;
+          if (Number.isNaN(last) || Math.abs(value - last) > 0.002) {
+            yield* lq.LqSetParam({ id: param.id, value });
+            last = value;
+            writes++;
+          }
+        }
+      }
+      yield* lq.LqSetParam({ id: param.id, value: to });
+      yield* lq.LqSongSet({ song, properties: [{ start_time: 0 }] });
+      yield* lq.LqStop({ song });
+      yield* lq.LqSongSet({ song, properties: [{ record_mode: false }] });
+      const state = (yield* lq.LqParamState({ id: param.id })).device_parameter;
+      const seconds = (Date.now() - began) / 1000;
+      yield* Console.log(
+        `${param.name ?? name} ${String(from)}→${String(to)} bars ${bars}: ${String(writes)} writes in ${seconds.toFixed(1)}s, automation_state ${String(state?.automation_state)}`,
+      );
+    }),
+).pipe(
+  Command.withDescription(
+    "Experimental: record a parameter ramp into the Arrangement while Live plays",
+  ),
+);
+
 /** The escape hatch: any GraphQL document, printed as compact JSON. */
 const gqlCommand = Command.make(
   "gql",
@@ -728,6 +877,8 @@ Command.make("lq").pipe(
     shotCommand,
     clickCommand,
     keysCommand,
+    axCommand,
+    sweepCommand,
     gqlCommand,
   ]),
   Command.run({ version: "0.0.0" }),
