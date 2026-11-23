@@ -1,30 +1,75 @@
+import type * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as GraphQLClient from "effect/graphql/GraphQLClient";
+import type * as GraphQLClientError from "effect/graphql/GraphQLClientError";
+import * as GraphQLProtocol from "effect/graphql/GraphQLProtocol";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
+import * as Match from "effect/Match";
 
 import { LiveQLError } from "#web/errors.ts";
 
-const GqlEnvelope = Schema.Struct({
-  data: Schema.optional(Schema.Unknown),
-  errors: Schema.optional(
-    Schema.Array(Schema.Struct({ message: Schema.String })),
-  ),
-});
+import { LiveSetGraphQLGroup } from "./liveql/liveSet.graphql.ts";
+
+const makeClient = GraphQLClient.make(LiveSetGraphQLGroup);
+
+type Client = Effect.Success<typeof makeClient>;
+
+const TRANSPORT_MESSAGE =
+  "LiveQL unreachable — is Live running with the liveql device started?";
+
+const toLiveQLError = (
+  error: GraphQLClientError.GraphQLClientError | Cause.TimeoutError,
+): Effect.Effect<never, LiveQLError> =>
+  error._tag === "TimeoutError"
+    ? Effect.fail(
+        new LiveQLError({
+          reason: "transport",
+          message: TRANSPORT_MESSAGE,
+          cause: error,
+        }),
+      )
+    : Match.value(error.reason).pipe(
+        Match.tagsExhaustive({
+          TransportError: (reason) =>
+            Effect.fail(
+              new LiveQLError({
+                reason: "transport",
+                message: TRANSPORT_MESSAGE,
+                cause: reason,
+              }),
+            ),
+          ResponseError: (reason) =>
+            Effect.fail(
+              new LiveQLError({
+                reason: "graphql",
+                message: reason.message,
+                cause: reason.errors,
+              }),
+            ),
+          DecodeError: (reason) =>
+            Effect.fail(
+              new LiveQLError({
+                reason: "decode",
+                message: "LiveQL response validation failed",
+                cause: reason,
+              }),
+            ),
+          EncodeError: () => Effect.die(error),
+          PaginationError: () => Effect.die(error),
+        }),
+      );
 
 export class LiveQL extends Context.Service<
   LiveQL,
   {
-    readonly gqlDecode: <A>(
-      schema: Schema.ConstraintDecoder<A>,
-      query: string,
-      variables?: Record<string, unknown>,
+    readonly execute: <A>(
+      call: (
+        client: Client,
+      ) => Effect.Effect<A, GraphQLClientError.GraphQLClientError>,
       options?: { readonly timeout?: Duration.Input },
     ) => Effect.Effect<A, LiveQLError>;
   }
@@ -32,59 +77,25 @@ export class LiveQL extends Context.Service<
   static readonly layerConfig: Layer.Layer<LiveQL> = Layer.effect(
     LiveQL,
     Effect.gen(function* () {
-      const endpoint = yield* Config.String("LIVEQL_ENDPOINT").pipe(
-        Config.withDefault("http://localhost:5100/graphql"),
-        Effect.orDie,
-      );
-      // No filterStatusOk: a GraphQL server answers a malformed document with
-      // 400 and the reason in the errors array. Filtering on status would turn
-      // that into a transport failure and throw the reason away, reporting an
-      // unreachable server for a request the server in fact answered.
-      const client = (yield* HttpClient.HttpClient).pipe(
-        HttpClient.mapRequest(HttpClientRequest.acceptJson),
-      );
-      const gqlDecode = Effect.fn("LiveQL.gqlDecode")(function* <A>(
-        schema: Schema.ConstraintDecoder<A>,
-        query: string,
-        variables?: Record<string, unknown>,
-        options?: { readonly timeout?: Duration.Input },
-      ) {
-        const { data, errors } = yield* HttpClientRequest.post(endpoint).pipe(
-          HttpClientRequest.bodyJsonUnsafe({ query, variables }),
-          client.execute,
-          Effect.flatMap(HttpClientResponse.schemaBodyJson(GqlEnvelope)),
-          Effect.timeout(options?.timeout ?? "10 seconds"),
-          Effect.mapError(
-            (cause) =>
-              new LiveQLError({
-                reason: "transport",
-                message:
-                  "LiveQL unreachable — is Live running with the liveql device started?",
-                cause,
-              }),
+      const client = yield* makeClient;
+      return LiveQL.of({
+        execute: (call, options) =>
+          call(client).pipe(
+            Effect.timeout(options?.timeout ?? "10 seconds"),
+            Effect.catch(toLiveQLError),
           ),
-        );
-        if (errors !== undefined && errors.length > 0) {
-          return yield* Effect.fail(
-            new LiveQLError({
-              reason: "graphql",
-              message: errors.map((e) => e.message).join("; "),
-              cause: errors,
-            }),
-          );
-        }
-        return yield* Schema.decodeUnknownEffect(schema)(data).pipe(
-          Effect.mapError(
-            (cause) =>
-              new LiveQLError({
-                reason: "decode",
-                message: "LiveQL response validation failed",
-                cause,
-              }),
-          ),
-        );
       });
-      return LiveQL.of({ gqlDecode });
     }),
-  ).pipe(Layer.provide(FetchHttpClient.layer));
+  ).pipe(
+    Layer.provide(
+      Layer.unwrap(
+        Config.String("LIVEQL_ENDPOINT").pipe(
+          Config.withDefault("http://localhost:5100/graphql"),
+          Effect.orDie,
+          Effect.map((url) => GraphQLProtocol.layerHttp({ url })),
+        ),
+      ),
+    ),
+    Layer.provide(FetchHttpClient.layer),
+  );
 }

@@ -1,0 +1,140 @@
+# Session and Arrangement clips are one LOM class and mean the same thing for
+# everything prelive does: note start_times are clip-relative beats, 0 at the
+# clip's bar 1.1.1. Only the clip's own start_time and end_time differ by kind,
+# and prelive does not select them. See
+# docs/note-list-editor-clip-context-research.md.
+fragment ClipWithNotes on Clip {
+  id
+  path
+  name
+  is_midi_clip
+  length
+  looping
+  loop_start
+  loop_end
+  start_marker
+  end_marker
+  signature_numerator
+  signature_denominator
+  get_all_notes_extended {
+    notes {
+      note_id
+      pitch
+      start_time
+      duration
+      velocity
+      mute
+      probability
+      velocity_deviation
+      release_velocity
+    }
+  }
+}
+
+query DetailClip {
+  live_set {
+    view {
+      selected_track {
+        name
+      }
+      detail_clip {
+        ...ClipWithNotes
+      }
+    }
+  }
+}
+
+query Overview {
+  live_set {
+    view {
+      detail_clip {
+        id
+      }
+    }
+    tracks {
+      name
+      clip_slots {
+        has_clip
+        clip {
+          id
+          path
+          name
+        }
+      }
+    }
+  }
+}
+
+query ClipBySlot($trackIndex: Int!, $slotIndex: Int!) {
+  live_set {
+    track(index: $trackIndex) {
+      name
+      clip_slot(index: $slotIndex) {
+        clip {
+          ...ClipWithNotes
+        }
+      }
+    }
+  }
+}
+
+query ClipById($id: Int!) {
+  clip(id: $id) {
+    ...ClipWithNotes
+  }
+}
+
+query PlayState {
+  live_set {
+    id
+    is_playing
+  }
+}
+
+mutation StopPlaying($id: Int!) {
+  song_stop_playing(id: $id) {
+    is_playing
+  }
+}
+
+mutation ContinuePlaying($id: Int!) {
+  song_continue_playing(id: $id) {
+    is_playing
+  }
+}
+
+mutation FireClip($id: Int!) {
+  clip_fire(id: $id) {
+    id
+  }
+}
+
+mutation ReplaceNotes(
+  $id: Int!
+  $setMarkers: Boolean!
+  $properties: [ClipSetInput!]! = []
+  $removeNotes: Boolean!
+  $from_time: Float! = 0
+  $time_span: Float! = 0
+  $addNotes: Boolean!
+  $notes: [NoteInput!]! = []
+) {
+  markers: clip_set(id: $id, properties: $properties)
+    @include(if: $setMarkers) {
+    id
+  }
+  removed: clip_remove_notes_extended(
+    id: $id
+    from_pitch: 0
+    pitch_span: 128
+    from_time: $from_time
+    time_span: $time_span
+  ) @include(if: $removeNotes) {
+    id
+  }
+  added: clip_add_new_notes(id: $id, notes: $notes) @include(if: $addNotes) {
+    clip {
+      id
+    }
+  }
+}

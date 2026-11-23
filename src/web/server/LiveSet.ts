@@ -1,191 +1,147 @@
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
 
-import * as Domain from "#domain/live.ts";
+import type * as Domain from "#domain/live.ts";
 import { LiveQLError } from "#web/errors.ts";
 
 import { LiveQL } from "./LiveQL.ts";
+import type * as LiveSetGraphQL from "./liveql/liveSet.graphql.ts";
 
-const ClipFields = `
-  id path name color end_time is_arrangement_clip is_session_clip is_midi_clip
-  length looping loop_start loop_end start_marker end_marker position muted
-  signature_denominator signature_numerator start_time
-  view { id path grid_quantization grid_is_triplet }
-`;
+type NullableKeys<A> = {
+  [K in keyof A]-?: null extends A[K] ? K : never;
+}[keyof A];
 
-const ClipWithNotesFields = `
-  ${ClipFields}
-  get_all_notes_extended {
-    notes { note_id pitch start_time duration velocity mute probability velocity_deviation release_velocity }
-  }
-`;
+type WithRequired<A, K extends keyof A> = A & {
+  readonly [P in K]: NonNullable<A[P]>;
+};
 
-const ReadClipData = Schema.Struct({
-  live_set: Schema.Struct({
-    view: Schema.Struct({
-      selected_track: Schema.NullOr(Schema.Struct({ name: Schema.String })),
-      detail_clip: Schema.NullOr(Domain.ClipWithNotes),
-    }),
-  }),
-});
+const hasFields = <A, K extends keyof A>(
+  value: A,
+  keys: readonly K[],
+): value is WithRequired<A, K> => keys.every((key) => value[key] !== null);
+
+/**
+ * LiveQL's schema makes almost every member nullable (a member the LOM object lacks reads as null),
+ * so the generated types allow null where prelive needs a value.
+ */
+const requireFields = <A extends object, const K extends NullableKeys<A>>(
+  type: string,
+  value: A,
+  keys: readonly K[],
+): Effect.Effect<WithRequired<A, K>, LiveQLError> => {
+  const missing = keys.filter((key) => value[key] === null);
+  return hasFields(value, keys)
+    ? Effect.succeed(value)
+    : Effect.fail(
+        new LiveQLError({
+          reason: "decode",
+          message: `LiveQL returned null for ${missing.map((key) => `${type}.${String(key)}`).join(", ")}`,
+          cause: value,
+        }),
+      );
+};
+
+const requireClip = (clip: LiveSetGraphQL.ClipWithNotes | null) =>
+  clip === null
+    ? Effect.succeed(null)
+    : requireFields("Clip", clip, [
+        "is_midi_clip",
+        "length",
+        "looping",
+        "loop_start",
+        "loop_end",
+        "start_marker",
+        "end_marker",
+        "signature_numerator",
+        "signature_denominator",
+      ]);
+
+/** Live silently drops a start set past the current end, or an end set before the start, so a growing region writes its end first. */
+const markerProperties = (
+  { looping, start, end }: Domain.ClipRegion,
+  current: { readonly loop_end: number; readonly end_marker: number },
+) => {
+  const [startItem, endItem, currentEnd] = looping
+    ? [{ loop_start: start }, { loop_end: end }, current.loop_end]
+    : [{ start_marker: start }, { end_marker: end }, current.end_marker];
+  return end > currentEnd ? [endItem, startItem] : [startItem, endItem];
+};
 
 export const readClip = Effect.fn("LiveSet.readClip")(function* () {
-  const { gqlDecode } = yield* LiveQL;
-  return yield* gqlDecode(
-    ReadClipData,
-    `{ live_set { view { selected_track { name } detail_clip {
-        ${ClipWithNotesFields}
-      } } } }`,
+  const { live_set } = yield* (yield* LiveQL).execute((client) =>
+    client.DetailClip(),
   );
-});
-
-const OverviewData = Schema.Struct({
-  live_set: Schema.Struct({
-    ...Domain.SongOverview.fields,
-    view: Schema.Struct({
-      ...Domain.SongView.fields,
-      selected_track: Schema.NullOr(Domain.Track),
-      detail_clip: Schema.NullOr(Domain.Clip),
-    }),
-  }),
+  const { view } = yield* requireFields("Song", live_set, ["view"]);
+  return {
+    clip: yield* requireClip(view.detail_clip),
+    trackName: view.selected_track?.name ?? null,
+  };
 });
 
 export const readLiveSetOverview = Effect.fn("LiveSet.readLiveSetOverview")(
   function* () {
-    const { gqlDecode } = yield* LiveQL;
-    return yield* gqlDecode(
-      OverviewData,
-      `{ live_set {
-          id path is_playing
-          view {
-            id path
-            selected_track { id path has_midi_input name }
-            detail_clip {
-              ${ClipFields}
-            }
-          }
-          tracks {
-            id path has_midi_input name
-            clip_slots {
-              id path has_clip
-              clip {
-                ${ClipFields}
-              }
-            }
-          }
-        } }`,
+    const { live_set } = yield* (yield* LiveQL).execute((client) =>
+      client.Overview(),
     );
+    const { view, tracks } = yield* requireFields("Song", live_set, [
+      "view",
+      "tracks",
+    ]);
+    return {
+      view,
+      tracks: yield* Effect.forEach(tracks, (track) =>
+        requireFields("Track", track, ["clip_slots"]),
+      ),
+    };
   },
 );
-
-const ClipBySlotData = Schema.Struct({
-  live_set: Schema.Struct({
-    track: Schema.NullOr(
-      Schema.Struct({
-        name: Schema.String,
-        clip_slot: Schema.NullOr(
-          Schema.Struct({
-            clip: Schema.NullOr(Domain.ClipWithNotes),
-          }),
-        ),
-      }),
-    ),
-  }),
-});
 
 export const readClipBySlot = Effect.fn("LiveSet.readClipBySlot")(
   function* (input: {
     readonly trackIndex: number;
     readonly slotIndex: number;
   }) {
-    const { gqlDecode } = yield* LiveQL;
-    return yield* gqlDecode(
-      ClipBySlotData,
-      `query ($trackIndex: Int!, $slotIndex: Int!) {
-      live_set {
-        track(index: $trackIndex) {
-          name
-          clip_slot(index: $slotIndex) {
-            clip {
-              ${ClipWithNotesFields}
-            }
-          }
-        }
-      }
-    }`,
-      { trackIndex: input.trackIndex, slotIndex: input.slotIndex },
+    const { live_set } = yield* (yield* LiveQL).execute((client) =>
+      client.ClipBySlot(input),
     );
+    return {
+      clip: yield* requireClip(live_set.track?.clip_slot?.clip ?? null),
+      trackName: live_set.track?.name ?? null,
+    };
   },
 );
 
-const PlayStateData = Schema.Struct({
-  live_set: Schema.Struct({
-    id: Schema.Number,
-    is_playing: Schema.Boolean,
-  }),
-});
-
-const StopData = Schema.Struct({
-  song_stop_playing: Schema.NullOr(
-    Schema.Struct({ is_playing: Schema.Boolean }),
-  ),
-});
-
-const ContinueData = Schema.Struct({
-  song_continue_playing: Schema.NullOr(
-    Schema.Struct({ is_playing: Schema.Boolean }),
-  ),
-});
-
 export const togglePlay = Effect.fn("LiveSet.togglePlay")(function* () {
-  const { gqlDecode } = yield* LiveQL;
-  const { live_set } = yield* gqlDecode(
-    PlayStateData,
-    `{ live_set { id is_playing } }`,
-  );
-  if (live_set.is_playing) {
-    const result = yield* gqlDecode(
-      StopData,
-      `mutation($id: Int!) { song_stop_playing(id: $id) { is_playing } }`,
-      { id: live_set.id },
+  const { execute } = yield* LiveQL;
+  const { live_set } = yield* execute((client) => client.PlayState());
+  if (live_set.is_playing === true) {
+    const result = yield* execute((client) =>
+      client.StopPlaying({ id: live_set.id }),
     );
     return result.song_stop_playing?.is_playing ?? false;
   }
-  const result = yield* gqlDecode(
-    ContinueData,
-    `mutation($id: Int!) { song_continue_playing(id: $id) { is_playing } }`,
-    { id: live_set.id },
+  const result = yield* execute((client) =>
+    client.ContinuePlaying({ id: live_set.id }),
   );
   return result.song_continue_playing?.is_playing ?? true;
-});
-
-const FireData = Schema.Struct({
-  clip_fire: Schema.Struct({ id: Schema.Number }),
 });
 
 export const fireClip = Effect.fn("LiveSet.fireClip")(function* (input: {
   readonly clipId: number;
 }) {
-  yield* (yield* LiveQL).gqlDecode(
-    FireData,
-    `mutation($id: Int!) { clip_fire(id: $id) { id } }`,
-    { id: input.clipId },
+  const result = yield* (yield* LiveQL).execute((client) =>
+    client.FireClip({ id: input.clipId }),
   );
-});
-
-const ClipByIdData = Schema.Struct({
-  clip: Schema.NullOr(Domain.ClipWithNotes),
+  yield* requireFields("Mutation", result, ["clip_fire"]);
 });
 
 export const readClipById = Effect.fn("LiveSet.readClipById")(function* (
   input: Domain.ClipIdInput,
 ) {
-  return yield* (yield* LiveQL).gqlDecode(
-    ClipByIdData,
-    `query($id: Int!) { clip(id: $id) { ${ClipWithNotesFields} } }`,
-    { id: input.clipId },
+  const { clip } = yield* (yield* LiveQL).execute((client) =>
+    client.ClipById({ id: input.clipId }),
   );
+  return { clip: yield* requireClip(clip) };
 });
 
 /**
@@ -206,10 +162,11 @@ export const readClipById = Effect.fn("LiveSet.readClipById")(function* (
  *    a note at a negative start_time, which a fixed 0..N window would miss.
  * 4. `add_new_notes` with the full list. Every note gets a new note_id.
  *
- * Phases 2-4 go in one GraphQL document as aliased mutation fields, which
- * the spec executes serially in document order, so the write is one round
- * trip after the read, without a composite on the server. Nothing is read
- * back: the caller autowrites the whole list and never merges Live's answer.
+ * Phases 2-4 are one `ReplaceNotes` mutation, each phase behind an `@include`
+ * that is false when it has nothing to do. GraphQL executes mutation fields
+ * serially in document order, so the phases keep their order in one round
+ * trip, without a composite on the server. Nothing is read back: the caller
+ * autowrites the whole list and never merges Live's answer.
  * Not atomic: nothing over the LOM is. A failure leaves the clip in whichever
  * state it reached, and the next write replaces the clip again. Notes added
  * in Live between the read and the delete survive; concurrent editing is
@@ -219,7 +176,7 @@ export const readClipById = Effect.fn("LiveSet.readClipById")(function* (
 export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
   input: Domain.ReplaceNotesInput,
 ) {
-  const { gqlDecode } = yield* LiveQL;
+  const { execute } = yield* LiveQL;
   const { clip: current } = yield* readClipById({ clipId: input.clipId });
   if (current === null) {
     return yield* Effect.fail(
@@ -231,60 +188,35 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
     );
   }
 
-  const steps: Step[] = [];
+  const properties =
+    input.region === undefined
+      ? undefined
+      : markerProperties(input.region, current);
 
-  if (input.region !== undefined) {
-    const { looping, start, end } = input.region;
-    const [startKey, endKey] = looping
-      ? (["loop_start", "loop_end"] as const)
-      : (["start_marker", "end_marker"] as const);
-    const startItem = { [startKey]: start };
-    const endItem = { [endKey]: end };
-    steps.push({
-      field: "clip_set",
-      args: {
-        properties:
-          end > current[endKey] ? [endItem, startItem] : [startItem, endItem],
-      },
-    });
-  }
+  const starts = (current.get_all_notes_extended?.notes ?? []).map(
+    (n) => n.start_time,
+  );
+  const from_time = Math.min(...starts);
+  const removeNotes = starts.length > 0;
+  const addNotes = input.notes.length > 0;
 
-  const existing = current.get_all_notes_extended?.notes ?? [];
-  if (existing.length > 0) {
-    const starts = existing.map((n) => n.start_time);
-    const from_time = Math.min(...starts);
-    steps.push({
-      field: "clip_remove_notes_extended",
-      args: {
-        from_pitch: 0,
-        pitch_span: 128,
-        from_time,
-        time_span: Math.max(...starts) + 1 - from_time,
-      },
-    });
-  }
-
-  if (input.notes.length > 0) {
-    steps.push({
-      field: "clip_add_new_notes",
-      args: { notes: input.notes },
-    });
-  }
-
-  if (steps.length === 0) {
+  if (properties === undefined && !removeNotes && !addNotes) {
     return { clipId: input.clipId };
   }
-  const [elapsed] = yield* gqlDecode(
-    Schema.Record(Schema.String, Schema.Unknown),
-    mutationDocument(steps),
-    {
-      id: input.clipId,
-      ...Object.fromEntries(
-        steps.flatMap((s, i) =>
-          Object.entries(s.args).map(([k, v]) => [varName(k, i), v]),
-        ),
-      ),
-    },
+  const [elapsed] = yield* execute(
+    (client) =>
+      client.ReplaceNotes({
+        id: input.clipId,
+        setMarkers: properties !== undefined,
+        properties,
+        removeNotes,
+        ...(removeNotes && {
+          from_time,
+          time_span: Math.max(...starts) + 1 - from_time,
+        }),
+        addNotes,
+        notes: input.notes,
+      }),
     { timeout: "60 seconds" },
   ).pipe(Effect.timed);
   yield* Effect.logInfo(
@@ -298,48 +230,3 @@ export const replaceNotes = Effect.fn("LiveSet.replaceNotes")(function* (
   );
   return { clipId: input.clipId };
 });
-
-interface Step {
-  readonly field: string;
-  readonly args: Record<string, unknown>;
-}
-
-const varName = (arg: string, step: number) => `${arg}${String(step)}`;
-const stepAlias = (step: number) => `s${String(step)}`;
-
-/**
- * What each field selects: the minimum. `clip_add_new_notes` returns a payload
- * with the clip nested under `clip`; the others return the clip itself.
- */
-const selection = (field: string) =>
-  field === "clip_add_new_notes" ? `{ clip { id } }` : `{ id }`;
-
-const ARG_TYPES: Record<string, string> = {
-  properties: "[ClipSetInput!]!",
-  from_pitch: "Int!",
-  pitch_span: "Int!",
-  from_time: "Float!",
-  time_span: "Float!",
-  notes: "[NoteInput!]!",
-};
-
-/**
- * One mutation document with one aliased root field per step. Variables are
- * suffixed with the step index so the same argument name can appear in
- * several steps. The spec runs mutation fields serially in document order.
- */
-const mutationDocument = (steps: readonly Step[]) => {
-  const vars = ["$id: Int!"];
-  const fields: string[] = [];
-  steps.forEach((s, i) => {
-    const args = ["id: $id"];
-    for (const k of Object.keys(s.args)) {
-      vars.push(`$${varName(k, i)}: ${ARG_TYPES[k]}`);
-      args.push(`${k}: $${varName(k, i)}`);
-    }
-    fields.push(
-      `${stepAlias(i)}: ${s.field}(${args.join(", ")}) ${selection(s.field)}`,
-    );
-  });
-  return `mutation(${vars.join(", ")}) {\n${fields.join("\n")}\n}`;
-};
