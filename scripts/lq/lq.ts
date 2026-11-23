@@ -810,8 +810,20 @@ const omniCommand = Command.make(
       yield* at(OMNI.clear);
       yield* at(OMNI.search);
       yield* at(OMNI.search);
+      // When the search box misses focus, the keys reach Live, where Space starts playback.
+      const playing = Effect.map(
+        (yield* Lq).LqSongTime(),
+        (r) => r.live_set.is_playing === true,
+      );
+      const wasPlaying = yield* playing;
       yield* Screen.keys([search, "return"], { paced: true });
       yield* Effect.sleep("1500 millis");
+      if (!wasPlaying && (yield* playing)) {
+        yield* (yield* Lq).LqStop({ song: set.id });
+        return yield* fail(
+          `the search went to Live, not Omnisphere, and started playback; stopped it and loaded nothing. Click the ${track.name} editor's search box with lq click and retry`,
+        );
+      }
       if (!list) {
         yield* at([
           OMNI.firstResult[0],
