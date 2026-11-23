@@ -1,0 +1,231 @@
+{
+  "tempo": 122,
+  "scenes": ["Groove", "Intro", "Breakdown", "Drop"],
+  "arrange": ["Intro:2", "Groove:2", "Breakdown:2", "Drop:4"],
+  "tracks": [
+    {
+      "name": "Bass",
+      "devices": ["Omnisphere"],
+      "patch": "MTAUR - Ostinato Bass, GLIDE off",
+      "mix": {
+        "vol": "-10.0 dB",
+        "pan": 0,
+        "sends": [0]
+      },
+      "clips": {
+        "Groove": {
+          "name": "Bass Am-F-C-G",
+          "length": 16,
+          "grid": 0.5,
+          "gate": 0.8,
+          "velocity": 110,
+          "lanes": [
+            ". A2 . A2*96 . A2 . A2*96 | . F2 . F2*96 . F2 . F2*96 | . C3 . C3*96 . C3 . C3*96 | . G2 . G2*96 . G2 . G2*96"
+          ]
+        },
+        "Intro": {
+          "name": "Bass intro",
+          "length": 16,
+          "grid": 0.5,
+          "gate": 0.9,
+          "velocity": 100,
+          "lanes": [
+            ". A2 . A2 . A2 . A2 | . F2 . F2 . F2 . F2 | . C3 . C3 . C3 . C3 | . G2 . G2 . G2 . G2"
+          ]
+        },
+        "Drop": {
+          "name": "Bass drop",
+          "length": 16,
+          "grid": 0.25,
+          "gate": 0.9,
+          "velocity": 100,
+          "lanes": [
+            ". . A2 A3? . . A2 . . . A2 A3? . . A2 A2? | . . F2 F3? . . F2 . . . F2 F3? . . F2 F2? | . . C3 C4? . . C3 . . . C3 C4? . . C3 C3? | . . G2 G3? . . G2 . . . G2 G3? . . G2 B2?"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Drums",
+      "devices": ["Drum Rack"],
+      "mix": {
+        "vol": "0.0 dB",
+        "pan": 0,
+        "sends": [0.08]
+      },
+      "clips": {
+        "Groove": {
+          "name": "Drums 4x4",
+          "length": 16,
+          "grid": 1,
+          "gate": 0.25,
+          "velocity": 120,
+          "lanes": [
+            "C1:x",
+            {
+              "lane": "D#1:.x",
+              "velocity": 105
+            },
+            {
+              "lane": ". F#1 . F#1*70",
+              "grid": 0.25,
+              "gate": 0.5,
+              "velocity": 60
+            },
+            {
+              "lane": "A#1:.x",
+              "grid": 0.5,
+              "gate": 0.5,
+              "velocity": 90
+            }
+          ]
+        },
+        "Intro": {
+          "name": "Drums intro",
+          "length": 16,
+          "grid": 0.5,
+          "gate": 0.45,
+          "velocity": 100,
+          "lanes": ["C1 F#1*70"]
+        },
+        "Drop": {
+          "name": "Drums drop",
+          "length": 16,
+          "grid": 1,
+          "gate": 0.225,
+          "velocity": 100,
+          "lanes": [
+            "C1:x",
+            {
+              "lane": "D#1:.x",
+              "velocity": 120
+            },
+            {
+              "lane": "F#1 F#1*100 F#1 . F#1 F#1*100 F#1 . F#1 F#1*100 F#1 . F#1 F#1*100 F#1 F#1*120",
+              "grid": 0.25,
+              "gate": 0.9,
+              "velocity": 70
+            },
+            {
+              "lane": "A#1:.x",
+              "grid": 0.5,
+              "gate": 0.45
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Pad",
+      "devices": ["Omnisphere"],
+      "patch": "Jupiter and JX Warm Pad",
+      "mix": {
+        "vol": "-8.5 dB",
+        "pan": 0,
+        "sends": [0.45]
+      },
+      "clips": {
+        "Groove": {
+          "name": "Pad Am7-Fmaj7-C-G",
+          "length": 16,
+          "grid": 4,
+          "gate": 1,
+          "velocity": 80,
+          "lanes": ["A2+C3+E3+G3 | A2+C3+F3+A3 | G2+C3+E3+G3 | G2+B2+D3+G3"]
+        },
+        "Breakdown": {
+          "name": "Pad breakdown",
+          "length": 16,
+          "grid": 4,
+          "gate": 1,
+          "velocity": 100,
+          "lanes": ["A2+C3+E3+G3+B3 | F2+A2+C3+E3+G3 | E3+G3+C4 | B2+D3+G3"]
+        },
+        "Drop": {
+          "name": "Pad drop",
+          "length": 16,
+          "grid": 4,
+          "gate": 1,
+          "velocity": 90,
+          "lanes": ["A2+C3+E3+G3 | F2+A2+C3+E3 | E3+G3+C4 | B2+D3+G3"]
+        }
+      }
+    },
+    {
+      "name": "Arp",
+      "devices": ["Omnisphere", "Auto Filter"],
+      "patch": "Chill Plucker",
+      "mix": {
+        "vol": "-13.5 dB",
+        "pan": 0,
+        "sends": [0.55]
+      },
+      "clips": {
+        "Groove": {
+          "name": "Arp 16ths",
+          "length": 16,
+          "grid": 0.25,
+          "gate": 0.8,
+          "velocity": 78,
+          "lanes": [
+            "A3*100 C4 E4 G4 E4*100 C4 A3 E4 A3*100 C4 E4 G4 E4*100 C4 A3 E4 | A3*100 C4 F4 A4 F4*100 C4 A3 F4 A3*100 C4 F4 A4 F4*100 C4 A3 F4 | G3*100 C4 E4 G4 E4*100 C4 G3 E4 G3*100 C4 E4 G4 E4*100 C4 G3 E4 | G3*100 B3 D4 G4 D4*100 B3 G3 D4 G3*100 B3 D4 G4 D4*100 B3 G3 D4"
+          ]
+        },
+        "Breakdown": {
+          "name": "Arp breakdown",
+          "length": 16,
+          "grid": 0.5,
+          "gate": 0.9,
+          "velocity": 100,
+          "lanes": [
+            "A3 E4 C4 E4 A3 E4 C4 E4 | A3 F4 C4 F4 A3 F4 C4 F4 | G3 E4 C4 E4 G3 E4 C4 E4 | G3 D4 B3 D4 G3 D4 B3 D4"
+          ]
+        },
+        "Drop": {
+          "name": "Arp drop",
+          "length": 16,
+          "grid": 0.25,
+          "gate": 0.9,
+          "velocity": 100,
+          "lanes": [
+            "A3 C4 E4 G4 E4 C4 A3 E4 A3 C4 E4 G4 E4 C4 A3 E4 | A3 C4 F4 A4 F4 C4 A3 F4 A3 C4 F4 A4 F4 C4 A3 F4 | G3 C4 E4 G4 E4 C4 G3 E4 G3 C4 E4 G4 E4 C4 G3 E4 | G3 B3 D4 G4 D4 B3 G3 D4 G3 B3 D4 G4 D4 B3 G3 D4"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Omni",
+      "devices": ["Omnisphere"],
+      "patch": "Giant Trance Lead 1, GLIDE off",
+      "mix": {
+        "vol": "-11.0 dB",
+        "pan": 0,
+        "sends": [0.35]
+      },
+      "clips": {
+        "Drop": {
+          "name": "Lead drop",
+          "length": 16,
+          "grid": 0.5,
+          "gate": 0.9,
+          "velocity": 105,
+          "lanes": [
+            "E4! - - - C4 - D4 E4 | F4! - - - E4 - C4 - | G4! - - - E4 - D4 C4 | D4! - - - B3 - - ."
+          ]
+        }
+      }
+    }
+  ],
+  "returns": [
+    {
+      "name": "A-Space",
+      "devices": ["Delay", "Reverb"],
+      "mix": {
+        "vol": "0.0 dB",
+        "pan": 0,
+        "sends": [0]
+      },
+      "clips": {}
+    }
+  ]
+}

@@ -11,26 +11,26 @@ export const LqTrackDevicesDevice = Schema.Struct({
 })
 export interface LqTrackDevicesDevice extends Schema.Struct.Type<typeof LqTrackDevicesDevice.fields> {}
 
-export const Clip_slotsClipClip = Schema.Struct({
+export const LqTrackClip_slotsClipClip = Schema.Struct({
   id: Shared.Int,
   name: Schema.String,
   length: Schema.NullOr(Shared.Float),
   is_playing: Schema.NullOr(Schema.Boolean)
 })
-export interface Clip_slotsClipClip extends Schema.Struct.Type<typeof Clip_slotsClipClip.fields> {}
+export interface LqTrackClip_slotsClipClip extends Schema.Struct.Type<typeof LqTrackClip_slotsClipClip.fields> {}
 
-export const Clip_slotsClipSlot = Schema.Struct({
+export const LqTrackClip_slotsClipSlot = Schema.Struct({
   id: Shared.Int,
-  clip: Schema.NullOr(Clip_slotsClipClip)
+  clip: Schema.NullOr(LqTrackClip_slotsClipClip)
 })
-export interface Clip_slotsClipSlot extends Schema.Struct.Type<typeof Clip_slotsClipSlot.fields> {}
+export interface LqTrackClip_slotsClipSlot extends Schema.Struct.Type<typeof LqTrackClip_slotsClipSlot.fields> {}
 
-export const Arrangement_clipsClip = Schema.Struct({
+export const LqTrackArrangement_clipsClip = Schema.Struct({
   id: Shared.Int,
   start_time: Schema.NullOr(Shared.Float),
   length: Schema.NullOr(Shared.Float)
 })
-export interface Arrangement_clipsClip extends Schema.Struct.Type<typeof Arrangement_clipsClip.fields> {}
+export interface LqTrackArrangement_clipsClip extends Schema.Struct.Type<typeof LqTrackArrangement_clipsClip.fields> {}
 
 export const VolumeDeviceParameter = Schema.Struct({
   id: Shared.Int,
@@ -51,12 +51,71 @@ export const LqTrack = Schema.Struct({
   name: Schema.String,
   /** Null on tracks the LOM does not give it to, such as the master track. */
   mute: Schema.NullOr(Schema.Boolean),
+  /** Null on tracks the LOM does not give it to, such as return and master tracks. */
+  arm: Schema.NullOr(Schema.Boolean),
+  implicit_arm: Schema.NullOr(Schema.Boolean),
   devices: Schema.NullOr(Schema.Array(LqTrackDevicesDevice)),
-  clip_slots: Schema.NullOr(Schema.Array(Clip_slotsClipSlot)),
-  arrangement_clips: Schema.NullOr(Schema.Array(Arrangement_clipsClip)),
+  clip_slots: Schema.NullOr(Schema.Array(LqTrackClip_slotsClipSlot)),
+  arrangement_clips: Schema.NullOr(Schema.Array(LqTrackArrangement_clipsClip)),
   mixer_device: Schema.NullOr(LqTrackMixer_deviceMixerDevice)
 })
 export interface LqTrack extends Schema.Struct.Type<typeof LqTrack.fields> {}
+
+export const LqDumpTrackDevicesDevice = Schema.Struct({
+  __typename: GraphQL.otherTypename<Shared.Typename.Device>()([]),
+  name: Schema.NullOr(Schema.String),
+  class_name: Schema.NullOr(Schema.String)
+})
+export interface LqDumpTrackDevicesDevice extends Schema.Struct.Type<typeof LqDumpTrackDevicesDevice.fields> {}
+
+export const Clip_slotsClipGet_all_notes_extendedNotesNote = Schema.Struct({
+  pitch: Shared.Int,
+  start_time: Shared.Float,
+  duration: Shared.Float,
+  velocity: Shared.Float
+})
+export interface Clip_slotsClipGet_all_notes_extendedNotesNote extends Schema.Struct.Type<typeof Clip_slotsClipGet_all_notes_extendedNotesNote.fields> {}
+
+export const Clip_slotsClipGet_all_notes_extendedNotesDictionary = Schema.Struct({
+  notes: Schema.Array(Clip_slotsClipGet_all_notes_extendedNotesNote)
+})
+export interface Clip_slotsClipGet_all_notes_extendedNotesDictionary extends Schema.Struct.Type<typeof Clip_slotsClipGet_all_notes_extendedNotesDictionary.fields> {}
+
+export const LqDumpTrackClip_slotsClipClip = Schema.Struct({
+  id: Shared.Int,
+  name: Schema.String,
+  length: Schema.NullOr(Shared.Float),
+  /**
+   * Every note in the clip, sorted by start_time then pitch. Null on an audio
+   * clip, as are the other three note fields.
+   */
+  get_all_notes_extended: Schema.NullOr(Clip_slotsClipGet_all_notes_extendedNotesDictionary)
+})
+export interface LqDumpTrackClip_slotsClipClip extends Schema.Struct.Type<typeof LqDumpTrackClip_slotsClipClip.fields> {}
+
+export const LqDumpTrackClip_slotsClipSlot = Schema.Struct({
+  id: Shared.Int,
+  clip: Schema.NullOr(LqDumpTrackClip_slotsClipClip)
+})
+export interface LqDumpTrackClip_slotsClipSlot extends Schema.Struct.Type<typeof LqDumpTrackClip_slotsClipSlot.fields> {}
+
+export const LqDumpTrackArrangement_clipsClip = Schema.Struct({
+  id: Shared.Int,
+  name: Schema.String,
+  start_time: Schema.NullOr(Shared.Float)
+})
+export interface LqDumpTrackArrangement_clipsClip extends Schema.Struct.Type<typeof LqDumpTrackArrangement_clipsClip.fields> {}
+
+/** `fragment LqDumpTrack on Track` */
+export const LqDumpTrack = Schema.Struct({
+  id: Shared.Int,
+  name: Schema.String,
+  devices: Schema.NullOr(Schema.Array(LqDumpTrackDevicesDevice)),
+  mixer_device: Schema.NullOr(LqTrackMixer_deviceMixerDevice),
+  clip_slots: Schema.NullOr(Schema.Array(LqDumpTrackClip_slotsClipSlot)),
+  arrangement_clips: Schema.NullOr(Schema.Array(LqDumpTrackArrangement_clipsClip))
+})
+export interface LqDumpTrack extends Schema.Struct.Type<typeof LqDumpTrack.fields> {}
 
 export const ViewSongView = Schema.Struct({
   id: Shared.Int
@@ -101,7 +160,7 @@ export const LqShow = GraphQL.query("LqShow", {
       { name: "live_set", body: ["{id name tempo is_playing view{id}scenes{id name}tracks{...LqTrack}return_tracks{...LqTrack}master_track{mixer_device{volume{id value}}}}"] }
     ],
     fragments: [
-      { name: "LqTrack", body: ["on Track{id name mute devices{__typename id name class_name}clip_slots{id clip{id name length is_playing}}arrangement_clips{id start_time length}mixer_device{volume{id value}panning{id value}sends{id value}}}"] }
+      { name: "LqTrack", body: ["on Track{id name mute arm implicit_arm devices{__typename id name class_name}clip_slots{id clip{id name length is_playing}}arrangement_clips{id start_time length}mixer_device{volume{id value}panning{id value}sends{id value}}}"] }
     ]
   },
   result: Schema.Struct({
@@ -883,23 +942,23 @@ export declare namespace LqDeleteDevice {
   export type Result = typeof LqDeleteDevice.result.Type
 }
 
-export const Note = Schema.Struct({
+export const LqClipNotesClipGet_all_notes_extendedNotesNote = Schema.Struct({
   note_id: Shared.Int,
   pitch: Shared.Int
 })
-export interface Note extends Schema.Struct.Type<typeof Note.fields> {}
+export interface LqClipNotesClipGet_all_notes_extendedNotesNote extends Schema.Struct.Type<typeof LqClipNotesClipGet_all_notes_extendedNotesNote.fields> {}
 
-export const NotesDictionary = Schema.Struct({
-  notes: Schema.Array(Note)
+export const LqClipNotesClipGet_all_notes_extendedNotesDictionary = Schema.Struct({
+  notes: Schema.Array(LqClipNotesClipGet_all_notes_extendedNotesNote)
 })
-export interface NotesDictionary extends Schema.Struct.Type<typeof NotesDictionary.fields> {}
+export interface LqClipNotesClipGet_all_notes_extendedNotesDictionary extends Schema.Struct.Type<typeof LqClipNotesClipGet_all_notes_extendedNotesDictionary.fields> {}
 
 export const LqClipNotesClipClip = Schema.Struct({
   /**
    * Every note in the clip, sorted by start_time then pitch. Null on an audio
    * clip, as are the other three note fields.
    */
-  get_all_notes_extended: Schema.NullOr(NotesDictionary)
+  get_all_notes_extended: Schema.NullOr(LqClipNotesClipGet_all_notes_extendedNotesDictionary)
 })
 export interface LqClipNotesClipClip extends Schema.Struct.Type<typeof LqClipNotesClipClip.fields> {}
 
@@ -961,5 +1020,34 @@ export declare namespace LqModifyNotes {
   export type Result = typeof LqModifyNotes.result.Type
 }
 
+export const LqDumpLive_setSong = Schema.Struct({
+  id: Shared.Int,
+  tempo: Schema.NullOr(Shared.Float),
+  scenes: Schema.NullOr(Schema.Array(ScenesScene)),
+  tracks: Schema.NullOr(Schema.Array(LqDumpTrack)),
+  return_tracks: Schema.NullOr(Schema.Array(LqDumpTrack))
+})
+export interface LqDumpLive_setSong extends Schema.Struct.Type<typeof LqDumpLive_setSong.fields> {}
+
+/** `query LqDump` */
+export const LqDump = GraphQL.query("LqDump", {
+  document: {
+    variables: [],
+    selections: [
+      { name: "live_set", body: ["{id tempo scenes{id name}tracks{...LqDumpTrack}return_tracks{...LqDumpTrack}}"] }
+    ],
+    fragments: [
+      { name: "LqDumpTrack", body: ["on Track{id name devices{__typename name class_name}mixer_device{volume{id value}panning{id value}sends{id value}}clip_slots{id clip{id name length get_all_notes_extended{notes{pitch start_time duration velocity}}}}arrangement_clips{id name start_time}}"] }
+    ]
+  },
+  result: Schema.Struct({
+    live_set: LqDumpLive_setSong
+  })
+})
+export declare namespace LqDump {
+  export type Variables = typeof LqDump.variables.Type
+  export type Result = typeof LqDump.result.Type
+}
+
 /** Every operation in lq.graphql. */
-export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState, LqDeleteDevice, LqClipNotes, LqModifyNotes)
+export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState, LqDeleteDevice, LqClipNotes, LqModifyNotes, LqDump)

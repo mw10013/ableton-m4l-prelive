@@ -4,6 +4,8 @@ fragment LqTrack on Track {
   id
   name
   mute
+  arm
+  implicit_arm
   devices {
     id
     name
@@ -264,5 +266,66 @@ query LqClipNotes($id: Int!) {
 mutation LqModifyNotes($id: Int!, $notes: [NoteInput!]!) {
   clip_apply_note_modifications(id: $id, notes: $notes) {
     id
+  }
+}
+
+fragment LqDumpTrack on Track {
+  id
+  name
+  devices {
+    name
+    class_name
+  }
+  mixer_device {
+    volume {
+      id
+      value
+    }
+    panning {
+      id
+      value
+    }
+    sends {
+      id
+      value
+    }
+  }
+  clip_slots {
+    id
+    clip {
+      id
+      name
+      length
+      get_all_notes_extended {
+        notes {
+          pitch
+          start_time
+          duration
+          velocity
+        }
+      }
+    }
+  }
+  arrangement_clips {
+    id
+    name
+    start_time
+  }
+}
+
+query LqDump {
+  live_set {
+    id
+    tempo
+    scenes {
+      id
+      name
+    }
+    tracks {
+      ...LqDumpTrack
+    }
+    return_tracks {
+      ...LqDumpTrack
+    }
   }
 }
