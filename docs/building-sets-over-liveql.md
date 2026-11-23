@@ -95,7 +95,7 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 - In the patch browser, a lit GLIDE button on the main page means notes slide in pitch (portamento). Clicking it
   off changes the copy in the Set only.
 - `lq omni <track> [-c category] [-p patch] [--list] [--glide off]` picks patches by mouse and reads the browser
-  with Homebrew's `tesseract`: it clicks a category and a patch by name, prints a category's patches with
+  with Apple Vision (`ax ocr`): it clicks a category and a patch by name, prints a category's patches with
   `--list`, and confirms the load by reading the patch name back. `--glide` reads the GLIDE button's color from one
   pixel and clicks it only if needed. The patch is stored in the Live Set; nothing is saved into Omnisphere. A
   first open may land on the About page; click the Spectrasonics logo for the main page.
@@ -107,10 +107,14 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
     playback.
   - The scroll wheel moves the lists in some instances and nothing in others, with the editor frontmost under the
     pointer. `omni` pages by clicking the scrollbar track instead, measured from a column of pixels.
-- OCR: lists read cleanly at a brightness threshold of 150 (at 165, "1" reads as "4"); the light-blue patch name
-  at 165. Launched by `vpx`, tesseract cannot open a path that starts with `/tmp`, so `readText` works in a
-  scoped temporary directory.
-- Listing Synth Short's 337 patches takes about 40 s; loading a patch takes 6 to 8 s.
+- OCR: `ax ocr` runs Apple Vision on a capture as it is, with no thresholding, about 0.2 s a read. It needs the
+  accurate level: the fast level garbles Omnisphere's light-on-dark text. Language correction stays off, since
+  it turns real patch names into words (Szignature to Signature, Seq to Seg). Over Synth Short's 336 patches,
+  Vision misread two: `Cllcky` for Clicky and a Cyrillic `МОРНО` for MOPHO. `readText` maps Cyrillic lookalikes
+  to Latin, and `textKey` matches names with i, l and 1, and o and 0, folded together. Tesseract, the earlier
+  reader, needed a brightness threshold per text color and read one patch twice, with two kinds of apostrophe.
+- Listing Synth Short's 336 patches takes about 40 s; loading a patch takes 6 to 8 s from the top of a list and
+  up to 30 s from deep in it.
 - Untested: Live's `-_PluginAutoPopulateThreshold` option in `Options.txt` would expose more parameters to LiveQL.
 
 ## Recording automation

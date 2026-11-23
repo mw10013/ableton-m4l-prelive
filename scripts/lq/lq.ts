@@ -769,10 +769,6 @@ interface OmniList {
   readonly bottom: number;
 }
 
-/** Lowercase letters and digits only, since OCR drops and adds spaces. */
-const normalize = (text: string) =>
-  text.toLowerCase().replaceAll(/[^a-z0-9]/gu, "");
-
 /**
  * The pages of a list from the top, read with OCR, until `stop` returns a value or the list
  * ends. Pages move by clicks in the scrollbar's track: Omnisphere ignores the scroll wheel in
@@ -822,13 +818,13 @@ const clickInList = Effect.fnUntraced(function* (
   list: OmniList,
   name: string,
 ) {
-  const wanted = normalize(name);
+  const wanted = Screen.textKey(name);
   const { found, seen } = yield* walkList(
     window,
     list,
     (lines) =>
-      lines.find((l) => normalize(l.text) === wanted) ??
-      lines.find((l) => normalize(l.text).includes(wanted)),
+      lines.find((l) => Screen.textKey(l.text) === wanted) ??
+      lines.find((l) => Screen.textKey(l.text).includes(wanted)),
   );
   if (found === undefined)
     return yield* fail(
@@ -957,10 +953,9 @@ const omniCommand = Command.make(
       if (Option.isSome(patch)) {
         yield* clickInList(window, OMNI.results, patch.value);
         const loaded = yield* Screen.until(
-          // The light-blue name reads cleanest at a higher threshold than the lists.
-          Effect.map(Screen.readText(window, OMNI.patchName, 165), (lines) => {
+          Effect.map(Screen.readText(window, OMNI.patchName), (lines) => {
             const text = lines.map((l) => l.text).join(" ");
-            return normalize(text).includes(normalize(patch.value))
+            return Screen.textKey(text).includes(Screen.textKey(patch.value))
               ? text
               : undefined;
           }),

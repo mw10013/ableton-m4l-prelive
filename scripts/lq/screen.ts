@@ -197,60 +197,64 @@ export interface TextLine {
   readonly height: number;
 }
 
-const OCR_SCALE = 3;
+/** Cyrillic letters Vision reads in place of the Latin ones they look like: МОРНО for MOPHO. */
+const LOOKALIKES: Record<string, string> = {
+  А: "A",
+  В: "B",
+  Е: "E",
+  К: "K",
+  М: "M",
+  Н: "H",
+  О: "O",
+  Р: "P",
+  С: "C",
+  Т: "T",
+  Х: "X",
+  а: "a",
+  е: "e",
+  о: "o",
+  р: "p",
+  с: "c",
+  у: "y",
+  х: "x",
+};
+
+/** Text read from Live and its plug-ins, which only use Latin letters. */
+export const latin = (text: string) =>
+  text.replaceAll(/[\u0400-\u04FF]/gu, (c) => LOOKALIKES[c] ?? c);
 
 /**
- * The lines of text in part of a window, read with Homebrew's `tesseract`. The capture is
- * scaled up and thresholded so only pixels brighter than `threshold` (0-255) count as text, which
- * reads light text on dark and on highlighted rows alike.
+ * A key for matching names read by OCR. It drops case, spaces and punctuation, which OCR adds
+ * and loses, and folds the letters it mixes up: i, l and 1 (Cllcky for Clicky), o and 0.
  */
+export const textKey = (text: string) =>
+  latin(text)
+    .toLowerCase()
+    .replaceAll(/[il1|]/gu, "l")
+    .replaceAll("0", "o")
+    .replaceAll(/[^a-z0-9]/gu, "");
+
+/** The lines of text in part of a window, read with Apple Vision through `ax ocr`. */
 export const readText = Effect.fnUntraced(function* (
   window: LiveWindow,
   crop: readonly [number, number, number, number],
-  threshold = 150,
 ) {
-  // Not under /tmp: launched by vpx, tesseract cannot open a path that starts with /tmp.
   const dir = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped();
   const path = `${dir}/capture.png`;
-  const prepared = `${dir}/prepared.png`;
   yield* capture(window, path, crop);
-  yield* run("ffmpeg", [
-    "-v",
-    "error",
-    "-y",
-    "-i",
-    path,
-    "-vf",
-    `scale=iw*${String(OCR_SCALE)}:ih*${String(OCR_SCALE)},format=gray,lut=y='if(gt(val,${String(threshold)}),0,255)'`,
-    prepared,
-  ]);
-  const tsv = yield* run("tesseract", [prepared, "-", "--psm", "6", "tsv"]);
-  const words = tsv
+  const lines = (yield* ax(["ocr", path]))
     .split("\n")
-    .slice(1)
-    .map((row) => row.split("\t"))
-    .filter((c) => c[0] === "5" && (c[11] ?? "").trim() !== "")
-    .map((c) => ({
-      line: `${c[2] ?? ""}-${c[3] ?? ""}-${c[4] ?? ""}`,
-      left: Number(c[6]),
-      top: Number(c[7]),
-      right: Number(c[6]) + Number(c[8]),
-      bottom: Number(c[7]) + Number(c[9]),
-      text: (c[11] ?? "").trim(),
-    }));
-  const lines = Object.values(Arr.groupBy(words, (w) => w.line)).map(
-    (group): TextLine => {
-      const left = Math.min(...group.map((w) => w.left));
-      const top = Math.min(...group.map((w) => w.top));
+    .filter((row) => row !== "")
+    .map((row): TextLine => {
+      const [x, y, width, height, ...text] = row.split("\t");
       return {
-        text: group.map((w) => w.text).join(" "),
-        x: crop[0] + left / OCR_SCALE,
-        y: crop[1] + top / OCR_SCALE,
-        width: (Math.max(...group.map((w) => w.right)) - left) / OCR_SCALE,
-        height: (Math.max(...group.map((w) => w.bottom)) - top) / OCR_SCALE,
+        text: latin(text.join("\t")),
+        x: crop[0] + Number(x),
+        y: crop[1] + Number(y),
+        width: Number(width),
+        height: Number(height),
       };
-    },
-  );
+    });
   return Arr.sortWith(lines, (l) => l.y, Num.Order);
 }, Effect.scoped);
 
