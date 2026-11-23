@@ -78,7 +78,7 @@ export const Master_trackTrack = Schema.Struct({
 })
 export interface Master_trackTrack extends Schema.Struct.Type<typeof Master_trackTrack.fields> {}
 
-export const Live_setSong = Schema.Struct({
+export const LqShowLive_setSong = Schema.Struct({
   id: Shared.Int,
   /** Empty string for a Set that has never been saved. */
   name: Schema.String,
@@ -90,7 +90,7 @@ export const Live_setSong = Schema.Struct({
   return_tracks: Schema.NullOr(Schema.Array(LqTrack)),
   master_track: Schema.NullOr(Master_trackTrack)
 })
-export interface Live_setSong extends Schema.Struct.Type<typeof Live_setSong.fields> {}
+export interface LqShowLive_setSong extends Schema.Struct.Type<typeof LqShowLive_setSong.fields> {}
 
 /** `query LqShow` */
 export const LqShow = GraphQL.query("LqShow", {
@@ -104,7 +104,7 @@ export const LqShow = GraphQL.query("LqShow", {
     ]
   },
   result: Schema.Struct({
-    live_set: Live_setSong
+    live_set: LqShowLive_setSong
   })
 })
 export declare namespace LqShow {
@@ -159,10 +159,10 @@ export declare namespace LqDeviceParams {
   export type Result = typeof LqDeviceParams.result.Type
 }
 
-export const Device_parameterDeviceParameter = Schema.Struct({
+export const LqParamTextDevice_parameterDeviceParameter = Schema.Struct({
   str_for_value: Schema.String
 })
-export interface Device_parameterDeviceParameter extends Schema.Struct.Type<typeof Device_parameterDeviceParameter.fields> {}
+export interface LqParamTextDevice_parameterDeviceParameter extends Schema.Struct.Type<typeof LqParamTextDevice_parameterDeviceParameter.fields> {}
 
 /** `query LqParamText` */
 export const LqParamText = GraphQL.query("LqParamText", {
@@ -181,7 +181,7 @@ export const LqParamText = GraphQL.query("LqParamText", {
     value: Shared.Float
   },
   result: Schema.Struct({
-    device_parameter: Schema.NullOr(Device_parameterDeviceParameter)
+    device_parameter: Schema.NullOr(LqParamTextDevice_parameterDeviceParameter)
   })
 })
 export declare namespace LqParamText {
@@ -219,10 +219,10 @@ export declare namespace LqSetParam {
   export type Result = typeof LqSetParam.result.Type
 }
 
-export const Song_setSong = Schema.Struct({
+export const LqSetTempoSong_setSong = Schema.Struct({
   tempo: Schema.NullOr(Shared.Float)
 })
-export interface Song_setSong extends Schema.Struct.Type<typeof Song_setSong.fields> {}
+export interface LqSetTempoSong_setSong extends Schema.Struct.Type<typeof LqSetTempoSong_setSong.fields> {}
 
 /** `mutation LqSetTempo` */
 export const LqSetTempo = GraphQL.mutation("LqSetTempo", {
@@ -241,7 +241,7 @@ export const LqSetTempo = GraphQL.mutation("LqSetTempo", {
     tempo: Shared.Float
   },
   result: Schema.Struct({
-    song_set: Schema.NullOr(Song_setSong)
+    song_set: Schema.NullOr(LqSetTempoSong_setSong)
   })
 })
 export declare namespace LqSetTempo {
@@ -768,5 +768,89 @@ export declare namespace LqEditor {
   export type Result = typeof LqEditor.result.Type
 }
 
+export const LqSongTimeLive_setSong = Schema.Struct({
+  current_song_time: Schema.NullOr(Shared.Float),
+  is_playing: Schema.NullOr(Schema.Boolean)
+})
+export interface LqSongTimeLive_setSong extends Schema.Struct.Type<typeof LqSongTimeLive_setSong.fields> {}
+
+/** `query LqSongTime` */
+export const LqSongTime = GraphQL.query("LqSongTime", {
+  document: {
+    variables: [],
+    selections: [
+      { name: "live_set", body: ["{current_song_time is_playing}"] }
+    ],
+    fragments: []
+  },
+  result: Schema.Struct({
+    live_set: LqSongTimeLive_setSong
+  })
+})
+export declare namespace LqSongTime {
+  export type Variables = typeof LqSongTime.variables.Type
+  export type Result = typeof LqSongTime.result.Type
+}
+
+export const LqSongSetSong_setSong = Schema.Struct({
+  current_song_time: Schema.NullOr(Shared.Float),
+  record_mode: Schema.NullOr(Schema.Boolean)
+})
+export interface LqSongSetSong_setSong extends Schema.Struct.Type<typeof LqSongSetSong_setSong.fields> {}
+
+/** `mutation LqSongSet` */
+export const LqSongSet = GraphQL.mutation("LqSongSet", {
+  document: {
+    variables: [
+      { name: "song", body: "Int!" },
+      { name: "properties", body: "[SongSetInput!]!" }
+    ],
+    selections: [
+      { name: "song_set", body: ["(id:$", "song", " properties:$", "properties", "){current_song_time record_mode}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    song: Shared.Int,
+    properties: Schema.Array(Shared.SongSetInput)
+  },
+  result: Schema.Struct({
+    song_set: Schema.NullOr(LqSongSetSong_setSong)
+  })
+})
+export declare namespace LqSongSet {
+  export type Variables = typeof LqSongSet.variables.Type
+  export type Result = typeof LqSongSet.result.Type
+}
+
+export const LqParamStateDevice_parameterDeviceParameter = Schema.Struct({
+  value: Schema.NullOr(Shared.Float),
+  automation_state: Schema.NullOr(Shared.Int)
+})
+export interface LqParamStateDevice_parameterDeviceParameter extends Schema.Struct.Type<typeof LqParamStateDevice_parameterDeviceParameter.fields> {}
+
+/** `query LqParamState` */
+export const LqParamState = GraphQL.query("LqParamState", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" }
+    ],
+    selections: [
+      { name: "device_parameter", body: ["(id:$", "id", "){value automation_state}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int
+  },
+  result: Schema.Struct({
+    device_parameter: Schema.NullOr(LqParamStateDevice_parameterDeviceParameter)
+  })
+})
+export declare namespace LqParamState {
+  export type Variables = typeof LqParamState.variables.Type
+  export type Result = typeof LqParamState.result.Type
+}
+
 /** Every operation in lq.graphql. */
-export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor)
+export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState)

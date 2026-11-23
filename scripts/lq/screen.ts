@@ -9,9 +9,13 @@
  * macOS attributes these calls to the app that launched the shell (T3 Code), which needs
  * Accessibility and Screen Recording. A sandboxed shell cannot capture at all.
  */
+import * as CliError from "effect/cli/CliError";
+import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import type * as PlatformError from "effect/PlatformError";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as Stream from "effect/Stream";
 
 export interface LiveWindow {
   readonly id: number;
@@ -22,13 +26,35 @@ export interface LiveWindow {
   readonly height: number;
 }
 
+export class ScreenError extends Data.TaggedError("ScreenError")<{
+  readonly message: string;
+}> {
+  get [CliError.userMessage]() {
+    return this.message;
+  }
+}
+
+const text = (stream: Stream.Stream<Uint8Array, PlatformError.PlatformError>) =>
+  stream.pipe(Stream.decodeText(), Stream.mkString);
+
+/** A command's stdout; a nonzero exit fails with its stderr. */
 const run = Effect.fnUntraced(function* (
   command: string,
   args: readonly string[],
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  return yield* spawner.string(ChildProcess.make(command, args));
-});
+  const handle = yield* spawner.spawn(ChildProcess.make(command, args));
+  const [stdout, stderr] = yield* Effect.all(
+    [text(handle.stdout), text(handle.stderr)],
+    { concurrency: 2 },
+  );
+  const code = yield* handle.exitCode;
+  if (code !== ChildProcessSpawner.ExitCode(0))
+    return yield* new ScreenError({
+      message: stderr.trim() || `${command} exited with ${String(code)}`,
+    });
+  return stdout;
+}, Effect.scoped);
 
 const jxa = (script: string) =>
   run("osascript", ["-l", "JavaScript", "-e", script]);
@@ -72,13 +98,44 @@ export const activate = jxa(
   `const live = Application("Live"); if (!live.frontmost()) { live.activate(); delay(0.3) } "ok"`,
 );
 
-/** Captures a window and scales it to points. */
+/** Captures a window and scales it to points; `crop` is `x,y,width,height` in those points. */
 export const capture = Effect.fnUntraced(function* (
   window: LiveWindow,
   path: string,
+  crop?: readonly [number, number, number, number],
 ) {
   yield* run("screencapture", ["-x", "-o", "-l", String(window.id), path]);
   yield* run("sips", ["-z", String(window.height), String(window.width), path]);
+  if (crop !== undefined) {
+    const [x, y, width, height] = crop;
+    yield* run("sips", [
+      "-c",
+      String(height),
+      String(width),
+      // sips centers the crop when an offset is 0, so the smallest offset is 1.
+      "--cropOffset",
+      String(Math.max(1, y)),
+      String(Math.max(1, x)),
+      path,
+    ]);
+  }
+});
+
+const AX_SOURCE = `${import.meta.dirname}/ax.swift`;
+const AX_BINARY = `${import.meta.dirname}/../../node_modules/.cache/lq/ax`;
+
+/**
+ * Runs the accessibility helper, compiling `ax.swift` first when it is newer than the binary.
+ * JXA reads the same tree through System Events at about 15 seconds a window; this takes 0.4.
+ */
+export const ax = Effect.fnUntraced(function* (args: readonly string[]) {
+  yield* run("sh", [
+    "-c",
+    `[ "$0" -nt "$1" ] || { mkdir -p "$(dirname "$0")" && swiftc -O "$1" -o "$0"; }`,
+    AX_BINARY,
+    AX_SOURCE,
+  ]);
+  return yield* run(AX_BINARY, args);
 });
 
 /** Clicks at `x`,`y` points inside `window`. Plug-in windows only show while Live is in front. */
