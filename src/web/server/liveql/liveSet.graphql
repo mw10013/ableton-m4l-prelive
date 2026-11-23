@@ -137,3 +137,10 @@ mutation ReplaceNotes(
     }
   }
 }
+
+# The open Set's .als path, empty while it is unsaved.
+query SetFile {
+  live_set {
+    file_path
+  }
+}
