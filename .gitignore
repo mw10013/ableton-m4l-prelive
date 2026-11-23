@@ -10,5 +10,6 @@ dist/
 todo.md
 .playwright-cli/
 test-results/
-als/.vitest/
 .vitest/
+projects/*/Backup/
+projects/*/Icon?
