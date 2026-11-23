@@ -11,10 +11,12 @@
  */
 import * as CliError from "effect/cli/CliError";
 import * as Data from "effect/Data";
+import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
 
 export interface LiveWindow {
@@ -33,6 +35,31 @@ export class ScreenError extends Data.TaggedError("ScreenError")<{
     return this.message;
   }
 }
+
+class NotYet extends Data.TaggedError("NotYet")<object> {}
+
+/** Reruns `look` every quarter second until it returns a value, failing after `within`. */
+export const until = <A, E, R>(
+  look: Effect.Effect<A | undefined, E, R>,
+  what: string,
+  within: Duration.Input,
+) =>
+  look.pipe(
+    Effect.flatMap((a) =>
+      a === undefined ? Effect.fail(new NotYet()) : Effect.succeed(a),
+    ),
+    Effect.retry({
+      schedule: Schedule.spaced("250 millis").pipe(
+        Schedule.upTo({ duration: within }),
+      ),
+      while: (e) => e instanceof NotYet,
+    }),
+    Effect.mapError((e) =>
+      e instanceof NotYet
+        ? new ScreenError({ message: `timed out waiting for ${what}` })
+        : e,
+    ),
+  );
 
 export const text = (
   stream: Stream.Stream<Uint8Array, PlatformError.PlatformError>,
