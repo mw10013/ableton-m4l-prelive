@@ -6,6 +6,7 @@
  * and every Session clip's notes. It does not cover device parameters, a Drum Rack's chains,
  * plug-in patches (`patch` is a note for people) or automation.
  */
+import * as Arr from "effect/Array";
 import * as Schema from "effect/Schema";
 
 /** A lane string, or one with its own grid, gate or base velocity. */
@@ -92,14 +93,9 @@ export const arrangementOf = (
 export const sectionsOf = (
   blocks: readonly number[],
   scenes: readonly string[],
-) => {
-  const out: string[] = [];
-  let i = 0;
-  while (i < blocks.length) {
-    let j = i;
-    while (j < blocks.length && blocks[j] === blocks[i]) j++;
-    out.push(`${scenes[blocks[i] ?? 0] ?? "?"}:${String(j - i)}`);
-    i = j;
-  }
-  return out;
-};
+) =>
+  Arr.isReadonlyArrayNonEmpty(blocks)
+    ? Arr.group(blocks).map(
+        (run) => `${scenes[run[0]] ?? "?"}:${String(run.length)}`,
+      )
+    : [];

@@ -2,6 +2,7 @@
  * Listening by measurement: export audio from Live's Export Audio/Video dialog, then measure
  * loudness and peaks with ffmpeg.
  */
+import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
@@ -15,19 +16,18 @@ const DIALOG = {
   length: [212, 118],
 } as const;
 
-const waitFor = Effect.fnUntraced(function* (
+const waitFor = (
   present: (windows: readonly Screen.LiveWindow[]) => boolean,
   what: string,
-  seconds: number,
-) {
-  for (let i = 0; i < seconds * 4; i++) {
-    if (present(yield* Screen.windows)) return;
-    yield* Effect.sleep("250 millis");
-  }
-  return yield* new Screen.ScreenError({
-    message: `timed out waiting for ${what}`,
-  });
-});
+  within: Duration.Input,
+) =>
+  Screen.until(
+    Screen.windows.pipe(
+      Effect.map((windows) => (present(windows) ? true : undefined)),
+    ),
+    what,
+    within,
+  );
 
 const hasWindow = (name: string) => (windows: readonly Screen.LiveWindow[]) =>
   windows.some((w) => w.name.startsWith(name));
@@ -56,7 +56,11 @@ export const exportAudio = Effect.fnUntraced(function* (
   options: ExportOptions,
 ) {
   yield* Screen.menu("File>Export Audio/Video...");
-  yield* waitFor(hasWindow("Export Audio/Video"), "the export dialog", 10);
+  yield* waitFor(
+    hasWindow("Export Audio/Video"),
+    "the export dialog",
+    "10 seconds",
+  );
   yield* Effect.sleep("500 millis");
   const dialog = (yield* Screen.windows).find(
     (w) => w.name === "Export Audio/Video",
@@ -101,7 +105,7 @@ export const exportAudio = Effect.fnUntraced(function* (
 
   // The press reports an error because the Save panel blocks it, but it goes through.
   yield* Screen.ax(["press", "export", "Export"]).pipe(Effect.ignore);
-  yield* waitFor(hasWindow("Save"), "the Save panel", 10);
+  yield* waitFor(hasWindow("Save"), "the Save panel", "10 seconds");
   yield* Effect.sleep("800 millis");
   // macOS's own sheets take Return through System Events, not cliclick.
   yield* Screen.keys(["cmd+shift+g"]);
@@ -117,7 +121,7 @@ export const exportAudio = Effect.fnUntraced(function* (
     (windows) =>
       !windows.some((w) => w.name.startsWith("Export") || w.name === "Save"),
     "the export to finish",
-    600,
+    "10 minutes",
   );
 });
 

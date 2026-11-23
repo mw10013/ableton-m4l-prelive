@@ -22,6 +22,7 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Layer from "effect/Layer";
+import * as Num from "effect/Number";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -124,7 +125,7 @@ const parseAssignment = Effect.fnUntraced(function* (text: string) {
 });
 
 const round = (n: number | null | undefined) =>
-  n === null || n === undefined ? "?" : String(Math.round(n * 1000) / 1000);
+  n === null || n === undefined ? "?" : String(Num.round(n, 3));
 
 /** Sets parameters by name; a quantized parameter also takes one of its value_items. */
 const setParams = Effect.fnUntraced(function* (
@@ -714,17 +715,19 @@ const loadCommand = Command.make(
             yield* lq.LqDeleteDevice({ track: track.id, index: i });
       }
       // Live sometimes ignores a selection, and the browser loads onto whatever is selected.
-      let selected = "";
-      for (let i = 0; i < 5 && selected !== track.name; i++) {
-        selected =
-          (yield* lq.LqSelectTrack({ view, track: track.id })).song_view_set
-            ?.selected_track?.name ?? "";
-        if (selected !== track.name) yield* Effect.sleep("300 millis");
-      }
-      if (selected !== track.name)
-        return yield* fail(
-          `could not select ${track.name}; ${selected} is selected`,
-        );
+      yield* Screen.until(
+        lq
+          .LqSelectTrack({ view, track: track.id })
+          .pipe(
+            Effect.map((r) =>
+              r.song_view_set?.selected_track?.name === track.name
+                ? true
+                : undefined,
+            ),
+          ),
+        `${track.name} to be selected`,
+        "2 seconds",
+      );
       // A plug-in editor in front would take the keystrokes meant for the browser.
       yield* closeEditors(replace ? yield* show : set);
       yield* Screen.keys(["cmd+f", name]);
@@ -793,14 +796,13 @@ const omniCommand = Command.make(
       yield* (yield* Lq).LqEditor({ id: device.id, open: true });
       yield* Screen.activate;
       const title = `omnisphere/${track.name.toLowerCase()}`;
-      let window: Screen.LiveWindow | undefined;
-      for (let i = 0; i < 20 && window === undefined; i++) {
-        window = (yield* Screen.windows).find(
-          (w) => w.name.toLowerCase() === title,
-        );
-        if (window === undefined) yield* Effect.sleep("250 millis");
-      }
-      if (window === undefined) return yield* fail(`no window ${title}`);
+      const window = yield* Screen.until(
+        Screen.windows.pipe(
+          Effect.map((all) => all.find((w) => w.name.toLowerCase() === title)),
+        ),
+        `the ${title} window`,
+        "5 seconds",
+      );
       const at = (p: readonly [number, number]) =>
         Screen.click(window, p[0], p[1], false);
       // A newly opened editor takes a moment, and its first click only focuses the window.
@@ -1165,7 +1167,7 @@ const transposeCommand = Command.make(
           id,
           notes: notes.map((n) => ({
             note_id: n.note_id,
-            pitch: Math.max(0, Math.min(127, n.pitch + semitones)),
+            pitch: Num.clamp(n.pitch + semitones, { minimum: 0, maximum: 127 }),
           })),
         });
         moved += notes.length;
@@ -1208,7 +1210,7 @@ const noteKey = (notes: readonly Note[]) =>
     .toSorted()
     .join(" ");
 
-const round3 = (n: number) => Math.round(n * 1000) / 1000;
+const round3 = Num.round(3);
 
 /** The spec for one track as Live has it now. */
 const trackSpec = Effect.fnUntraced(function* (
