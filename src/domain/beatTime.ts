@@ -4,6 +4,9 @@
  * Positions are 1-based (`1.1.1` is the first sixteenth of the clip); lengths are 0-based spans
  * (`0.0.2` is two sixteenths). The "sixteenth" segment is always a sixteenth note regardless of meter;
  * in 6/8 a beat is an eighth, so beat runs 1..6 and sixteenth runs 1..2.
+ *
+ * The notation never follows Live's clip grid (`ClipView.grid_quantization`): the grid is transient
+ * UI state, so a position always reads in bars, beats and sixteenths.
  */
 
 export type BeatTimeKind = "position" | "length";
