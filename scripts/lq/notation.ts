@@ -14,6 +14,9 @@
  *   `C1:x...x...`   `x` hit, `X` accent, `o` soft, `.` rest, `-` hold
  */
 
+import * as Arr from "effect/Array";
+import * as Num from "effect/Number";
+
 export interface Note {
   readonly pitch: number;
   readonly start_time: number;
@@ -151,7 +154,7 @@ const parseSteps = (lane: string): readonly Step[] => {
     .map(parseToken);
 };
 
-const clampVelocity = (v: number) => Math.max(1, Math.min(127, v));
+const clampVelocity = Num.clamp({ minimum: 1, maximum: 127 });
 
 /** The notes of one lane, repeated to fill `length` beats. */
 export const parseLane = (
@@ -263,19 +266,22 @@ const fit = (notes: readonly Note[], length: number): Fit | undefined => {
   return undefined;
 };
 
-const groupBy = <T>(items: readonly T[], key: (item: T) => number) => {
-  const groups = new Map<number, T[]>();
-  for (const item of items) {
-    const k = key(item);
-    groups.set(k, [...(groups.get(k) ?? []), item]);
-  }
-  return groups;
-};
+/** Runs of items with the same key, in key order; each run keeps its input order. */
+const runsBy = <T>(
+  items: Arr.NonEmptyReadonlyArray<T>,
+  key: (item: T) => number,
+) =>
+  Arr.groupWith(
+    Arr.sortWith(items, key, Num.Order),
+    (a, b) => key(a) === key(b),
+  );
 
-const mode = (values: readonly number[]) => {
-  const counts = new Map<number, number>();
-  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
-  return [...counts].toSorted((a, b) => b[1] - a[1])[0]?.[0] ?? 100;
+/** The most frequent value; on a tie, the one seen first. */
+const mode = (values: Arr.NonEmptyReadonlyArray<number>) => {
+  const count = (v: number) => Arr.countBy(values, (x) => x === v);
+  return Arr.reduce(Arr.dedupe(values), values[0], (best, v) =>
+    count(v) > count(best) ? v : best,
+  );
 };
 
 /** The shortest repeating pattern of a lane's tokens; lanes repeat to the clip length. */
@@ -309,13 +315,13 @@ const sequenceLane = (
   base: number,
   perBar: number,
 ): string | undefined => {
-  const tokens: string[] = Array.from({ length: count }, () => ".");
-  const onsets = groupBy(placed, (p) => p.step);
+  if (!Arr.isReadonlyArrayNonEmpty(placed)) return undefined;
+  const tokens: string[] = Arr.replicate(".", count);
   let free = 0;
-  for (const step of [...onsets.keys()].toSorted((a, b) => a - b)) {
-    const group = onsets.get(step) ?? [];
+  for (const group of runsBy(placed, (p) => p.step)) {
     const first = group[0];
-    if (first === undefined || step < free) return undefined;
+    const step = first.step;
+    if (step < free) return undefined;
     if (
       !group.every(
         (p) => p.steps === first.steps && p.velocity === first.velocity,
@@ -342,18 +348,15 @@ const stepLane = (
 ): string | undefined => {
   const first = placed[0];
   if (first === undefined) return undefined;
-  const chars: string[] = Array.from({ length: count }, () => ".");
+  const chars: string[] = Arr.replicate(".", count);
   for (const p of placed) {
     const char = STEP_CHAR[p.velocity - base];
     if (p.steps !== 1 || char === undefined) return undefined;
     chars[p.step] = char;
   }
   const pattern = shortestPeriod(chars);
-  const size = perBar >= 1 ? perBar : pattern.length;
-  const bars: string[] = [];
-  for (let i = 0; i < pattern.length; i += size)
-    bars.push(pattern.slice(i, i + size).join(""));
-  return `${pitchName(first.pitch)}:${bars.join(" ")}`;
+  const bars = Arr.chunksOf(pattern, perBar >= 1 ? perBar : pattern.length);
+  return `${pitchName(first.pitch)}:${bars.map((bar) => bar.join("")).join(" ")}`;
 };
 
 const laneFor = (
@@ -372,8 +375,9 @@ const laneFor = (
  * the clip's carries its own. Throws when a pitch fits no lane.
  */
 export const toLanes = (notes: readonly Note[], length: number): Lanes => {
-  if (notes.length === 0) return { grid: 1, gate: 1, velocity: 100, lanes: [] };
-  const base = mode(notes.map((n) => Math.round(n.velocity)));
+  if (!Arr.isReadonlyArrayNonEmpty(notes))
+    return { grid: 1, gate: 1, velocity: 100, lanes: [] };
+  const base = mode(Arr.map(notes, (n) => Math.round(n.velocity)));
   const whole = fit(notes, length);
   if (whole !== undefined) {
     const count = Math.round(length / whole.grid);
@@ -387,15 +391,13 @@ export const toLanes = (notes: readonly Note[], length: number): Lanes => {
         lanes: [single],
       };
   }
-  const pitches = [...groupBy(notes, (n) => n.pitch)].toSorted(
-    (a, b) => a[0] - b[0],
-  );
-  const lanes = pitches.map(([pitch, group]) => {
+  const lanes = runsBy(notes, (n) => n.pitch).map((group) => {
+    const pitch = group[0].pitch;
     const own = fit(group, length);
     if (own === undefined)
       throw new NotationError(`pitch ${pitchName(pitch)} fits no grid`);
     const count = Math.round(length / own.grid);
-    const ownBase = mode(own.placed.map((p) => p.velocity));
+    const ownBase = mode(Arr.map(group, (n) => Math.round(n.velocity)));
     const lane = laneFor(own.placed, count, ownBase, 4 / own.grid);
     if (lane === undefined)
       throw new NotationError(`pitch ${pitchName(pitch)} fits no lane`);
