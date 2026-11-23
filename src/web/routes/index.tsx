@@ -29,11 +29,7 @@ import {
   EMPTY_BUFFERS,
   slotSummaryOf,
 } from "#domain/clipBuffers.ts";
-import type {
-  ClipRegion,
-  ClipWithNotes,
-  ReplaceNotesInput,
-} from "#domain/live.ts";
+import type { ClipRegion, ReplaceNotesInput } from "#domain/live.ts";
 import {
   isSameRegion,
   type NoteRow,
@@ -74,15 +70,17 @@ type ClipSource =
   | { kind: "detail" }
   | { kind: "slot"; trackIndex: number; slotIndex: number };
 
+type ClipWithNotes = NonNullable<
+  Awaited<ReturnType<typeof readClipById>>["clip"]
+>;
+
 interface ClipReadResult {
   clip: ClipWithNotes | null;
   trackName: string | null;
   liveSelectedClipId: number | null;
 }
 
-type LiveSetOverview = Awaited<
-  ReturnType<typeof readLiveSetOverview>
->["live_set"];
+type LiveSetOverview = Awaited<ReturnType<typeof readLiveSetOverview>>;
 
 interface TrackRow extends Record<string, unknown> {
   trackIndex: number;
@@ -130,21 +128,13 @@ const clipQueryOptions = (source: ClipSource) =>
     queryKey: ["clip", source],
     queryFn: async (): Promise<ClipReadResult> => {
       if (source.kind === "detail") {
-        const data = await readClip();
-        return {
-          clip: data.live_set.view.detail_clip,
-          trackName: data.live_set.view.selected_track?.name ?? null,
-          liveSelectedClipId: data.live_set.view.detail_clip?.id ?? null,
-        };
+        const read = await readClip();
+        return { ...read, liveSelectedClipId: read.clip?.id ?? null };
       }
-      const data = await readClipBySlot({
+      const read = await readClipBySlot({
         data: { trackIndex: source.trackIndex, slotIndex: source.slotIndex },
       });
-      return {
-        clip: data.live_set.track?.clip_slot?.clip ?? null,
-        trackName: data.live_set.track?.name ?? null,
-        liveSelectedClipId: null,
-      };
+      return { ...read, liveSelectedClipId: null };
     },
     retry: false,
     refetchOnMount: "always",
@@ -182,7 +172,7 @@ function RouteComponent() {
   const [scrubLockedDuration, setScrubLockedDuration] = useState(1);
   const [scrubLastCommit, setScrubLastCommit] = useState<string | null>(null);
 
-  const overview = overviewQuery.data?.live_set ?? null;
+  const overview = overviewQuery.data ?? null;
   const liveSelectedClipId =
     clipSource?.kind === "detail" &&
     clipQuery.dataUpdatedAt > overviewQuery.dataUpdatedAt

@@ -1,8 +1,7 @@
 #!/usr/bin/env vpx
 /**
- * `vp run liveql:schema [ref]`: writes LiveQL's committed `schema.graphql` at `ref` (a branch, tag
- * or commit of ableton-m4l-liveql, default `main`) to `src/web/server/liveql/liveql.graphql`, the
- * schema prelive's documents are generated and checked against. The first line pins the commit.
+ * `vp run liveql:schema [ref]`: pins `src/web/server/liveql/liveql.graphql` to LiveQL's committed
+ * `schema.graphql` at a branch, tag or commit (default `main`).
  */
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";

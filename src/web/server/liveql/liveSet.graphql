@@ -1,3 +1,8 @@
+# Session and Arrangement clips are one LOM class and mean the same thing for
+# everything prelive does: note start_times are clip-relative beats, 0 at the
+# clip's bar 1.1.1. Only the clip's own start_time and end_time differ by kind,
+# and prelive does not select them. See
+# docs/note-list-editor-clip-context-research.md.
 fragment ClipWithNotes on Clip {
   id
   path
