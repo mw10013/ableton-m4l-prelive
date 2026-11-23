@@ -1124,6 +1124,43 @@ const levelsCommand = Command.make(
   ),
 );
 
+/** Moves every note in a track's Session and Arrangement clips by `semitones`. */
+const transposeCommand = Command.make(
+  "transpose",
+  { track: trackArg, semitones: Argument.Int("semitones") },
+  ({ track: ref, semitones }) =>
+    Effect.gen(function* () {
+      const lq = yield* Lq;
+      const track = yield* findTrack(yield* show, ref);
+      const clips = [
+        ...(track.clip_slots ?? []).flatMap((s) => (s.clip ? [s.clip.id] : [])),
+        ...(track.arrangement_clips ?? []).map((c) => c.id),
+      ];
+      let moved = 0;
+      for (const id of clips) {
+        const notes =
+          (yield* lq.LqClipNotes({ id })).clip?.get_all_notes_extended?.notes ??
+          [];
+        if (notes.length === 0) continue;
+        yield* lq.LqModifyNotes({
+          id,
+          notes: notes.map((n) => ({
+            note_id: n.note_id,
+            pitch: Math.max(0, Math.min(127, n.pitch + semitones)),
+          })),
+        });
+        moved += notes.length;
+      }
+      yield* Console.log(
+        `${track.name}: ${String(moved)} notes in ${String(clips.length)} clips moved ${String(semitones)} semitones`,
+      );
+    }),
+).pipe(
+  Command.withDescription(
+    "Move a track's notes in every Session and Arrangement clip: transpose Bass 12",
+  ),
+);
+
 /** The escape hatch: any GraphQL document, printed as compact JSON. */
 const gqlCommand = Command.make(
   "gql",
@@ -1168,6 +1205,7 @@ Command.make("lq").pipe(
     sweepCommand,
     exportCommand,
     levelsCommand,
+    transposeCommand,
     gqlCommand,
   ]),
   Command.run({ version: "0.0.0" }),
