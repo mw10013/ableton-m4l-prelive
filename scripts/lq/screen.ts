@@ -34,8 +34,9 @@ export class ScreenError extends Data.TaggedError("ScreenError")<{
   }
 }
 
-const text = (stream: Stream.Stream<Uint8Array, PlatformError.PlatformError>) =>
-  stream.pipe(Stream.decodeText(), Stream.mkString);
+export const text = (
+  stream: Stream.Stream<Uint8Array, PlatformError.PlatformError>,
+) => stream.pipe(Stream.decodeText(), Stream.mkString);
 
 /** A command's stdout; a nonzero exit fails with its stderr. */
 const run = Effect.fnUntraced(function* (
@@ -93,9 +94,13 @@ export const findWindow = (all: readonly LiveWindow[], ref: string) => {
   return all.find((w) => w.name.toLowerCase().includes(wanted));
 };
 
-/** Brings Live forward unless it already is, which would move focus off a plug-in window. */
+/**
+ * Brings Live forward unless it already is. It asks System Events, because asking Live itself
+ * (`Application("Live").frontmost()`) moves keyboard focus off a plug-in window.
+ */
 export const activate = jxa(
-  `const live = Application("Live"); if (!live.frontmost()) { live.activate(); delay(0.3) } "ok"`,
+  `const front = Application("System Events").processes.whose({ frontmost: true })[0].name();
+   if (front !== "Live") { Application("Live").activate(); delay(0.3) } "ok"`,
 );
 
 /** Captures a window and scales it to points; `crop` is `x,y,width,height` in those points. */
@@ -120,6 +125,38 @@ export const capture = Effect.fnUntraced(function* (
     ]);
   }
 });
+
+/** The RGB of one pixel of a PNG, read with ffmpeg. */
+export const pixel = Effect.fnUntraced(function* (
+  path: string,
+  x: number,
+  y: number,
+) {
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const bytes = yield* Stream.runCollect(
+    Stream.unwrap(
+      spawner
+        .spawn(
+          ChildProcess.make("ffmpeg", [
+            "-v",
+            "error",
+            "-i",
+            path,
+            "-vf",
+            `crop=1:1:${String(Math.round(x))}:${String(Math.round(y))}`,
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-",
+          ]),
+        )
+        .pipe(Effect.map((handle) => handle.stdout)),
+    ),
+  );
+  const [r = 0, g = 0, b = 0] = bytes.flatMap((chunk) => [...chunk]);
+  return { r, g, b };
+}, Effect.scoped);
 
 const AX_SOURCE = `${import.meta.dirname}/ax.swift`;
 const AX_BINARY = `${import.meta.dirname}/../../node_modules/.cache/lq/ax`;
@@ -150,46 +187,99 @@ export const click = Effect.fnUntraced(function* (
   yield* run("cliclick", [`${double ? "dc" : "c"}:${at}`]);
 });
 
-const KEYS = new Set([
-  "return",
-  "enter",
-  "esc",
-  "tab",
-  "space",
-  "delete",
-  "fwd-delete",
-  "home",
-  "end",
-  "page-up",
-  "page-down",
-  "arrow-up",
-  "arrow-down",
-  "arrow-left",
-  "arrow-right",
-]);
-const MODIFIERS = new Set(["cmd", "ctrl", "alt", "shift", "fn"]);
+/** macOS virtual key codes for the keys `keys` presses by name. */
+const KEY_CODES: Record<string, number> = {
+  return: 36,
+  enter: 76,
+  esc: 53,
+  tab: 48,
+  space: 49,
+  delete: 51,
+  "fwd-delete": 117,
+  home: 115,
+  end: 119,
+  "page-up": 116,
+  "page-down": 121,
+  "arrow-left": 123,
+  "arrow-right": 124,
+  "arrow-down": 125,
+  "arrow-up": 126,
+};
+const MODIFIERS: Record<string, string> = {
+  cmd: "command down",
+  alt: "option down",
+  shift: "shift down",
+  ctrl: "control down",
+};
+
+export type KeyStep = { readonly cliclick: string } | { readonly jxa: string };
 
 /**
- * cliclick commands for `keys`: a key name (`return`, `arrow-down`) presses it, `cmd+f` holds
- * the modifiers, anything else is typed as text, one character at a time.
+ * The steps for `keys`. Shortcuts with modifiers (`cmd+f`) and text go through System Events,
+ * where a modifier is part of the keystroke and cannot stay held down; cliclick's separate
+ * key-down and key-up once left Cmd held, which turned typed text into shortcuts. A bare key name
+ * (`return`, `arrow-down`) goes through cliclick, because Live's own UI ignores System Events'
+ * key codes; `native` sends those through System Events instead, which macOS's own sheets need.
+ * `paced` types one character at a time: Omnisphere drops fast typing.
  */
-export const keyCommands = (tokens: readonly string[]): readonly string[] =>
-  tokens.flatMap((token) => {
+export const keySteps = (
+  tokens: readonly string[],
+  options: { readonly paced?: boolean; readonly native?: boolean } = {},
+): readonly KeyStep[] =>
+  tokens.flatMap((token): KeyStep[] => {
     const parts = token.split("+");
     const key = parts.at(-1) ?? "";
     const mods = parts.slice(0, -1);
-    if (mods.length > 0 && mods.every((m) => MODIFIERS.has(m))) {
-      const press = KEYS.has(key) ? `kp:${key}` : `t:${key}`;
-      return [`kd:${mods.join(",")}`, press, `ku:${mods.join(",")}`];
+    if (mods.length > 0 && mods.every((m) => m in MODIFIERS)) {
+      const using = `, { using: ${JSON.stringify(mods.map((m) => MODIFIERS[m]))} }`;
+      const code = KEY_CODES[key];
+      return [
+        {
+          jxa:
+            code === undefined
+              ? `se.keystroke(${JSON.stringify(key)}${using})`
+              : `se.keyCode(${String(code)}${using})`,
+        },
+      ];
     }
-    if (KEYS.has(token)) return [`kp:${token}`];
-    // One command per character, so `-w` paces them; plug-ins drop fast typing.
-    return token.split("").map((c) => (c === " " ? "kp:space" : `t:${c}`));
+    const code = KEY_CODES[token];
+    if (code !== undefined)
+      return [
+        options.native === true
+          ? { jxa: `se.keyCode(${String(code)})` }
+          : { cliclick: `kp:${token}` },
+      ];
+    if (options.paced !== true)
+      return [{ jxa: `se.keystroke(${JSON.stringify(token)})` }];
+    return token
+      .split("")
+      .map((c) => ({ jxa: `se.keystroke(${JSON.stringify(c)})` }));
   });
 
-export const keys = Effect.fnUntraced(function* (tokens: readonly string[]) {
+export const keys = Effect.fnUntraced(function* (
+  tokens: readonly string[],
+  options: { readonly paced?: boolean; readonly native?: boolean } = {},
+) {
   yield* activate;
-  yield* run("cliclick", ["-w", "50", ...keyCommands(tokens)]);
+  // Consecutive cliclick keys go in one call: Live misses keys sent as separate calls.
+  let pending: string[] = [];
+  const flush = Effect.suspend(() => {
+    const batch = pending;
+    pending = [];
+    return batch.length > 0
+      ? run("cliclick", ["-w", "100", ...batch])
+      : Effect.succeed("");
+  });
+  for (const step of keySteps(tokens, options)) {
+    if ("cliclick" in step) {
+      pending.push(step.cliclick);
+      continue;
+    }
+    yield* flush;
+    yield* jxa(`const se = Application("System Events"); ${step.jxa}; "ok"`);
+    yield* Effect.sleep("100 millis");
+  }
+  yield* flush;
 });
 
 /** Clicks a menu item by path, as `File>Save Live Set`. */

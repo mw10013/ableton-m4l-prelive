@@ -23,6 +23,7 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import * as Audio from "./audio.ts";
 import { LqGraphQLGroup, type LqShow } from "./lq.graphql.ts";
 import { NotationError, type Note, parseLane } from "./notation.ts";
 import * as Screen from "./screen.ts";
@@ -153,6 +154,17 @@ const setParams = Effect.fnUntraced(function* (
   return out;
 });
 
+const PLUGIN_CLASSES = new Set(["AuPluginDevice", "PluginDevice"]);
+
+/** Closes every plug-in editor, so none sits in front of the window being driven. */
+const closeEditors = Effect.fnUntraced(function* (set: LiveSet) {
+  const lq = yield* Lq;
+  for (const t of allTracks(set))
+    for (const d of t.devices ?? [])
+      if (PLUGIN_CLASSES.has(d.class_name ?? ""))
+        yield* lq.LqEditor({ id: d.id, open: false });
+});
+
 const trackLine = (t: Track, index: string) => {
   const mixer = t.mixer_device;
   const sends = (mixer?.sends ?? [])
@@ -256,6 +268,34 @@ const tweakCommand = Command.make(
   ),
 );
 
+/** The number a text starts with, as -6.0 in "-6.0 dB". */
+const leadingNumber = (text: string) =>
+  Number(/^\s*(?<n>[-+]?\d+(?:\.\d+)?)/u.exec(text)?.groups?.n ?? Number.NaN);
+
+/**
+ * The knob position whose text reads `db` decibels, found by bisection over `str_for_value`,
+ * since volume and send knobs are 0..1 positions on a curve.
+ */
+const knobForDb = Effect.fnUntraced(function* (id: number, db: number) {
+  const lq = yield* Lq;
+  const dbAt = Effect.fnUntraced(function* (value: number) {
+    const text =
+      (yield* lq.LqParamText({ id, value })).device_parameter?.str_for_value ??
+      "";
+    return text.includes("inf")
+      ? Number.NEGATIVE_INFINITY
+      : leadingNumber(text);
+  });
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 20; i++) {
+    const mid = (low + high) / 2;
+    if ((yield* dbAt(mid)) < db) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
+});
+
 const mixCommand = Command.make(
   "mix",
   {
@@ -286,19 +326,25 @@ const mixCommand = Command.make(
                 : undefined;
         if (param === undefined || param === null)
           return yield* fail(`no mixer control ${name} on ${t.name}`);
-        yield* lq.LqSetParam({ id: param.id, value: Number(value) });
+        const knob = /db$/iu.test(value)
+          ? yield* knobForDb(param.id, leadingNumber(value))
+          : Number(value);
+        if (Number.isNaN(knob)) return yield* fail(`not a value: ${text}`);
+        yield* lq.LqSetParam({ id: param.id, value: knob });
         const { device_parameter } = yield* lq.LqParamText({
           id: param.id,
-          value: Number(value),
+          value: knob,
         });
         out.push(
-          `${name}=${value} (${device_parameter?.str_for_value ?? "?"})`,
+          `${name}=${round(knob)} (${device_parameter?.str_for_value ?? "?"})`,
         );
       }
       yield* Console.log(`${t.name}: ${out.join("; ")}`);
     }),
 ).pipe(
-  Command.withDescription("Set volume, pan and sends: mix Pad vol=0.7 A=0.4"),
+  Command.withDescription(
+    "Set volume, pan and sends as knob positions or decibels: mix Pad vol=-6db A=0.4",
+  ),
 );
 
 const trackCommand = Command.make(
@@ -587,10 +633,22 @@ const clickCommand = Command.make(
 
 const keysCommand = Command.make(
   "keys",
-  { keys: Argument.String("keys").pipe(Argument.variadic({ min: 1 })) },
-  ({ keys }) =>
+  {
+    keys: Argument.String("keys").pipe(Argument.variadic({ min: 1 })),
+    paced: Flag.Boolean("paced").pipe(
+      Flag.withDescription("Type one character at a time, for plug-ins"),
+      Flag.withDefault(false),
+    ),
+    native: Flag.Boolean("native").pipe(
+      Flag.withDescription(
+        "Send key names through System Events, for macOS panels and sheets",
+      ),
+      Flag.withDefault(false),
+    ),
+  },
+  ({ keys, paced, native }) =>
     Effect.gen(function* () {
-      yield* Screen.keys(keys);
+      yield* Screen.keys(keys, { paced, native });
       yield* Console.log(keys.join(" "));
     }),
 ).pipe(
@@ -624,24 +682,152 @@ const editorCommand = Command.make(
  */
 const loadCommand = Command.make(
   "load",
-  { track: Argument.String("track"), name: Argument.String("name") },
-  ({ track: ref, name }) =>
+  {
+    track: Argument.String("track"),
+    name: Argument.String("name"),
+    replace: Flag.Boolean("replace").pipe(
+      Flag.withDescription("Delete the track's devices first, except LiveQL"),
+      Flag.withDefault(false),
+    ),
+  },
+  ({ track: ref, name, replace }) =>
     Effect.gen(function* () {
+      const lq = yield* Lq;
       const set = yield* show;
       const track = yield* findTrack(set, ref);
       const view = set.view?.id;
       if (view === undefined) return yield* fail("no song view");
-      yield* (yield* Lq).LqSelectTrack({ view, track: track.id });
+      if (replace) {
+        const devices = track.devices ?? [];
+        // Delete from the end so the remaining indexes stay valid.
+        for (let i = devices.length - 1; i >= 0; i--)
+          if (devices[i]?.class_name !== "MxDeviceMidiEffect")
+            yield* lq.LqDeleteDevice({ track: track.id, index: i });
+      }
+      // Live sometimes ignores a selection, and the browser loads onto whatever is selected.
+      let selected = "";
+      for (let i = 0; i < 5 && selected !== track.name; i++) {
+        selected =
+          (yield* lq.LqSelectTrack({ view, track: track.id })).song_view_set
+            ?.selected_track?.name ?? "";
+        if (selected !== track.name) yield* Effect.sleep("300 millis");
+      }
+      if (selected !== track.name)
+        return yield* fail(
+          `could not select ${track.name}; ${selected} is selected`,
+        );
+      // A plug-in editor in front would take the keystrokes meant for the browser.
+      yield* closeEditors(replace ? yield* show : set);
       yield* Screen.keys(["cmd+f", name]);
       yield* Effect.sleep("1 second");
       yield* Screen.keys(["arrow-down", "return"]);
       yield* Effect.sleep("2 seconds");
-      const after = yield* findTrack(yield* show, ref);
+      const loaded = yield* show;
+      yield* closeEditors(loaded);
+      const after = yield* findTrack(loaded, ref);
       yield* Console.log(trackLine(after, ref));
     }),
 ).pipe(
   Command.withDescription(
     "Load the browser's first match for a name onto a track, plug-ins included",
+  ),
+);
+
+/** Points in Omnisphere's editor at its default size, measured from `shot`. */
+const OMNI = {
+  clear: [293, 125],
+  search: [165, 125],
+  firstResult: [130, 504],
+  rowHeight: 20.4,
+  glide: [1261, 534],
+  glideSample: [1236, 534],
+  list: [18, 490, 292, 275],
+  patch: [560, 200, 520, 260],
+} as const;
+
+/**
+ * Loads an Omnisphere patch by searching its browser, since the LOM cannot see its patches.
+ * `--list` only shows the results. Either way it saves a cropped shot to check by eye.
+ */
+const omniCommand = Command.make(
+  "omni",
+  {
+    track: Argument.String("track"),
+    search: Argument.String("search"),
+    pick: Flag.Int("pick").pipe(
+      Flag.withAlias("p"),
+      Flag.withDescription("Which result to load, from 1"),
+      Flag.withDefault(1),
+    ),
+    list: Flag.Boolean("list").pipe(
+      Flag.withDescription("Show the results without loading one"),
+      Flag.withDefault(false),
+    ),
+    glide: Flag.ChoiceWithValue("glide", [
+      ["on", "on"],
+      ["off", "off"],
+    ] as const).pipe(
+      Flag.withDescription(
+        "Turn the patch's portamento on or off after loading",
+      ),
+      Flag.optional,
+    ),
+  },
+  ({ track: ref, search, pick, list, glide }) =>
+    Effect.gen(function* () {
+      const set = yield* show;
+      const track = yield* findTrack(set, ref);
+      const device = (track.devices ?? []).find((d) => d.name === "Omnisphere");
+      if (device === undefined)
+        return yield* fail(`no Omnisphere on ${track.name}`);
+      yield* closeEditors(set);
+      yield* (yield* Lq).LqEditor({ id: device.id, open: true });
+      yield* Screen.activate;
+      const title = `omnisphere/${track.name.toLowerCase()}`;
+      let window: Screen.LiveWindow | undefined;
+      for (let i = 0; i < 20 && window === undefined; i++) {
+        window = (yield* Screen.windows).find(
+          (w) => w.name.toLowerCase() === title,
+        );
+        if (window === undefined) yield* Effect.sleep("250 millis");
+      }
+      if (window === undefined) return yield* fail(`no window ${title}`);
+      const at = (p: readonly [number, number]) =>
+        Screen.click(window, p[0], p[1], false);
+      // A newly opened editor takes a moment, and its first click only focuses the window.
+      yield* Effect.sleep("1 second");
+      yield* at(OMNI.clear);
+      yield* at(OMNI.search);
+      yield* at(OMNI.search);
+      yield* Screen.keys([search, "return"], { paced: true });
+      yield* Effect.sleep("1500 millis");
+      if (!list) {
+        yield* at([
+          OMNI.firstResult[0],
+          OMNI.firstResult[1] + (pick - 1) * OMNI.rowHeight,
+        ]);
+        yield* Effect.sleep("4 seconds");
+      }
+      const path = `/tmp/lq-omni-${track.name}.png`;
+      if (!list && Option.isSome(glide)) {
+        // GLIDE lights cyan when on and is grey when off.
+        const isOn = Effect.gen(function* () {
+          yield* Screen.capture(window, path);
+          const { r, b } = yield* Screen.pixel(path, ...OMNI.glideSample);
+          return b - r > 60;
+        });
+        if ((yield* isOn) !== (glide.value === "on")) {
+          yield* at(OMNI.glide);
+          yield* Effect.sleep("500 millis");
+        }
+        yield* Console.log(`glide ${(yield* isOn) ? "on" : "off"}`);
+      }
+      yield* Screen.capture(window, path, list ? OMNI.list : OMNI.patch);
+      yield* Console.log(path);
+    }),
+).pipe(
+  Command.withDescription(
+    'Search Omnisphere\'s patch browser on a track and load a result: omni Pad "warm pad" -p 2',
   ),
 );
 
@@ -838,6 +1024,106 @@ const sweepCommand = Command.make(
   ),
 );
 
+const exportCommand = Command.make(
+  "export",
+  {
+    dir: Argument.String("dir").pipe(
+      Argument.withDescription("An existing folder to save into"),
+    ),
+    name: Flag.String("name").pipe(
+      Flag.withAlias("n"),
+      Flag.withDefault("mix"),
+    ),
+    start: Flag.Int("start").pipe(Flag.withDefault(1)),
+    bars: Flag.Int("bars").pipe(
+      Flag.withDescription("Default: through the last Arrangement clip"),
+      Flag.optional,
+    ),
+    stems: Flag.Boolean("stems").pipe(
+      Flag.withDescription("One file per track, plus the mix"),
+      Flag.withDefault(false),
+    ),
+  },
+  ({ dir, name, start, bars, stems }) =>
+    Effect.gen(function* () {
+      const set = yield* show;
+      const end = Math.max(
+        0,
+        ...allTracks(set).flatMap((t) =>
+          (t.arrangement_clips ?? []).map(
+            (c) => (c.start_time ?? 0) + (c.length ?? 0),
+          ),
+        ),
+      );
+      const length = Option.getOrElse(
+        bars,
+        () => Math.ceil(end / 4) - start + 1,
+      );
+      yield* closeEditors(set);
+      yield* Audio.exportAudio({ dir, name, start, bars: length, stems });
+      yield* Console.log(
+        `exported bars ${String(start)}-${String(start + length - 1)} to ${dir}`,
+      );
+    }),
+).pipe(
+  Command.withDescription(
+    "Render the Arrangement through File > Export Audio/Video: export /tmp/mh --stems",
+  ),
+);
+
+const levelsCommand = Command.make(
+  "levels",
+  {
+    files: Argument.String("file").pipe(Argument.variadic({ min: 1 })),
+    sections: Flag.String("section").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription("Name:from-to bars, end exclusive; repeatable"),
+      Flag.atLeast(0),
+    ),
+  },
+  ({ files, sections }) =>
+    Effect.gen(function* () {
+      const tempo = (yield* show).tempo ?? 120;
+      const bar = (4 * 60) / tempo;
+      const parsed: Audio.Section[] = [];
+      for (const text of sections) {
+        const section = Audio.parseSection(text);
+        if (section === undefined)
+          return yield* fail(`--section takes Name:from-to, got ${text}`);
+        parsed.push(section);
+      }
+      const cell = (l: Audio.Level) =>
+        `${l.lufs.toFixed(1).padStart(6)} ${l.peak.toFixed(1).padStart(5)}`;
+      yield* Console.log(
+        [
+          "file".padEnd(16),
+          "whole LUFS/pk".padStart(12),
+          ...parsed.map((s) => s.name.padStart(12)),
+        ].join(" "),
+      );
+      for (const file of files) {
+        const cells = [cell(yield* Audio.measure(file))];
+        for (const s of parsed)
+          cells.push(
+            cell(
+              yield* Audio.measure(file, (s.from - 1) * bar, (s.to - 1) * bar),
+            ),
+          );
+        const label = (file.split("/").at(-1) ?? file).replace(/\.aif$/u, "");
+        yield* Console.log(
+          [
+            label.padEnd(16).slice(0, 16),
+            ...cells.map((c) => c.padStart(12)),
+          ].join(" "),
+        );
+      }
+    }),
+).pipe(
+  Command.withDescription(
+    "Loudness (LUFS) and true peak (dBFS) per file and section: levels *.aif -s Drop:25-41",
+  ),
+);
+
 /** The escape hatch: any GraphQL document, printed as compact JSON. */
 const gqlCommand = Command.make(
   "gql",
@@ -872,6 +1158,7 @@ Command.make("lq").pipe(
     menuCommand,
     arrangeCommand,
     loadCommand,
+    omniCommand,
     editorCommand,
     windowsCommand,
     shotCommand,
@@ -879,6 +1166,8 @@ Command.make("lq").pipe(
     keysCommand,
     axCommand,
     sweepCommand,
+    exportCommand,
+    levelsCommand,
     gqlCommand,
   ]),
   Command.run({ version: "0.0.0" }),
