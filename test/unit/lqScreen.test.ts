@@ -1,18 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { findWindow, keyCommands } from "#scripts/lq/screen.ts";
+import { findWindow, keySteps } from "#scripts/lq/screen.ts";
 
 describe("lq screen", () => {
-  it("turns key tokens into cliclick commands", () => {
-    expect(keyCommands(["cmd+f", "a b", "arrow-down", "return"])).toEqual([
-      "kd:cmd",
-      "t:f",
-      "ku:cmd",
-      "t:a",
-      "kp:space",
-      "t:b",
-      "kp:arrow-down",
-      "kp:return",
+  it("sends shortcuts and text through System Events, key names through cliclick", () => {
+    expect(keySteps(["cmd+shift+g", "a b", "arrow-down"])).toEqual([
+      { jxa: 'se.keystroke("g", { using: ["command down","shift down"] })' },
+      { jxa: 'se.keystroke("a b")' },
+      { cliclick: "kp:arrow-down" },
+    ]);
+    expect(keySteps(["ab", "return"], { paced: true, native: true })).toEqual([
+      { jxa: 'se.keystroke("a")' },
+      { jxa: 'se.keystroke("b")' },
+      { jxa: "se.keyCode(36)" },
     ]);
   });
 

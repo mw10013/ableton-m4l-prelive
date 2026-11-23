@@ -21,6 +21,7 @@ fragment LqTrack on Track {
   arrangement_clips {
     id
     start_time
+    length
   }
   mixer_device {
     volume {
@@ -210,7 +211,9 @@ mutation LqDeleteTrackClip($track: Int!, $clip: Int!) {
 
 mutation LqSelectTrack($view: Int!, $track: Int!) {
   song_view_set(id: $view, properties: [{ selected_track: $track }]) {
-    id
+    selected_track {
+      name
+    }
   }
 }
 
@@ -238,5 +241,11 @@ query LqParamState($id: Int!) {
   device_parameter(id: $id) {
     value
     automation_state
+  }
+}
+
+mutation LqDeleteDevice($track: Int!, $index: Int!) {
+  track_delete_device(id: $track, index: $index) {
+    id
   }
 }

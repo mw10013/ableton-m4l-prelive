@@ -32,12 +32,23 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 - Switching Sets while the current one has unsaved changes brings up a save prompt. LiveQL's `test/live/open.js`
   clicks Don't Save by position, but for projects we care about, a person answers it.
 - Live's browser search loads anything it finds onto the selected track, plug-ins included: select the track with
-  `song_view_set(selected_track:)`, then Cmd-F, type the name, Down, Return. `lq load <track> <name>` does that.
+  `song_view_set(selected_track:)`, then Cmd-F, type the name, Down, Return. `lq load <track> <name> [--replace]`
+  does that. It checks the selection took (Live sometimes ignores the first `selected_track`, and the browser loads
+  onto whatever is selected) and closes plug-in editors before and after, since an editor in front takes the keys.
+  Loading an instrument onto a track that has one replaces it, settings and all.
 - macOS credits the agent's shell to T3 Code (Nightly), which has Accessibility and Screen Recording. Capture
   still fails inside Claude Code's Bash sandbox (`could not create image from display`); run `lq shot` and the
   other screen commands with the sandbox off.
 - `lq shot [window]` saves a PNG of one window scaled to points, so its pixel coordinates are what `lq click`
-  takes. `lq keys` types with `cliclick`, one character per command, because Omnisphere drops fast typing.
+  takes (`cliclick`).
+- Keys need two routes. `lq keys` sends shortcuts (`cmd+f`) and text through System Events, where a modifier is
+  part of the keystroke. cliclick's separate key-down and key-up once left Cmd held, so the letters of "Omnisphere"
+  became Cmd-O, Cmd-N and Cmd-S: Live saved, then opened a new Set. Bare key names (`return`, `arrow-down`,
+  `page-up`) go through cliclick in one call, because Live's own UI ignores System Events key codes and misses keys
+  sent in separate cliclick calls. macOS's own sheets (the Save panel's Go To) are the reverse: `keys --native`.
+  `--paced` types one character at a time for Omnisphere.
+- Live's popup menus wrap around with the arrow keys, ignore typed names and ignore clicks on items. Page Up goes to
+  the first item.
 - `lq ax` reads Live's Accessibility tree: every labeled control in a window and its value, about 280 lines for the
   main window (`lq ax tree "" -f volume` filters). `ax press` and `ax set` act on a control by label. It runs a
   small Swift helper (`scripts/lq/ax.swift`, compiled on first use into `node_modules/.cache/lq/`) that takes 0.4 s
@@ -49,8 +60,8 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 - While the screen is locked or asleep, Live cannot come forward and its tree shrinks to one stub window named
   `Live`. LiveQL keeps working.
 - `shot --crop x,y,w,h` keeps part of a window, which costs fewer tokens to look at.
-- Bringing Live forward moves focus off a plug-in window, so the screen commands only activate Live when it is not
-  already in front.
+- The screen commands bring Live forward only when it is not in front, and they ask System Events which app is
+  in front: asking Live itself (`Application("Live").frontmost()`) moves keyboard focus off a plug-in window.
 
 ## Listening
 
@@ -83,11 +94,13 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
   configured. Omnisphere keeps its patches in its own library.
 - In the patch browser, a lit GLIDE button on the main page means notes slide in pitch (portamento). Clicking it
   off changes the copy in the Set only.
-- The screen does the rest. `lq editor Omni` opens the editor (it may open on the About page; click the
-  Spectrasonics logo for the main page). In the patch browser, the search box is at about 165,125 and the first
-  result at 130,511: `lq click Omnisphere/Omni 165 125`, `lq keys "warm pad" return`, `lq click Omnisphere/Omni 130
-  511`, then `lq shot omni` to read the loaded patch. The patch is stored in the Live Set; nothing is saved into
-  Omnisphere.
+- The screen does the rest. `lq omni <track> <search> [--list] [-p n] [--glide off]` opens the track's editor,
+  searches the patch browser, loads result `n` and saves a cropped shot of the patch name to check by eye.
+  `--glide` reads the GLIDE button's color from one pixel (`ffmpeg`) and clicks it only if needed. The patch is
+  stored in the Live Set; nothing is saved into Omnisphere. A first open may land on the About page; click the
+  Spectrasonics logo for the main page.
+- One instance's search box would not take typing at all, even freshly reloaded, while the others did. Its category
+  list worked by mouse: drag the scrollbar, click a category (Synth Short holds the plucks), click a patch.
 - Untested: Live's `-_PluginAutoPopulateThreshold` option in `Options.txt` would expose more parameters to LiveQL.
 
 ## Recording automation
@@ -110,6 +123,63 @@ What we learned:
   shows the recorded curve: it matched the ramp to three decimals. `automation_state` 1 means automated.
 - Recording runs in real time: the 8-bar sweep takes 18 s, with the master silenced (`lq master 0`).
 - Setting an automated parameter while stopped overrides its automation until `re_enable_automation`.
+
+## Listening by measurement
+
+The agent cannot hear, but it can export audio and measure it with `ffmpeg` (Homebrew).
+
+`lq export <dir> [-n name] [--stems] [--start 1] [--bars n]` drives File > Export Audio/Video: it sets the
+rendered track, the range (default: bar 1 through the last Arrangement clip) and turns off the analysis file, checks
+the dialog with `ax` before pressing Export, then answers the Save panel. **All Individual Tracks** (`--stems`)
+renders one file per track plus the mix. The master fader is part of the render, so put it at 0 dB first; Live
+renders offline and plays nothing. The dialog's quirks, all handled by `export`:
+
+- The range is whatever the dialog last held, not the loop. Typing into the Render Start and Render Length fields
+  sets it; `ax set` succeeds and changes nothing.
+- The Rendered Track popup takes Page Up and arrows (see the popup notes above).
+- `ax press export Export` reports error -25204 because the Save panel blocks it, but it goes through.
+- Wait for each sheet before typing, or the text lands in the name field.
+
+`lq levels <files...> -s Intro:1-9 -s Drop:25-41` prints integrated loudness (LUFS) and true peak (dBFS) per file
+and section, using the Set's tempo for bar times.
+
+Measuring:
+
+- `levels` runs `ffmpeg -i f.aif -af atrim=a:b,ebur128=peak=true -f null -`, with a and b from bars (a bar is
+  240/BPM seconds).
+- `showspectrumpic` draws a spectrogram PNG the agent can read like a screenshot. Section changes show clearly.
+- Spectral centroid misleads on gappy parts: near-silent frames pull it up. The level above a high-pass works better.
+
+What the first export of Melodic House (Drift instruments) found:
+
+| Stem  | Drop LUFS | Drop peak | Finding                                         |
+| ----- | --------- | --------- | ----------------------------------------------- |
+| Omni  | −11.8     | +0.1      | Loudest part, and the clipping (261 samples)    |
+| Drums | −17.7     | −3.3      |                                                 |
+| Pad   | −18.4     | −7.1      |                                                 |
+| Bass  | −30.0     | −12.6     | About 13 LU under the drums; nearly inaudible   |
+| Arp   | −33.6     | −15.1     | Quiet                                           |
+| Mix   | −9.9      | +0.7      | Intro −20.8, Groove −14.8, Breakdown −16.2 LUFS |
+
+The Arp sweep did not show in the audio: its level above 1 kHz stayed flat across the Breakdown. Drift's `LP Mod
+Amt 1` is 0.968, so each note's envelope opens the filter far above the base `LP Freq`, which is what the sweep moved
+(56 Hz to 1.1 kHz). Sweep a knob that dominates the sound, or lower the envelope amount first.
+
+After the move to Omnisphere every synth came in 5 to 8 LU over the drums and the mix clipped in every section.
+Faders set in decibels (`lq mix Bass vol=-8db`) against the drums as the anchor, and a Limiter on Main (True Peak,
+ceiling −1 dB), gave:
+
+| Stem  | Drop LUFS | Fader    | Role                                       |
+| ----- | --------- | -------- | ------------------------------------------ |
+| Drums | −17.7     | 0 dB     | Anchor                                     |
+| Bass  | −18.3     | −8 dB    | With the kick                              |
+| Omni  | −18.9     | −11 dB   | Lead, level with the bass                  |
+| Pad   | −22.0     | −8.5 dB  | Bed                                        |
+| Arp   | −23.1     | −13.5 dB | Under the pad                              |
+| Mix   | −12.5     | peak −1  | Intro −17.2, Groove −14.3, Breakdown −19.1 |
+
+The Arp's sweep moved to an Auto Filter after Omnisphere, whose `Env Amount` is bipolar (0.5 is off, 0 is −100%).
+Its energy above 1 kHz now drops about 14 dB at the start of the Breakdown and opens back up into the Drop.
 
 ## Building a Drum Rack
 
@@ -134,18 +204,21 @@ with `vp run liveql:codegen`. Tracks are named or numbered, and `Space` finds `A
 | `track <name> -d Drift k=v...`                                                  | Makes sure a MIDI track exists with that device, then sets parameters    |
 | `params <track> [-d dev] [-f text]`                                             | A device's parameters as `name=value [min..max]` or `{items}`            |
 | `tweak <track> "LP Freq=0.4"...`                                                | Sets parameters by name and prints the result with units                 |
-| `mix <track> vol=0.7 pan=0 A=0.4`                                               | Volume, pan and sends by letter                                          |
+| `mix <track> vol=-8db pan=0 A=0.4`                                              | Volume, pan and sends by letter, as knob positions or decibels           |
 | `clip <track> <slot> <lane>... [-l beats -g grid --gate -v vel -n name --fire]` | Replaces a slot's clip                                                   |
 | `scene <i> [-n name] [--fire]`                                                  | Names or fires a scene, creating scenes up to its index                  |
 | `arrange Intro:2 Drop:4`                                                        | Rebuilds the Arrangement from scenes. Rerunning converges                |
 | `tempo`, `master`, `play`, `stop`, `save`                                       | `save` clicks File > Save Live Set                                       |
 | `gql '<document>'`                                                              | The escape hatch                                                         |
-| `load <track> <name>`                                                           | Loads the browser's first match onto a track, plug-ins included          |
+| `load <track> <name> [--replace]`                                               | Loads the browser's first match onto a track, plug-ins included          |
+| `omni <track> <search> [--list] [-p n] [--glide off]`                           | Searches Omnisphere's patch browser and loads a result                   |
 | `editor <track> [--close]`                                                      | Opens or closes a plug-in's editor                                       |
 | `windows`, `shot [window] [-o png]`                                             | Lists Live's windows; captures one at one pixel per point                |
-| `click <window> x y [--double]`, `keys cmd+f text return`, `menu "File>Save"`   | Drives Live and plug-in windows. `""` as the window is the Set           |
+| `click <window> x y [--double]`, `keys cmd+f text return [--paced --native]`    | Drives Live and plug-in windows. `""` as the window is the Set           |
+| `menu "File>Save Live Set"`                                                     | Clicks a menu item                                                       |
 | `ax tree <window> [-f text]`, `ax press <window> <label>`, `ax set ... <value>` | Live's controls as text, and acting on them by label                     |
-| `sweep <track> <param> <from> <to> <bars> [--curve --before]`                   | Experimental: records a parameter ramp into the Arrangement              |
+| `sweep <track> <param> <from> <to> <bars> [-d dev --curve --before]`            | Experimental: records a parameter ramp into the Arrangement              |
+| `export <dir> [-n name --stems --start --bars]`, `levels <files> -s Name:a-b`   | Renders audio, then measures loudness and peaks per section              |
 
 Lanes (`scripts/lq/notation.ts`): sequence tokens are a note (`A1`, Ableton octaves with C3 = 60), a chord
 (`Am7@2`, `C@3^1` for the first inversion), `+` to stack, `.` rest, `-` hold, and a `!` or `?` suffix for an
@@ -154,17 +227,17 @@ accent or a soft step. A step lane is `C1:x..oX.-.` (hit, rest, soft, accent, ho
 ## Melodic House, as built
 
 122 BPM, A minor, chords Am, F, C, G a bar each. Scenes: 0 Groove, 1 Intro, 2 Breakdown, 3 Drop. The Arrangement
-is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars. The Omni track holds Omnisphere on Giant Trance Lead 1
-with GLIDE off, playing a lead in the Drop. The Arp's LP Freq is automated: 0.58 through bar 16, a slow rise from
-0.15 across the Breakdown (bars 17–24), 0.58 in the Drop. Slot 0 is the first sketch:
+is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars. Every instrument but the drums is Omnisphere, chosen by
+name without hearing it. Main ends in a Limiter (True Peak, ceiling −1 dB).
 
 | Track            | Device                                                                                | Notes                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Bass             | Drift (LP Freq 0.42, LP Res 0.25, Env 1 Decay 0.3, Sustain 0.35)                      | Offbeat eighths on the roots, MIDI 45, 41, 48, 43                                             |
+| Bass             | Omnisphere: MTAUR - Ostinato Bass, GLIDE off                                          | Offbeat eighths on the roots, MIDI 45, 41, 48, 43                                             |
 | Drums            | Drum Rack: Kick 909 1 (36), Clap 909 (39), Hihat Closed 909 (42), Hihat Open 909 (46) | Kick every beat, clap on 2 and 4, open hat on offbeats, soft closed hats on the 16ths between |
-| Pad              | Drift (Attack 0.55, Release 0.6, Sustain 0.85, LP Freq 0.55, Volume 0.4)              | Am7, Fmaj7, C, G held a bar each in close voicing                                             |
-| Arp              | Drift (Decay 0.28, Sustain 0, LP Freq 0.62, Volume 0.38)                              | 16ths through the chord tones an octave up, order 0 1 2 3 2 1 0 2                             |
-| A-Space (return) | Delay, Reverb                                                                         | Sends: Pad 0.45, Arp 0.55, Drums 0.08                                                         |
+| Pad              | Omnisphere: Jupiter and JX Warm Pad                                                   | Am7, Fmaj7, C, G held a bar each; wider voicings in the Breakdown                             |
+| Arp              | Omnisphere: Chill Plucker, then Auto Filter (Frequency automated)                     | 16ths through the chord tones an octave up; 8ths in the Breakdown                             |
+| Omni             | Omnisphere: Giant Trance Lead 1, GLIDE off                                            | Lead melody in the Drop                                                                       |
+| A-Space (return) | Delay, Reverb                                                                         | Sends: Pad 0.45, Arp 0.55, Omni 0.35, Drums 0.08                                              |
 
 ## Next
 
@@ -172,4 +245,4 @@ with GLIDE off, playing a lead in the Drop. The Arp's LP Freq is automated: 0.58
 2. Generators over the notation: chord progressions in a key, arps from chords.
 3. Several ramps in one recording pass, since each pass runs in real time. Clip envelopes are no way around it:
    creating them and inserting steps is Python-only, like Arrangement envelopes.
-4. Record the master to a file and measure levels, so the agent can catch clipping and silent tracks.
+4. Listen to the Omnisphere picks and replace any that miss; the agent chose them by name.

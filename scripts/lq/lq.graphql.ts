@@ -27,7 +27,8 @@ export interface Clip_slotsClipSlot extends Schema.Struct.Type<typeof Clip_slots
 
 export const Arrangement_clipsClip = Schema.Struct({
   id: Shared.Int,
-  start_time: Schema.NullOr(Shared.Float)
+  start_time: Schema.NullOr(Shared.Float),
+  length: Schema.NullOr(Shared.Float)
 })
 export interface Arrangement_clipsClip extends Schema.Struct.Type<typeof Arrangement_clipsClip.fields> {}
 
@@ -57,10 +58,10 @@ export const LqTrack = Schema.Struct({
 })
 export interface LqTrack extends Schema.Struct.Type<typeof LqTrack.fields> {}
 
-export const SongView = Schema.Struct({
+export const ViewSongView = Schema.Struct({
   id: Shared.Int
 })
-export interface SongView extends Schema.Struct.Type<typeof SongView.fields> {}
+export interface ViewSongView extends Schema.Struct.Type<typeof ViewSongView.fields> {}
 
 export const ScenesScene = Schema.Struct({
   id: Shared.Int,
@@ -84,7 +85,7 @@ export const LqShowLive_setSong = Schema.Struct({
   name: Schema.String,
   tempo: Schema.NullOr(Shared.Float),
   is_playing: Schema.NullOr(Schema.Boolean),
-  view: Schema.NullOr(SongView),
+  view: Schema.NullOr(ViewSongView),
   scenes: Schema.NullOr(Schema.Array(ScenesScene)),
   tracks: Schema.NullOr(Schema.Array(LqTrack)),
   return_tracks: Schema.NullOr(Schema.Array(LqTrack)),
@@ -100,7 +101,7 @@ export const LqShow = GraphQL.query("LqShow", {
       { name: "live_set", body: ["{id name tempo is_playing view{id}scenes{id name}tracks{...LqTrack}return_tracks{...LqTrack}master_track{mixer_device{volume{id value}}}}"] }
     ],
     fragments: [
-      { name: "LqTrack", body: ["on Track{id name mute devices{__typename id name class_name}clip_slots{id clip{id name length is_playing}}arrangement_clips{id start_time}mixer_device{volume{id value}panning{id value}sends{id value}}}"] }
+      { name: "LqTrack", body: ["on Track{id name mute devices{__typename id name class_name}clip_slots{id clip{id name length is_playing}}arrangement_clips{id start_time length}mixer_device{volume{id value}panning{id value}sends{id value}}}"] }
     ]
   },
   result: Schema.Struct({
@@ -713,6 +714,11 @@ export declare namespace LqDeleteTrackClip {
   export type Result = typeof LqDeleteTrackClip.result.Type
 }
 
+export const Song_view_setSongView = Schema.Struct({
+  selected_track: Schema.NullOr(Track_setTrack)
+})
+export interface Song_view_setSongView extends Schema.Struct.Type<typeof Song_view_setSongView.fields> {}
+
 /** `mutation LqSelectTrack` */
 export const LqSelectTrack = GraphQL.mutation("LqSelectTrack", {
   document: {
@@ -721,7 +727,7 @@ export const LqSelectTrack = GraphQL.mutation("LqSelectTrack", {
       { name: "track", body: "Int!" }
     ],
     selections: [
-      { name: "song_view_set", body: ["(id:$", "view", " properties:[{selected_track:$", "track", "}]){id}"] }
+      { name: "song_view_set", body: ["(id:$", "view", " properties:[{selected_track:$", "track", "}]){selected_track{name}}"] }
     ],
     fragments: []
   },
@@ -730,7 +736,7 @@ export const LqSelectTrack = GraphQL.mutation("LqSelectTrack", {
     track: Shared.Int
   },
   result: Schema.Struct({
-    song_view_set: Schema.NullOr(SongView)
+    song_view_set: Schema.NullOr(Song_view_setSongView)
   })
 })
 export declare namespace LqSelectTrack {
@@ -852,5 +858,30 @@ export declare namespace LqParamState {
   export type Result = typeof LqParamState.result.Type
 }
 
+/** `mutation LqDeleteDevice` */
+export const LqDeleteDevice = GraphQL.mutation("LqDeleteDevice", {
+  document: {
+    variables: [
+      { name: "track", body: "Int!" },
+      { name: "index", body: "Int!" }
+    ],
+    selections: [
+      { name: "track_delete_device", body: ["(id:$", "track", " index:$", "index", "){id}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    track: Shared.Int,
+    index: Shared.Int
+  },
+  result: Schema.Struct({
+    track_delete_device: Schema.NullOr(TracksTrack)
+  })
+})
+export declare namespace LqDeleteDevice {
+  export type Variables = typeof LqDeleteDevice.variables.Type
+  export type Result = typeof LqDeleteDevice.result.Type
+}
+
 /** Every operation in lq.graphql. */
-export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState)
+export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState, LqDeleteDevice)
