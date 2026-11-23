@@ -233,7 +233,7 @@ name without hearing it. Main ends in a Limiter (True Peak, ceiling −1 dB).
 
 | Track            | Device                                                                                | Notes                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Bass             | Omnisphere: MTAUR - Ostinato Bass, GLIDE off, fader −10 dB                            | Offbeat eighths on the roots, MIDI 57, 53, 60, 55: an octave up, which sounded less wobbly    |
+| Bass             | Omnisphere: MTAUR - Ostinato Bass, GLIDE off, fader −10 dB                            | Offbeat eighths on the roots, MIDI 57, 53, 60, 55: an octave up, against a wobble at MIDI 45  |
 | Drums            | Drum Rack: Kick 909 1 (36), Clap 909 (39), Hihat Closed 909 (42), Hihat Open 909 (46) | Kick every beat, clap on 2 and 4, open hat on offbeats, soft closed hats on the 16ths between |
 | Pad              | Omnisphere: Jupiter and JX Warm Pad                                                   | Am7, Fmaj7, C, G held a bar each; wider voicings in the Breakdown                             |
 | Arp              | Omnisphere: Chill Plucker, then Auto Filter (Frequency automated)                     | 16ths through the chord tones an octave up; 8ths in the Breakdown                             |
