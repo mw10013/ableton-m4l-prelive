@@ -22,6 +22,7 @@
     "clean": "rm -rf node_modules .tanstack",
     "liveql:schema": "vpx scripts/liveql-schema.ts",
     "liveql:codegen": "graphqlgen",
+    "project:new": "vpx scripts/project-new.ts",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
   },
   "dependencies": {

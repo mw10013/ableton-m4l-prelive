@@ -356,5 +356,29 @@ export declare namespace ReplaceNotes {
   export type Result = typeof ReplaceNotes.result.Type
 }
 
+export const SetFileLive_setSong = Schema.Struct({
+  /** Empty string for a Set that has never been saved. */
+  file_path: Schema.String
+})
+export interface SetFileLive_setSong extends Schema.Struct.Type<typeof SetFileLive_setSong.fields> {}
+
+/** `query SetFile` */
+export const SetFile = GraphQL.query("SetFile", {
+  document: {
+    variables: [],
+    selections: [
+      { name: "live_set", body: ["{file_path}"] }
+    ],
+    fragments: []
+  },
+  result: Schema.Struct({
+    live_set: SetFileLive_setSong
+  })
+})
+export declare namespace SetFile {
+  export type Variables = typeof SetFile.variables.Type
+  export type Result = typeof SetFile.result.Type
+}
+
 /** Every operation in liveSet.graphql. */
-export const LiveSetGraphQLGroup = GraphQLGroup.make(DetailClip, Overview, ClipBySlot, ClipById, PlayState, StopPlaying, ContinuePlaying, FireClip, ReplaceNotes)
+export const LiveSetGraphQLGroup = GraphQLGroup.make(DetailClip, Overview, ClipBySlot, ClipById, PlayState, StopPlaying, ContinuePlaying, FireClip, ReplaceNotes, SetFile)
