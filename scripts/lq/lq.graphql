@@ -1,0 +1,209 @@
+# Operations for the experimental `lq` CLI in scripts/lq/.
+
+fragment LqTrack on Track {
+  id
+  name
+  mute
+  devices {
+    id
+    name
+    class_name
+  }
+  clip_slots {
+    id
+    clip {
+      id
+      name
+      length
+      is_playing
+    }
+  }
+  arrangement_clips {
+    id
+    start_time
+  }
+  mixer_device {
+    volume {
+      id
+      value
+    }
+    panning {
+      id
+      value
+    }
+    sends {
+      id
+      value
+    }
+  }
+}
+
+query LqShow {
+  live_set {
+    id
+    name
+    tempo
+    is_playing
+    view {
+      id
+    }
+    scenes {
+      id
+      name
+    }
+    tracks {
+      ...LqTrack
+    }
+    return_tracks {
+      ...LqTrack
+    }
+    master_track {
+      mixer_device {
+        volume {
+          id
+          value
+        }
+      }
+    }
+  }
+}
+
+query LqDeviceParams($id: Int!) {
+  device(id: $id) {
+    id
+    name
+    parameters {
+      id
+      name
+      value
+      min
+      max
+      is_quantized
+      value_items
+    }
+  }
+}
+
+query LqParamText($id: Int!, $value: Float!) {
+  device_parameter(id: $id) {
+    str_for_value(value: $value)
+  }
+}
+
+mutation LqSetParam($id: Int!, $value: Float!) {
+  device_parameter_set(id: $id, properties: [{ value: $value }]) {
+    value
+  }
+}
+
+mutation LqSetTempo($song: Int!, $tempo: Float!) {
+  song_set(id: $song, properties: [{ tempo: $tempo }]) {
+    tempo
+  }
+}
+
+mutation LqCreateMidiTrack($song: Int!) {
+  song_create_midi_track(id: $song, index: -1) {
+    tracks {
+      id
+    }
+  }
+}
+
+mutation LqRenameTrack($id: Int!, $name: String!) {
+  track_set(id: $id, properties: [{ name: $name }]) {
+    name
+  }
+}
+
+mutation LqInsertDevice($track: Int!, $name: String!) {
+  track_insert_device(id: $track, device_name: $name) {
+    devices {
+      id
+      name
+    }
+  }
+}
+
+mutation LqCreateClip($slot: Int!, $length: Float!) {
+  clip_slot_create_clip(id: $slot, length: $length) {
+    clip {
+      id
+    }
+  }
+}
+
+mutation LqDeleteClip($slot: Int!) {
+  clip_slot_delete_clip(id: $slot) {
+    has_clip
+  }
+}
+
+mutation LqWriteClip($id: Int!, $name: String!, $notes: [NoteInput!]!) {
+  clip_set(id: $id, properties: [{ name: $name }]) {
+    name
+  }
+  clip_add_new_notes(id: $id, notes: $notes) {
+    note_ids
+  }
+}
+
+mutation LqFireSlot($id: Int!) {
+  clip_slot_fire(id: $id) {
+    id
+  }
+}
+
+mutation LqStopTrack($id: Int!) {
+  track_stop_all_clips(id: $id) {
+    id
+  }
+}
+
+mutation LqCreateScene($song: Int!) {
+  song_create_scene(id: $song, index: -1) {
+    create_scene {
+      id
+    }
+  }
+}
+
+mutation LqRenameScene($id: Int!, $name: String!) {
+  scene_set(id: $id, properties: [{ name: $name }]) {
+    name
+  }
+}
+
+mutation LqFireScene($id: Int!) {
+  scene_fire(id: $id) {
+    id
+  }
+}
+
+mutation LqPlay($song: Int!) {
+  song_start_playing(id: $song) {
+    is_playing
+  }
+}
+
+mutation LqStop($song: Int!) {
+  song_stop_playing(id: $song) {
+    is_playing
+  }
+}
+
+mutation LqToArrangement($track: Int!, $clip: Int!, $time: Float!) {
+  track_duplicate_clip_to_arrangement(
+    id: $track
+    clip: $clip
+    destination_time: $time
+  ) {
+    id
+  }
+}
+
+mutation LqDeleteTrackClip($track: Int!, $clip: Int!) {
+  track_delete_clip(id: $track, clip: $clip) {
+    id
+  }
+}
