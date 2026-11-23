@@ -6,6 +6,7 @@
  */
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import * as Arr from "effect/Array";
 import * as Argument from "effect/cli/Argument";
 import * as CliError from "effect/cli/CliError";
 import * as Command from "effect/cli/Command";
@@ -747,32 +748,134 @@ const loadCommand = Command.make(
 
 /** Points in Omnisphere's editor at its default size, measured from `shot`. */
 const OMNI = {
-  clear: [293, 125],
   search: [165, 125],
-  firstResult: [130, 504],
-  rowHeight: 20.4,
+  clear: [293, 125],
+  /** Inside the search box, clear of typed text: white when focused, grey when not. */
+  searchSample: [250, 125],
+  // Scrollbar tracks measured from a column of pixels; top and bottom sit just inside each end,
+  // so a click there lands on the thumb only when the list is already at that end.
+  categories: { text: [18, 225, 280, 272], bar: 300, top: 222, bottom: 474 },
+  results: { text: [18, 490, 280, 275], bar: 298, top: 494, bottom: 757 },
+  patchName: [650, 205, 415, 40],
   glide: [1261, 534],
   glideSample: [1236, 534],
-  list: [18, 490, 292, 275],
-  patch: [560, 200, 520, 260],
 } as const;
 
+/** A scrolling list in Omnisphere's browser: where its text is, and its scrollbar's track. */
+interface OmniList {
+  readonly text: readonly [number, number, number, number];
+  readonly bar: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** Lowercase letters and digits only, since OCR drops and adds spaces. */
+const normalize = (text: string) =>
+  text.toLowerCase().replaceAll(/[^a-z0-9]/gu, "");
+
 /**
- * Loads an Omnisphere patch by searching its browser, since the LOM cannot see its patches.
- * `--list` only shows the results. Either way it saves a cropped shot to check by eye.
+ * The pages of a list from the top, read with OCR, until `stop` returns a value or the list
+ * ends. Pages move by clicks in the scrollbar's track: Omnisphere ignores the scroll wheel in
+ * some instances, and a click on the thumb at either end moves nothing, which ends the walk.
+ */
+const walkList = Effect.fnUntraced(function* <A>(
+  window: Screen.LiveWindow,
+  list: OmniList,
+  stop: (lines: readonly Screen.TextLine[]) => A | undefined,
+) {
+  const read = Screen.readText(window, list.text);
+  const key = (lines: readonly Screen.TextLine[]) =>
+    lines.map((l) => l.text).join("|");
+  let lines = yield* read;
+  const visible = stop(lines);
+  if (visible !== undefined) return { found: visible, seen: lines };
+  // An end is two clicks in a row that move nothing: the first click after the browser changes
+  // can be swallowed.
+  let still = 0;
+  for (let up = 0; up < 100 && still < 2; up++) {
+    yield* Screen.click(window, list.bar, list.top, false);
+    yield* Effect.sleep("150 millis");
+    const next = yield* read;
+    still = key(next) === key(lines) ? still + 1 : 0;
+    lines = next;
+  }
+  const seen: Screen.TextLine[] = [];
+  for (let page = 0; page < 100; page++) {
+    const found = stop(lines);
+    seen.push(...lines);
+    if (found !== undefined) return { found, seen };
+    let next = lines;
+    for (let tries = 0; tries < 2 && key(next) === key(lines); tries++) {
+      yield* Screen.click(window, list.bar, list.bottom, false);
+      yield* Effect.sleep("150 millis");
+      next = yield* read;
+    }
+    if (key(next) === key(lines)) break;
+    lines = next;
+  }
+  return { found: undefined, seen };
+});
+
+/** Finds a line by name in a list and clicks it; exact matches beat partial ones. */
+const clickInList = Effect.fnUntraced(function* (
+  window: Screen.LiveWindow,
+  list: OmniList,
+  name: string,
+) {
+  const wanted = normalize(name);
+  const { found, seen } = yield* walkList(
+    window,
+    list,
+    (lines) =>
+      lines.find((l) => normalize(l.text) === wanted) ??
+      lines.find((l) => normalize(l.text).includes(wanted)),
+  );
+  if (found === undefined)
+    return yield* fail(
+      `no "${name}" in the list; it has ${Arr.dedupe(seen.map((l) => l.text))
+        .slice(0, 60)
+        .join(", ")}`,
+    );
+  yield* Screen.click(window, found.x + 20, found.y + found.height / 2, false);
+  return found.text;
+});
+
+/** Every line of a list, from the top. */
+const readList = Effect.fnUntraced(function* (
+  window: Screen.LiveWindow,
+  list: OmniList,
+) {
+  const { seen } = yield* walkList(window, list, () => undefined);
+  return Arr.dedupe(seen.map((l) => l.text));
+});
+
+/**
+ * Picks an Omnisphere patch, since the LOM cannot see its patches. It works by mouse and reads
+ * the browser with OCR: `--category` and `--patch` click lines by name, scrolling as needed, and
+ * `--list` prints the results. `--search` types into the search box, but only once the box shows
+ * focus; Omnisphere sometimes refuses focus to every instance's box.
  */
 const omniCommand = Command.make(
   "omni",
   {
     track: Argument.String("track"),
-    search: Argument.String("search"),
-    pick: Flag.Int("pick").pipe(
+    category: Flag.String("category").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription('A category, as "Synth Bass"'),
+      Flag.optional,
+    ),
+    search: Flag.String("search").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription("Type into the search box, when it takes focus"),
+      Flag.optional,
+    ),
+    patch: Flag.String("patch").pipe(
       Flag.withAlias("p"),
-      Flag.withDescription("Which result to load, from 1"),
-      Flag.withDefault(1),
+      Flag.withDescription("Load the result with this name"),
+      Flag.optional,
     ),
     list: Flag.Boolean("list").pipe(
-      Flag.withDescription("Show the results without loading one"),
+      Flag.withDescription("Print the results"),
       Flag.withDefault(false),
     ),
     glide: Flag.ChoiceWithValue("glide", [
@@ -785,15 +888,16 @@ const omniCommand = Command.make(
       Flag.optional,
     ),
   },
-  ({ track: ref, search, pick, list, glide }) =>
+  ({ track: ref, category, search, patch, list, glide }) =>
     Effect.gen(function* () {
+      const lq = yield* Lq;
       const set = yield* show;
       const track = yield* findTrack(set, ref);
       const device = (track.devices ?? []).find((d) => d.name === "Omnisphere");
       if (device === undefined)
         return yield* fail(`no Omnisphere on ${track.name}`);
       yield* closeEditors(set);
-      yield* (yield* Lq).LqEditor({ id: device.id, open: true });
+      yield* lq.LqEditor({ id: device.id, open: true });
       yield* Screen.activate;
       const title = `omnisphere/${track.name.toLowerCase()}`;
       const window = yield* Screen.until(
@@ -805,52 +909,83 @@ const omniCommand = Command.make(
       );
       const at = (p: readonly [number, number]) =>
         Screen.click(window, p[0], p[1], false);
+      const path = "/tmp/lq-omni.png";
       // A newly opened editor takes a moment, and its first click only focuses the window.
       yield* Effect.sleep("1 second");
       yield* at(OMNI.clear);
-      yield* at(OMNI.search);
-      yield* at(OMNI.search);
-      // When the search box misses focus, the keys reach Live, where Space starts playback.
-      const playing = Effect.map(
-        (yield* Lq).LqSongTime(),
-        (r) => r.live_set.is_playing === true,
-      );
-      const wasPlaying = yield* playing;
-      yield* Screen.keys([search, "return"], { paced: true });
-      yield* Effect.sleep("1500 millis");
-      if (!wasPlaying && (yield* playing)) {
-        yield* (yield* Lq).LqStop({ song: set.id });
-        return yield* fail(
-          `the search went to Live, not Omnisphere, and started playback; stopped it and loaded nothing. Click the ${track.name} editor's search box with lq click and retry`,
+
+      if (Option.isSome(category)) {
+        const clicked = yield* clickInList(
+          window,
+          OMNI.categories,
+          category.value,
         );
+        yield* Effect.sleep("800 millis");
+        yield* Console.log(`category ${clicked}`);
       }
-      if (!list) {
-        yield* at([
-          OMNI.firstResult[0],
-          OMNI.firstResult[1] + (pick - 1) * OMNI.rowHeight,
-        ]);
-        yield* Effect.sleep("4 seconds");
-      }
-      const path = `/tmp/lq-omni-${track.name}.png`;
-      if (!list && Option.isSome(glide)) {
-        // GLIDE lights cyan when on and is grey when off.
-        const isOn = Effect.gen(function* () {
-          yield* Screen.capture(window, path);
-          const { r, b } = yield* Screen.pixel(path, ...OMNI.glideSample);
-          return b - r > 60;
-        });
-        if ((yield* isOn) !== (glide.value === "on")) {
-          yield* at(OMNI.glide);
-          yield* Effect.sleep("500 millis");
+
+      if (Option.isSome(search)) {
+        yield* at(OMNI.search);
+        yield* Effect.sleep("300 millis");
+        yield* Screen.capture(window, path);
+        const { r } = yield* Screen.pixel(path, ...OMNI.searchSample);
+        if (r < 240)
+          return yield* fail(
+            "Omnisphere's search box did not take focus, so typing would reach Live; browse with --category instead",
+          );
+        // The box can show focus and still miss keys; then they reach Live, where Space plays.
+        const playing = Effect.map(
+          lq.LqSongTime(),
+          (t) => t.live_set.is_playing === true,
+        );
+        const wasPlaying = yield* playing;
+        yield* Screen.keys([search.value, "return"], { paced: true });
+        yield* Effect.sleep("1500 millis");
+        if (!wasPlaying && (yield* playing)) {
+          yield* lq.LqStop({ song: set.id });
+          return yield* fail(
+            "the search went to Live, not Omnisphere, and started playback; stopped it and loaded nothing",
+          );
         }
-        yield* Console.log(`glide ${(yield* isOn) ? "on" : "off"}`);
       }
-      yield* Screen.capture(window, path, list ? OMNI.list : OMNI.patch);
-      yield* Console.log(path);
+
+      if (list) {
+        const names = yield* readList(window, OMNI.results);
+        yield* Console.log(names.join("\n"));
+      }
+
+      if (Option.isSome(patch)) {
+        yield* clickInList(window, OMNI.results, patch.value);
+        const loaded = yield* Screen.until(
+          // The light-blue name reads cleanest at a higher threshold than the lists.
+          Effect.map(Screen.readText(window, OMNI.patchName, 165), (lines) => {
+            const text = lines.map((l) => l.text).join(" ");
+            return normalize(text).includes(normalize(patch.value))
+              ? text
+              : undefined;
+          }),
+          `${patch.value} to load`,
+          "15 seconds",
+        );
+        yield* Console.log(`loaded ${loaded.replace(/\*$/u, "")}`);
+        if (Option.isSome(glide)) {
+          // GLIDE lights cyan when on and is grey when off.
+          const isOn = Effect.gen(function* () {
+            yield* Screen.capture(window, path);
+            const { r, b } = yield* Screen.pixel(path, ...OMNI.glideSample);
+            return b - r > 60;
+          });
+          if ((yield* isOn) !== (glide.value === "on")) {
+            yield* at(OMNI.glide);
+            yield* Effect.sleep("500 millis");
+          }
+          yield* Console.log(`glide ${(yield* isOn) ? "on" : "off"}`);
+        }
+      }
     }),
 ).pipe(
   Command.withDescription(
-    'Search Omnisphere\'s patch browser on a track and load a result: omni Pad "warm pad" -p 2',
+    'Pick an Omnisphere patch by mouse: omni Bass -c "Synth Bass" --list, omni Bass -c "Synth Bass" -p "Black Sand"',
   ),
 );
 

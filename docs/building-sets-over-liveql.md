@@ -94,17 +94,23 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
   configured. Omnisphere keeps its patches in its own library.
 - In the patch browser, a lit GLIDE button on the main page means notes slide in pitch (portamento). Clicking it
   off changes the copy in the Set only.
-- The screen does the rest. `lq omni <track> <search> [--list] [-p n] [--glide off]` opens the track's editor,
-  searches the patch browser, loads result `n` and saves a cropped shot of the patch name to check by eye.
-  `--glide` reads the GLIDE button's color from one pixel (`ffmpeg`) and clicks it only if needed. The patch is
-  stored in the Live Set; nothing is saved into Omnisphere. A first open may land on the About page; click the
-  Spectrasonics logo for the main page.
-- The editor window often does not become the key window, so its search box takes no typing and the keys reach Live
-  instead, where Space starts playback. Clicking the box or the title bar, `AXRaise` and setting `AXMain` did not
-  make it key. `omni` checks `is_playing` around its typing; if the keys started playback, it stops Live and fails
-  without loading a patch.
-- One instance's search box would not take typing at all, even freshly reloaded, while the others did. Its category
-  list worked by mouse: drag the scrollbar, click a category (Synth Short holds the plucks), click a patch.
+- `lq omni <track> [-c category] [-p patch] [--list] [--glide off]` picks patches by mouse and reads the browser
+  with Homebrew's `tesseract`: it clicks a category and a patch by name, prints a category's patches with
+  `--list`, and confirms the load by reading the patch name back. `--glide` reads the GLIDE button's color from one
+  pixel and clicks it only if needed. The patch is stored in the Live Set; nothing is saved into Omnisphere. A
+  first open may land on the About page; click the Spectrasonics logo for the main page.
+- Measured, the parts of Omnisphere's editor that take input:
+  - Mouse clicks work in every instance.
+  - The search box at times takes no focus in any instance, whatever the click (single, double, slow, on the
+    magnifier), while Live reports the editor as its focused window. Typing then reaches Live, where Space plays.
+    `-s/--search` types only when a pixel inside the box is white (focused) and still stops Live if typing started
+    playback.
+  - The scroll wheel moves the lists in some instances and nothing in others, with the editor frontmost under the
+    pointer. `omni` pages by clicking the scrollbar track instead, measured from a column of pixels.
+- OCR: lists read cleanly at a brightness threshold of 150 (at 165, "1" reads as "4"); the light-blue patch name
+  at 165. Launched by `vpx`, tesseract cannot open a path that starts with `/tmp`, so `readText` works in a
+  scoped temporary directory.
+- Listing Synth Short's 337 patches takes about 40 s; loading a patch takes 6 to 8 s.
 - Untested: Live's `-_PluginAutoPopulateThreshold` option in `Options.txt` would expose more parameters to LiveQL.
 
 ## Recording automation
@@ -239,7 +245,7 @@ with `vp run liveql:codegen`. Tracks are named or numbered, and `Space` finds `A
 | `tempo`, `master`, `play`, `stop`, `save`                                       | `save` clicks File > Save Live Set                                       |
 | `gql '<document>'`                                                              | The escape hatch                                                         |
 | `load <track> <name> [--replace]`                                               | Loads the browser's first match onto a track, plug-ins included          |
-| `omni <track> <search> [--list] [-p n] [--glide off]`                           | Searches Omnisphere's patch browser and loads a result                   |
+| `omni <track> [-c category] [-p patch] [--list] [--glide off]`                  | Picks an Omnisphere patch by mouse, reading the browser with OCR         |
 | `editor <track> [--close]`                                                      | Opens or closes a plug-in's editor                                       |
 | `windows`, `shot [window] [-o png]`                                             | Lists Live's windows; captures one at one pixel per point                |
 | `click <window> x y [--double]`, `keys cmd+f text return [--paced --native]`    | Drives Live and plug-in windows. `""` as the window is the Set           |
