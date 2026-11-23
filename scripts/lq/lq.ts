@@ -15,6 +15,7 @@ import * as Console from "effect/Console";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as GraphQLClient from "effect/graphql/GraphQLClient";
 import * as GraphQLProtocol from "effect/graphql/GraphQLProtocol";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
@@ -22,11 +23,19 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import * as Audio from "./audio.ts";
-import { LqGraphQLGroup, type LqShow } from "./lq.graphql.ts";
-import { NotationError, type Note, parseLane } from "./notation.ts";
+import { type LqDump, LqGraphQLGroup, type LqShow } from "./lq.graphql.ts";
+import {
+  NotationError,
+  type Note,
+  parseLane,
+  parseLanes as parseLaneList,
+  toLanes,
+} from "./notation.ts";
 import * as Screen from "./screen.ts";
+import * as Song from "./song.ts";
 
 class LqError extends Data.TaggedError("LqError")<{
   readonly message: string;
@@ -832,9 +841,46 @@ const omniCommand = Command.make(
 );
 
 /**
- * Rebuilds the Arrangement from scenes: `arrange Intro:2 Drop:4` plays each scene's clips
- * that many times in order. It first deletes every Arrangement clip, so rerunning converges.
+ * Rebuilds the Arrangement from scenes: each `Scene:repeats` plays that scene's clips that many
+ * times in order. It first deletes every Arrangement clip, so rerunning converges. Automation
+ * lives on the tracks, not the clips, and stays.
  */
+const arrange = Effect.fnUntraced(function* (sections: readonly string[]) {
+  const lq = yield* Lq;
+  const set = yield* show;
+  const scenes = set.scenes ?? [];
+  const tracks = set.tracks ?? [];
+  for (const t of tracks)
+    for (const c of t.arrangement_clips ?? [])
+      yield* lq.LqDeleteTrackClip({ track: t.id, clip: c.id });
+  let time = 0;
+  const out: string[] = [];
+  for (const section of sections) {
+    const [ref = "", repeatText = "1"] = section.split(":");
+    const index = /^\d+$/u.test(ref)
+      ? Number(ref)
+      : scenes.findIndex((s) => s.name.toLowerCase() === ref.toLowerCase());
+    if (index < 0 || index >= scenes.length)
+      return yield* fail(`no scene ${ref}`);
+    const repeats = Number(repeatText);
+    const clips = tracks.flatMap((t) => {
+      const clip = t.clip_slots?.[index]?.clip;
+      return clip ? [{ track: t.id, clip }] : [];
+    });
+    const length = Math.max(...clips.map(({ clip }) => clip.length ?? 0), 4);
+    for (let k = 0; k < repeats; k++)
+      for (const { track, clip } of clips)
+        yield* lq.LqToArrangement({
+          track,
+          clip: clip.id,
+          time: time + k * length,
+        });
+    out.push(`${ref}@${String(time / 4 + 1)}`);
+    time += repeats * length;
+  }
+  return `${out.join(" ")}, ${String(time / 4)} bars`;
+});
+
 const arrangeCommand = Command.make(
   "arrange",
   {
@@ -844,42 +890,7 @@ const arrangeCommand = Command.make(
   },
   ({ sections }) =>
     Effect.gen(function* () {
-      const lq = yield* Lq;
-      const set = yield* show;
-      const scenes = set.scenes ?? [];
-      const tracks = set.tracks ?? [];
-      for (const t of tracks)
-        for (const c of t.arrangement_clips ?? [])
-          yield* lq.LqDeleteTrackClip({ track: t.id, clip: c.id });
-      let time = 0;
-      const out: string[] = [];
-      for (const section of sections) {
-        const [ref = "", repeatText = "1"] = section.split(":");
-        const index = /^\d+$/u.test(ref)
-          ? Number(ref)
-          : scenes.findIndex((s) => s.name.toLowerCase() === ref.toLowerCase());
-        if (index < 0 || index >= scenes.length)
-          return yield* fail(`no scene ${ref}`);
-        const repeats = Number(repeatText);
-        const clips = tracks.flatMap((t) => {
-          const clip = t.clip_slots?.[index]?.clip;
-          return clip ? [{ track: t.id, clip }] : [];
-        });
-        const length = Math.max(
-          ...clips.map(({ clip }) => clip.length ?? 0),
-          4,
-        );
-        for (let k = 0; k < repeats; k++)
-          for (const { track, clip } of clips)
-            yield* lq.LqToArrangement({
-              track,
-              clip: clip.id,
-              time: time + k * length,
-            });
-        out.push(`${ref}@${String(time / 4 + 1)}`);
-        time += repeats * length;
-      }
-      yield* Console.log(`${out.join(" ")}, ${String(time / 4)} bars`);
+      yield* Console.log(yield* arrange(sections));
     }),
 ).pipe(
   Command.withDescription(
@@ -977,6 +988,14 @@ const sweepCommand = Command.make(
         .map(Number);
       if (Number.isNaN(startBar) || Number.isNaN(endBar) || endBar <= startBar)
         return yield* fail("bars must be start-end, as 17-25");
+      // Arrangement Record also records every armed track, over the clips already there.
+      const armed = (set.tracks ?? []).filter(
+        (t) => t.arm === true || t.implicit_arm === true,
+      );
+      if (armed.length > 0)
+        return yield* fail(
+          `disarm ${armed.map((t) => t.name).join(", ")} first: recording would overwrite their clips`,
+        );
       const start = (startBar - 1) * 4;
       const end = (endBar - 1) * 4;
       const song = set.id;
@@ -1161,6 +1180,427 @@ const transposeCommand = Command.make(
   ),
 );
 
+type DumpSet = LqDump.Result["live_set"];
+type DumpTrack = NonNullable<DumpSet["tracks"]>[number];
+
+const parseLanes = (clip: Song.ClipSpec) =>
+  Effect.try({
+    try: () =>
+      parseLaneList(clip.lanes, {
+        grid: clip.grid,
+        gate: clip.gate,
+        velocity: clip.velocity,
+        length: clip.length,
+      }),
+    catch: (e) =>
+      new LqError({
+        message: `clip ${clip.name}: ${e instanceof NotationError ? e.message : String(e)}`,
+      }),
+  });
+
+/** A comparable form of a note list: Live stores times and velocities as floats. */
+const noteKey = (notes: readonly Note[]) =>
+  notes
+    .map(
+      (n) =>
+        `${String(n.pitch)}@${n.start_time.toFixed(3)}:${n.duration.toFixed(3)}:${String(Math.round(n.velocity))}`,
+    )
+    .toSorted()
+    .join(" ");
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** The spec for one track as Live has it now. */
+const trackSpec = Effect.fnUntraced(function* (
+  t: DumpTrack,
+  scenes: readonly string[],
+  patch: string | undefined,
+) {
+  const lq = yield* Lq;
+  const volume = t.mixer_device?.volume;
+  const vol =
+    volume === undefined || volume === null
+      ? 0.85
+      : ((yield* lq.LqParamText({ id: volume.id, value: volume.value ?? 0 }))
+          .device_parameter?.str_for_value ?? round3(volume.value ?? 0));
+  const clips: Record<string, Song.ClipSpec> = {};
+  for (const [i, slot] of (t.clip_slots ?? []).entries()) {
+    const clip = slot.clip;
+    if (!clip) continue;
+    const notes = clip.get_all_notes_extended?.notes ?? [];
+    const length = clip.length ?? 4;
+    const lanes = yield* Effect.try({
+      try: () => toLanes(notes, length),
+      catch: (e) =>
+        new LqError({
+          message: `${t.name} slot ${String(i)}: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    });
+    clips[scenes[i] ?? String(i)] = { name: clip.name ?? "", length, ...lanes };
+  }
+  return {
+    name: t.name,
+    devices: (t.devices ?? [])
+      .filter((d) => d.class_name !== "MxDeviceMidiEffect")
+      .map((d) => d.name ?? ""),
+    ...(patch === undefined ? {} : { patch }),
+    mix: {
+      vol,
+      pan: round3(t.mixer_device?.panning?.value ?? 0),
+      sends: (t.mixer_device?.sends ?? []).map((x) => round3(x.value ?? 0)),
+    },
+    clips,
+  } satisfies Song.TrackSpec;
+});
+
+/**
+ * The Arrangement as `Scene:repeats`: each bar-aligned start whose clips are Session clips of
+ * one scene is a block. Clips that fit no block are left for `arrangementDiff` to report.
+ */
+const arrangeOf = (set: DumpSet, scenes: readonly string[]) => {
+  const slotAt = new Map<number, number>();
+  for (const t of set.tracks ?? [])
+    for (const c of t.arrangement_clips ?? []) {
+      const start = c.start_time ?? 0;
+      const slot = (t.clip_slots ?? []).findIndex(
+        (s) => s.clip?.name === c.name,
+      );
+      if (
+        slot !== -1 &&
+        Math.abs(start / 4 - Math.round(start / 4)) < 1e-3 &&
+        !slotAt.has(start)
+      )
+        slotAt.set(start, slot);
+    }
+  const blocks = [...slotAt]
+    .toSorted((a, b) => a[0] - b[0])
+    .map(([, slot]) => slot);
+  return Song.sectionsOf(blocks, scenes);
+};
+
+/**
+ * Arrangement clips that differ from what `arrange` would lay out for these sections, as
+ * `+` expected but missing and `-` present but unexpected.
+ */
+const arrangementDiff = (
+  set: DumpSet,
+  arrangeSpec: readonly string[],
+  scenes: readonly string[],
+  clipAt: (
+    track: string,
+    slot: number,
+  ) => { name: string; length: number } | undefined,
+) => {
+  const tracks = (set.tracks ?? []).map((t) => t.name);
+  const placed =
+    Song.arrangementOf(arrangeSpec, scenes, (slot) =>
+      tracks.flatMap((track) => {
+        const clip = clipAt(track, slot);
+        return clip === undefined ? [] : [{ track, length: clip.length }];
+      }),
+    ) ?? [];
+  const key = (track: string, name: string, start: number) =>
+    `${track} "${name}" bar ${String(Math.round((start / 4 + 1) * 1000) / 1000)}`;
+  const expected = new Set(
+    placed.map((p) =>
+      key(p.track, clipAt(p.track, p.slot)?.name ?? "", p.start),
+    ),
+  );
+  const actual = new Set(
+    (set.tracks ?? []).flatMap((t) =>
+      (t.arrangement_clips ?? []).map((c) =>
+        key(t.name, c.name ?? "", c.start_time ?? 0),
+      ),
+    ),
+  );
+  return [
+    ...[...expected].filter((k) => !actual.has(k)).map((k) => `+ ${k}`),
+    ...[...actual].filter((k) => !expected.has(k)).map((k) => `- ${k}`),
+  ];
+};
+
+/** A Session clip's name and length as Live has it. */
+const liveClipAt = (set: DumpSet) => (track: string, slot: number) => {
+  const clip = (set.tracks ?? []).find((t) => t.name === track)?.clip_slots?.[
+    slot
+  ]?.clip;
+  return clip ? { name: clip.name ?? "", length: clip.length ?? 0 } : undefined;
+};
+
+const decodeSpec = Schema.decodeUnknownEffect(Song.SongSpecJson);
+
+const readSpec = Effect.fnUntraced(function* (path: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const text = yield* fs.readFileString(path);
+  return yield* decodeSpec(text).pipe(
+    Effect.mapError((e) => new LqError({ message: `${path}: ${e.message}` })),
+  );
+});
+
+/**
+ * Writes the Set as a song spec. A `patch` already in the file is kept, since Live cannot read
+ * a plug-in's patch.
+ */
+const dumpCommand = Command.make(
+  "dump",
+  { path: Argument.String("song.json") },
+  ({ path }) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const before = (yield* fs.exists(path))
+        ? Option.some(yield* readSpec(path))
+        : Option.none();
+      const patches = new Map(
+        Option.match(before, {
+          onNone: () => [],
+          onSome: (spec) =>
+            [...spec.tracks, ...spec.returns].flatMap((t) =>
+              t.patch === undefined ? [] : [[t.name, t.patch] as const],
+            ),
+        }),
+      );
+      const set = (yield* (yield* Lq).LqDump()).live_set;
+      // Live's unnamed default scenes with no clips add nothing to a spec.
+      const scenes = (set.scenes ?? []).map((s) => s.name);
+      const used = (slot: number) =>
+        [...(set.tracks ?? []), ...(set.return_tracks ?? [])].some(
+          (t) => t.clip_slots?.[slot]?.clip,
+        );
+      while (scenes.at(-1) === "" && !used(scenes.length - 1)) scenes.pop();
+      const tracks: Song.TrackSpec[] = [];
+      for (const t of set.tracks ?? [])
+        if (t.name !== "LiveQL")
+          tracks.push(yield* trackSpec(t, scenes, patches.get(t.name)));
+      const returns: Song.TrackSpec[] = [];
+      for (const t of set.return_tracks ?? [])
+        returns.push(yield* trackSpec(t, scenes, patches.get(t.name)));
+      const spec: Song.SongSpec = {
+        tempo: round3(set.tempo ?? 120),
+        scenes,
+        arrange: arrangeOf(set, scenes),
+        tracks,
+        returns,
+      };
+      yield* fs.writeFileString(path, `${JSON.stringify(spec, null, 2)}\n`);
+      for (const d of arrangementDiff(
+        set,
+        spec.arrange,
+        scenes,
+        liveClipAt(set),
+      ))
+        yield* Console.log(
+          `! Arrangement differs from ${spec.arrange.join(" ")}: ${d}`,
+        );
+      const clipCount = tracks.reduce(
+        (n, t) => n + Object.keys(t.clips).length,
+        0,
+      );
+      yield* Console.log(
+        `${path}: ${String(tracks.length)} tracks, ${String(returns.length)} returns, ${String(clipCount)} clips, ${spec.arrange.join(" ")}`,
+      );
+    }),
+).pipe(Command.withDescription("Write the Set as a song spec: dump song.json"));
+
+/**
+ * Makes the Set match a song spec, changing only what differs, so a second run changes nothing.
+ * Devices it cannot insert (plug-ins) are reported for `lq load`.
+ */
+const applyCommand = Command.make(
+  "apply",
+  {
+    path: Argument.String("song.json"),
+    dryRun: Flag.Boolean("dry-run").pipe(
+      Flag.withDescription("List the changes without making them"),
+      Flag.withDefault(false),
+    ),
+  },
+  ({ path, dryRun }) =>
+    Effect.gen(function* () {
+      const lq = yield* Lq;
+      const spec = yield* readSpec(path);
+      const changes: string[] = [];
+      const warnings: string[] = [];
+      const change = <E, R>(
+        what: string,
+        effect: Effect.Effect<unknown, E, R>,
+      ) =>
+        Effect.gen(function* () {
+          changes.push(what);
+          if (!dryRun) yield* effect;
+        });
+      let set = (yield* lq.LqDump()).live_set;
+
+      if (Math.abs((set.tempo ?? 0) - spec.tempo) > 1e-3)
+        yield* change(
+          `tempo ${String(spec.tempo)}`,
+          lq.LqSetTempo({ song: set.id, tempo: spec.tempo }),
+        );
+
+      for (let i = (set.scenes ?? []).length; i < spec.scenes.length; i++)
+        yield* change(
+          `create scene ${String(i)}`,
+          lq.LqCreateScene({ song: set.id }),
+        );
+      if (!dryRun) set = (yield* lq.LqDump()).live_set;
+      for (const [i, name] of spec.scenes.entries()) {
+        const scene = set.scenes?.[i];
+        if (scene !== undefined && scene.name !== name)
+          yield* change(
+            `scene ${String(i)} "${name}"`,
+            lq.LqRenameScene({ id: scene.id, name }),
+          );
+      }
+
+      const song = set.id;
+      const createTrack = Effect.fnUntraced(function* (name: string) {
+        const created = yield* lq.LqCreateMidiTrack({ song });
+        const id = created.song_create_midi_track?.tracks?.at(-1)?.id;
+        if (id !== undefined) yield* lq.LqRenameTrack({ id, name });
+      });
+      const existing = new Set((set.tracks ?? []).map((x) => x.name));
+      for (const t of spec.tracks)
+        if (!existing.has(t.name))
+          yield* change(`create track ${t.name}`, createTrack(t.name));
+      if (!dryRun) set = (yield* lq.LqDump()).live_set;
+
+      let clipsChanged = false;
+      const sync = Effect.fnUntraced(function* (
+        want: Song.TrackSpec,
+        have: DumpTrack,
+      ) {
+        const present = new Set((have.devices ?? []).map((d) => d.name ?? ""));
+        for (const device of want.devices.filter((d) => !present.has(d))) {
+          if (dryRun) {
+            changes.push(`${want.name}: insert ${device}`);
+            continue;
+          }
+          const after = yield* lq.LqInsertDevice({
+            track: have.id,
+            name: device,
+          });
+          if (
+            (after.track_insert_device?.devices ?? []).some(
+              (d) => d.name === device,
+            )
+          )
+            changes.push(`${want.name}: insert ${device}`);
+          else
+            warnings.push(
+              `${want.name}: ${device} is missing; load it with lq load ${want.name} "${device}"${want.patch === undefined ? "" : ` and pick ${want.patch}`}`,
+            );
+        }
+
+        const mixer = have.mixer_device;
+        const volume = mixer?.volume;
+        if (volume !== undefined && volume !== null) {
+          const knob =
+            typeof want.mix.vol === "number"
+              ? want.mix.vol
+              : yield* knobForDb(volume.id, leadingNumber(want.mix.vol));
+          if (Math.abs((volume.value ?? 0) - knob) > 0.002)
+            yield* change(
+              `${want.name}: vol ${String(want.mix.vol)}`,
+              lq.LqSetParam({ id: volume.id, value: knob }),
+            );
+        }
+        const pan = mixer?.panning;
+        if (
+          pan !== undefined &&
+          pan !== null &&
+          Math.abs((pan.value ?? 0) - want.mix.pan) > 0.002
+        )
+          yield* change(
+            `${want.name}: pan ${String(want.mix.pan)}`,
+            lq.LqSetParam({ id: pan.id, value: want.mix.pan }),
+          );
+        for (const [i, value] of want.mix.sends.entries()) {
+          const send = mixer?.sends?.[i];
+          if (send !== undefined && Math.abs((send.value ?? 0) - value) > 0.002)
+            yield* change(
+              `${want.name}: send ${String.fromCodePoint(65 + i)} ${String(value)}`,
+              lq.LqSetParam({ id: send.id, value }),
+            );
+        }
+
+        for (const [i, slot] of (have.clip_slots ?? []).entries()) {
+          const target = want.clips[spec.scenes[i] ?? String(i)];
+          const current = slot.clip;
+          if (target === undefined) {
+            if (current) {
+              clipsChanged = true;
+              yield* change(
+                `${want.name}: delete clip ${String(i)}`,
+                lq.LqDeleteClip({ slot: slot.id }),
+              );
+            }
+            continue;
+          }
+          const notes = yield* parseLanes(target);
+          const same =
+            current !== null &&
+            current !== undefined &&
+            current.name === target.name &&
+            Math.abs((current.length ?? 0) - target.length) < 1e-3 &&
+            noteKey(current.get_all_notes_extended?.notes ?? []) ===
+              noteKey(notes);
+          if (same) continue;
+          clipsChanged = true;
+          yield* change(
+            `${want.name}: clip ${String(i)} "${target.name}" (${String(notes.length)} notes)`,
+            Effect.gen(function* () {
+              if (current) yield* lq.LqDeleteClip({ slot: slot.id });
+              const created = yield* lq.LqCreateClip({
+                slot: slot.id,
+                length: target.length,
+              });
+              const id = created.clip_slot_create_clip?.clip?.id;
+              if (id === undefined || id === null)
+                return yield* fail("Live made no clip");
+              yield* lq.LqWriteClip({ id, name: target.name, notes });
+            }),
+          );
+        }
+      });
+      for (const want of spec.tracks) {
+        const have = (set.tracks ?? []).find((x) => x.name === want.name);
+        if (have !== undefined) yield* sync(want, have);
+      }
+      for (const want of spec.returns) {
+        const have = (set.return_tracks ?? []).find(
+          (x) => x.name === want.name,
+        );
+        if (have === undefined) warnings.push(`no return track ${want.name}`);
+        else yield* sync(want, have);
+      }
+
+      const specClipAt = (track: string, slot: number) => {
+        const clip = [...spec.tracks, ...spec.returns].find(
+          (t) => t.name === track,
+        )?.clips[spec.scenes[slot] ?? String(slot)];
+        return clip === undefined
+          ? undefined
+          : { name: clip.name, length: clip.length };
+      };
+      const drift = arrangementDiff(set, spec.arrange, spec.scenes, specClipAt);
+      if (clipsChanged || drift.length > 0)
+        yield* change(
+          `arrange ${spec.arrange.join(" ")}${drift.length > 0 ? ` (${drift.join("; ")})` : ""}`,
+          arrange(spec.arrange),
+        );
+
+      for (const w of warnings) yield* Console.log(`! ${w}`);
+      yield* Console.log(
+        changes.length === 0
+          ? "in sync"
+          : `${dryRun ? "would change" : "changed"} ${String(changes.length)}:\n  ${changes.join("\n  ")}`,
+      );
+    }),
+).pipe(
+  Command.withDescription(
+    "Make the Set match a song spec, changing only what differs: apply song.json [--dry-run]",
+  ),
+);
+
 /** The escape hatch: any GraphQL document, printed as compact JSON. */
 const gqlCommand = Command.make(
   "gql",
@@ -1206,6 +1646,8 @@ Command.make("lq").pipe(
     exportCommand,
     levelsCommand,
     transposeCommand,
+    dumpCommand,
+    applyCommand,
     gqlCommand,
   ]),
   Command.run({ version: "0.0.0" }),

@@ -123,6 +123,9 @@ What we learned:
   shows the recorded curve: it matched the ramp to three decimals. `automation_state` 1 means automated.
 - Recording runs in real time: the 8-bar sweep takes 18 s, with the master silenced (`lq master 0`).
 - Setting an automated parameter while stopped overrides its automation until `re_enable_automation`.
+- Arrangement Record also records every armed track, over its clips. A stray keystroke had armed Drums, so a sweep
+  replaced bar 16 of the drums with an empty recording and cut the Drop's first downbeat. `sweep` now refuses to run
+  while any track is armed (`arm` or `implicit_arm`).
 
 ## Listening by measurement
 
@@ -181,6 +184,27 @@ ceiling −1 dB), gave:
 The Arp's sweep moved to an Auto Filter after Omnisphere, whose `Env Amount` is bipolar (0.5 is off, 0 is −100%).
 Its energy above 1 kHz now drops about 14 dB at the start of the Breakdown and opens back up into the Drop.
 
+## Song spec
+
+`projects/<Name> Project/song.json` describes the Set: tempo, scenes, the Arrangement as `Scene:repeats`, each track's
+devices, mix (volume in decibels) and Session clips in lane notation. `patch` records a plug-in's patch for people,
+since Live cannot read it; `dump` keeps it.
+
+- `lq dump song.json` writes the spec from Live. It turns notes back into lanes (`toLanes` in `notation.ts`): one
+  lane when the notes fit, otherwise one lane per pitch, a step lane where every hit is one step long. A token's
+  `*96` suffix sets an exact velocity, and a lane can be `{ "lane": ..., "gate": 0.5 }` when it needs its own grid,
+  gate or base velocity. It warns about Arrangement clips the spec cannot express.
+- `lq apply song.json [--dry-run]` changes only what differs: tempo, scene names, missing tracks and native devices,
+  mix, clips whose notes, name or length differ, and the Arrangement when any clip changed or it differs from the
+  spec clip by clip. A missing plug-in is reported for `lq load`. A second run reports `in sync`.
+
+Measured on Melodic House: `dump` takes 1.7 s and writes 275 lines for 13 clips. After changing the tempo, a fader, a
+scene name, the lead's notes and deleting a clip, `apply` restored all of it in 14 s, the next run was `in sync`, and a
+fresh dump matched the spec byte for byte. Its first run found the armed-Drums damage above and rebuilt the
+Arrangement; the Arp's automation, which lives on the track, came through every rebuild.
+
+Not covered: device parameters, a Drum Rack's chains and samples, plug-in patches and automation.
+
 ## Building a Drum Rack
 
 1. `track_insert_device(device_name: "Drum Rack")`.
@@ -220,15 +244,16 @@ with `vp run liveql:codegen`. Tracks are named or numbered, and `Space` finds `A
 | `sweep <track> <param> <from> <to> <bars> [-d dev --curve --before]`            | Experimental: records a parameter ramp into the Arrangement              |
 | `export <dir> [-n name --stems --start --bars]`, `levels <files> -s Name:a-b`   | Renders audio, then measures loudness and peaks per section              |
 | `transpose <track> <semitones>`                                                 | Moves the notes in all of a track's Session and Arrangement clips        |
+| `dump song.json`, `apply song.json [--dry-run]`                                 | Writes the Set as a song spec; makes the Set match one                   |
 
 Lanes (`scripts/lq/notation.ts`): sequence tokens are a note (`A1`, Ableton octaves with C3 = 60), a chord
-(`Am7@2`, `C@3^1` for the first inversion), `+` to stack, `.` rest, `-` hold, and a `!` or `?` suffix for an
-accent or a soft step. A step lane is `C1:x..oX.-.` (hit, rest, soft, accent, hold). A lane repeats to the clip length.
+(`Am7@2`, `C@3^1` for the first inversion), `+` to stack, `.` rest, `-` hold, a `!` or `?` suffix for an
+accent or a soft step, and `*96` for an exact velocity. A step lane is `C1:x..oX.-.` (hit, rest, soft, accent, hold). A lane repeats to the clip length.
 
 ## Melodic House, as built
 
 122 BPM, A minor, chords Am, F, C, G a bar each. Scenes: 0 Groove, 1 Intro, 2 Breakdown, 3 Drop. The Arrangement
-is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars. Every instrument but the drums is Omnisphere, chosen by
+is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars, and `song.json` beside the Set specs all of it. Every instrument but the drums is Omnisphere, chosen by
 name without hearing it. Main ends in a Limiter (True Peak, ceiling −1 dB).
 
 | Track            | Device                                                                                | Notes                                                                                         |
@@ -242,7 +267,7 @@ name without hearing it. Main ends in a Limiter (True Peak, ceiling −1 dB).
 
 ## Next
 
-1. A song spec file that `lq` applies whole, so a Set rebuilds from one file.
+1. Extend the song spec to device parameters and Drum Rack samples, so a Set rebuilds from the Seed.
 2. Generators over the notation: chord progressions in a key, arps from chords.
 3. Several ramps in one recording pass, since each pass runs in real time. Clip envelopes are no way around it:
    creating them and inserting steps is Python-only, like Arrangement envelopes.
