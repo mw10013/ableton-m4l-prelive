@@ -234,6 +234,9 @@ importers:
       '@babel/core':
         specifier: 8.0.9
         version: 8.0.9
+      '@effect/graphql-generator':
+        specifier: 4.1.5
+        version: 4.1.5(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)
       '@effect/vitest':
         specifier: 4.1.5
         version: 4.1.5(effect@4.1.5)(vitest@5.1.0)
@@ -264,9 +267,6 @@ importers:
       '@vitest/browser-playwright':
         specifier: 'catalog:'
         version: 5.1.0(@voidzero-dev/vite-plus-core@1.6.0(@types/node@24.19.2)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@7.0.2)(yaml@2.8.3))(playwright@1.64.1)(vitest@5.1.0)
-      graphql:
-        specifier: 17.0.2
-        version: 17.0.2
       node:
         specifier: runtime:24.22.0
         version: runtime:24.22.0
@@ -652,6 +652,13 @@ packages:
 
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
+
+  '@effect/graphql-generator@4.1.5':
+    resolution: {integrity: sha512-Re1ZD0VkEAICN/TK7Y30TkcBnYk3im9O1iUpfnlvlWS9y4Vl/9C2Du/O5NGanXPpm75MuPitOUu/eCN1nTvRBg==}
+    hasBin: true
+    peerDependencies:
+      '@effect/platform-node': ^4.1.5
+      effect: ^4.1.5
 
   '@effect/platform-node-shared@4.1.5':
     resolution: {integrity: sha512-JzlrYe4uKaBFTWihBRXo2pDjkUVB39kQpKdGfXdbp7Co5sKT8hbcjOmdB5pg/WOYESdGTddd3fxD4lwlZELbZQ==}
@@ -2458,10 +2465,6 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  graphql@17.0.2:
-    resolution: {integrity: sha512-FRWbddMxfkjiB7z+aQDWIR+E34xo9I8c9mtK2RPv8PmMzKRvrdsreHL/Ui/TmwHJfhHChEtsFPyMHKI+xuarQQ==}
-    engines: {node: ^22.0.0 || ^24.0.0 || ^25.0.0 || >=26.0.0}
-
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
@@ -3914,6 +3917,11 @@ snapshots:
   '@blazediff/core@1.10.0': {}
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
+
+  '@effect/graphql-generator@4.1.5(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)':
+    dependencies:
+      '@effect/platform-node': 4.1.5(effect@4.1.5)(redis@6.2.1)
+      effect: 4.1.5
 
   '@effect/platform-node-shared@4.1.5(effect@4.1.5)':
     dependencies:
@@ -5380,8 +5388,6 @@ snapshots:
   globals@14.0.0: {}
 
   graceful-fs@4.2.11: {}
-
-  graphql@17.0.2: {}
 
   has-flag@4.0.0: {}
 

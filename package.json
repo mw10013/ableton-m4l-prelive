@@ -21,6 +21,7 @@
     "start": "vp preview",
     "clean": "rm -rf node_modules .tanstack",
     "liveql:schema": "vpx scripts/liveql-schema.ts",
+    "liveql:codegen": "graphqlgen",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "@astryxdesign/build": "0.7.4",
     "@astryxdesign/cli": "0.7.4",
     "@babel/core": "8.0.9",
+    "@effect/graphql-generator": "4.1.5",
     "@effect/vitest": "4.1.5",
     "@mw10013/rigging": "catalog:",
     "@stylexjs/babel-plugin": "0.19.1",
@@ -51,7 +53,6 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "@vitest/browser-playwright": "catalog:",
-    "graphql": "17.0.2",
     "playwright": "1.64.1",
     "typescript": "7.0.2",
     "vite": "catalog:",

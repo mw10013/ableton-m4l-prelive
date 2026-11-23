@@ -201,6 +201,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
       ignorePatterns: [
         "src/web/routeTree.gen.ts",
         "src/web/server/liveql/liveql.graphql",
+        "**/*.graphql.ts",
       ],
       sortImports: true,
     },
@@ -223,6 +224,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
         "refs/",
         "tmp/",
         "src/web/routeTree.gen.ts",
+        "**/*.graphql.ts",
       ],
       rules: {
         ...lint.rules,
