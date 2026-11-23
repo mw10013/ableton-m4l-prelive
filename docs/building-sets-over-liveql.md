@@ -111,6 +111,46 @@ What we learned:
 - Recording runs in real time: the 8-bar sweep takes 18 s, with the master silenced (`lq master 0`).
 - Setting an automated parameter while stopped overrides its automation until `re_enable_automation`.
 
+## Listening by measurement
+
+The agent cannot hear, but it can export audio and measure it with `ffmpeg` (Homebrew).
+
+Exporting, as done by hand with `lq`:
+
+1. `lq menu "File>Export Audio/Video..."`. The dialog is readable with `lq ax tree export`: rendered track, start,
+   length, normalize, sample rate, file type.
+2. The range is whatever the dialog last held, not the loop. Click the Render Start or Render Length field and type
+   bars (`lq click export 212 96`, `lq keys 17 return`).
+3. The Rendered Track popup: click it (`215,73`), then `arrow-down` and Return. Clicking a menu item did not take.
+   **All Individual Tracks** renders one file per track plus the mix, which made the analysis possible.
+4. `lq ax press export Export` opens the Save panel; the press reports error -25204 because the panel blocks, but it
+   works. Cmd-Shift-G, the folder path, then Return through System Events (`key code 36`): the Go To sheet ignores
+   cliclick's Return. Wait for each sheet before typing, or the text lands in the name field.
+
+Live ignores `ax set` on its controls: the call succeeds and nothing changes. `ax` reads and presses; typing sets.
+
+Measuring:
+
+- Loudness and true peak per section: `ffmpeg -i f.aif -af atrim=a:b,ebur128=peak=true -f null -`, with
+  a and b from bars (a bar is 240/BPM seconds).
+- `showspectrumpic` draws a spectrogram PNG the agent can read like a screenshot. Section changes show clearly.
+- Spectral centroid misleads on gappy parts: near-silent frames pull it up. The level above a high-pass works better.
+
+What the first export of Melodic House found:
+
+| Stem  | Drop LUFS | Drop peak | Finding                                         |
+| ----- | --------- | --------- | ----------------------------------------------- |
+| Omni  | −11.8     | +0.1      | Loudest part, and the clipping (261 samples)    |
+| Drums | −17.7     | −3.3      |                                                 |
+| Pad   | −18.4     | −7.1      |                                                 |
+| Bass  | −30.0     | −12.6     | About 13 LU under the drums; nearly inaudible   |
+| Arp   | −33.6     | −15.1     | Quiet                                           |
+| Mix   | −9.9      | +0.7      | Intro −20.8, Groove −14.8, Breakdown −16.2 LUFS |
+
+The Arp sweep did not show in the audio: its level above 1 kHz stayed flat across the Breakdown. Drift's `LP Mod
+Amt 1` is 0.968, so each note's envelope opens the filter far above the base `LP Freq`, which is what the sweep moved
+(56 Hz to 1.1 kHz). Sweep a knob that dominates the sound, or lower the envelope amount first.
+
 ## Building a Drum Rack
 
 1. `track_insert_device(device_name: "Drum Rack")`.
