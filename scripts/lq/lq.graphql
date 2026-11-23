@@ -249,3 +249,20 @@ mutation LqDeleteDevice($track: Int!, $index: Int!) {
     id
   }
 }
+
+query LqClipNotes($id: Int!) {
+  clip(id: $id) {
+    get_all_notes_extended {
+      notes {
+        note_id
+        pitch
+      }
+    }
+  }
+}
+
+mutation LqModifyNotes($id: Int!, $notes: [NoteInput!]!) {
+  clip_apply_note_modifications(id: $id, notes: $notes) {
+    id
+  }
+}

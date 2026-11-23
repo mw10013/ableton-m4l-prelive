@@ -883,5 +883,83 @@ export declare namespace LqDeleteDevice {
   export type Result = typeof LqDeleteDevice.result.Type
 }
 
+export const Note = Schema.Struct({
+  note_id: Shared.Int,
+  pitch: Shared.Int
+})
+export interface Note extends Schema.Struct.Type<typeof Note.fields> {}
+
+export const NotesDictionary = Schema.Struct({
+  notes: Schema.Array(Note)
+})
+export interface NotesDictionary extends Schema.Struct.Type<typeof NotesDictionary.fields> {}
+
+export const LqClipNotesClipClip = Schema.Struct({
+  /**
+   * Every note in the clip, sorted by start_time then pitch. Null on an audio
+   * clip, as are the other three note fields.
+   */
+  get_all_notes_extended: Schema.NullOr(NotesDictionary)
+})
+export interface LqClipNotesClipClip extends Schema.Struct.Type<typeof LqClipNotesClipClip.fields> {}
+
+/** `query LqClipNotes` */
+export const LqClipNotes = GraphQL.query("LqClipNotes", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" }
+    ],
+    selections: [
+      { name: "clip", body: ["(id:$", "id", "){get_all_notes_extended{notes{note_id pitch}}}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int
+  },
+  result: Schema.Struct({
+    /**
+     * The clip with this LOM id, or null if no object has it or the object is not
+     * a Clip. The by-id queries never raise for a bad id.
+     */
+    clip: Schema.NullOr(LqClipNotesClipClip)
+  })
+})
+export declare namespace LqClipNotes {
+  export type Variables = typeof LqClipNotes.variables.Type
+  export type Result = typeof LqClipNotes.result.Type
+}
+
+/** `mutation LqModifyNotes` */
+export const LqModifyNotes = GraphQL.mutation("LqModifyNotes", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" },
+      { name: "notes", body: "[NoteInput!]!" }
+    ],
+    selections: [
+      { name: "clip_apply_note_modifications", body: ["(id:$", "id", " notes:$", "notes", "){id}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int,
+    notes: Schema.Array(Shared.NoteInput)
+  },
+  result: Schema.Struct({
+    /**
+     * Live silently ignores the entire list when any note_id in it is not in the
+     * clip: no error, nothing changes, and the returned clip is unchanged. Check the
+     * ids first with clip(id) { get_notes_by_id(note_ids: [...]) } if that matters,
+     * and compare the returned notes with what you asked for.
+     */
+    clip_apply_note_modifications: Schema.NullOr(Clip_slot_create_clipClipClip)
+  })
+})
+export declare namespace LqModifyNotes {
+  export type Variables = typeof LqModifyNotes.variables.Type
+  export type Result = typeof LqModifyNotes.result.Type
+}
+
 /** Every operation in lq.graphql. */
-export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState, LqDeleteDevice)
+export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState, LqDeleteDevice, LqClipNotes, LqModifyNotes)

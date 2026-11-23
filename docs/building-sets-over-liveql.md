@@ -219,6 +219,7 @@ with `vp run liveql:codegen`. Tracks are named or numbered, and `Space` finds `A
 | `ax tree <window> [-f text]`, `ax press <window> <label>`, `ax set ... <value>` | Live's controls as text, and acting on them by label                     |
 | `sweep <track> <param> <from> <to> <bars> [-d dev --curve --before]`            | Experimental: records a parameter ramp into the Arrangement              |
 | `export <dir> [-n name --stems --start --bars]`, `levels <files> -s Name:a-b`   | Renders audio, then measures loudness and peaks per section              |
+| `transpose <track> <semitones>`                                                 | Moves the notes in all of a track's Session and Arrangement clips        |
 
 Lanes (`scripts/lq/notation.ts`): sequence tokens are a note (`A1`, Ableton octaves with C3 = 60), a chord
 (`Am7@2`, `C@3^1` for the first inversion), `+` to stack, `.` rest, `-` hold, and a `!` or `?` suffix for an
@@ -232,7 +233,7 @@ name without hearing it. Main ends in a Limiter (True Peak, ceiling −1 dB).
 
 | Track            | Device                                                                                | Notes                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Bass             | Omnisphere: MTAUR - Ostinato Bass, GLIDE off                                          | Offbeat eighths on the roots, MIDI 45, 41, 48, 43                                             |
+| Bass             | Omnisphere: MTAUR - Ostinato Bass, GLIDE off, fader −10 dB                            | Offbeat eighths on the roots, MIDI 57, 53, 60, 55: an octave up, which sounded less wobbly    |
 | Drums            | Drum Rack: Kick 909 1 (36), Clap 909 (39), Hihat Closed 909 (42), Hihat Open 909 (46) | Kick every beat, clap on 2 and 4, open hat on offbeats, soft closed hats on the 16ths between |
 | Pad              | Omnisphere: Jupiter and JX Warm Pad                                                   | Am7, Fmaj7, C, G held a bar each; wider voicings in the Breakdown                             |
 | Arp              | Omnisphere: Chill Plucker, then Auto Filter (Frequency automated)                     | 16ths through the chord tones an octave up; 8ths in the Breakdown                             |
