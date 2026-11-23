@@ -99,6 +99,10 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
   `--glide` reads the GLIDE button's color from one pixel (`ffmpeg`) and clicks it only if needed. The patch is
   stored in the Live Set; nothing is saved into Omnisphere. A first open may land on the About page; click the
   Spectrasonics logo for the main page.
+- The editor window often does not become the key window, so its search box takes no typing and the keys reach Live
+  instead, where Space starts playback. Clicking the box or the title bar, `AXRaise` and setting `AXMain` did not
+  make it key. `omni` checks `is_playing` around its typing; if the keys started playback, it stops Live and fails
+  without loading a patch.
 - One instance's search box would not take typing at all, even freshly reloaded, while the others did. Its category
   list worked by mouse: drag the scrollbar, click a category (Synth Short holds the plucks), click a patch.
 - Untested: Live's `-_PluginAutoPopulateThreshold` option in `Options.txt` would expose more parameters to LiveQL.
