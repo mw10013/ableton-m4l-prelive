@@ -1,11 +1,19 @@
 {
   "tempo": 122,
-  "scenes": ["Groove", "Intro", "Breakdown", "Drop"],
-  "arrange": ["Intro:2", "Groove:2", "Breakdown:2", "Drop:4"],
+  "scenes": ["Groove", "Intro", "Breakdown", "Drop", "Build", "Lift", "Outro"],
+  "arrange": [
+    "Intro:2",
+    "Groove:2",
+    "Lift:2",
+    "Breakdown:1",
+    "Build:1",
+    "Drop:2",
+    "Outro:1"
+  ],
   "tracks": [
     {
       "name": "Bass",
-      "devices": ["Omnisphere"],
+      "devices": ["Omnisphere", "Compressor"],
       "patch": "MTAUR - Ostinato Bass, GLIDE off",
       "mix": {
         "vol": "-10.0 dB",
@@ -35,12 +43,32 @@
         },
         "Drop": {
           "name": "Bass drop",
-          "length": 16,
+          "length": 32,
           "grid": 0.25,
           "gate": 0.9,
           "velocity": 100,
           "lanes": [
             ". . A2 A3? . . A2 . . . A2 A3? . . A2 A2? | . . F2 F3? . . F2 . . . F2 F3? . . F2 F2? | . . C3 C4? . . C3 . . . C3 C4? . . C3 C3? | . . G2 G3? . . G2 . . . G2 G3? . . G2 B2?"
+          ]
+        },
+        "Lift": {
+          "name": "Bass lift",
+          "length": 16,
+          "grid": 0.5,
+          "gate": 0.8,
+          "velocity": 110,
+          "lanes": [
+            ". A2 . A2*96 . A2 . A2*96 | . F2 . F2*96 . F2 . F2*96 | . C3 . C3*96 . C3 . C3*96 | . G2 . G2*96 . G2 . G2*96"
+          ]
+        },
+        "Build": {
+          "name": "Bass build",
+          "length": 32,
+          "grid": 0.5,
+          "gate": 0.8,
+          "velocity": 105,
+          "lanes": [
+            ". A2 . A2 . A2 . A2 | . F2 . F2 . F2 . F2 | . C3 . C3 . C3 . C3 | . G2 . G2 . G2 . G2 | . A2 . A2 . A2 . A2 | . F2 . F2 . F2 . F2 | A2 A2 A2 A2 A2 A2 A2 A2 | . . . . . . . ."
           ]
         }
       }
@@ -90,7 +118,7 @@
         },
         "Drop": {
           "name": "Drums drop",
-          "length": 16,
+          "length": 32,
           "grid": 1,
           "gate": 0.225,
           "velocity": 100,
@@ -110,6 +138,73 @@
               "lane": "A#1:.x",
               "grid": 0.5,
               "gate": 0.45
+            },
+            {
+              "lane": "D1:........................................................................................................................o.o.oxXX",
+              "grid": 0.25,
+              "velocity": 95
+            }
+          ]
+        },
+        "Lift": {
+          "name": "Drums lift",
+          "length": 16,
+          "grid": 0.25,
+          "gate": 0.5,
+          "velocity": 100,
+          "lanes": [
+            "C1:x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x...",
+            {
+              "lane": "D#1:....x.......x...",
+              "velocity": 105
+            },
+            {
+              "lane": "F#1:o.o.o.o.o.o.o.o.",
+              "velocity": 75
+            },
+            {
+              "lane": "A#1:..x...x...x...x.",
+              "velocity": 90
+            },
+            {
+              "lane": "D1:................ ................ ................ ........o.o.oxXX",
+              "velocity": 95
+            }
+          ]
+        },
+        "Build": {
+          "name": "Drums build",
+          "length": 32,
+          "grid": 0.25,
+          "gate": 0.5,
+          "velocity": 100,
+          "lanes": [
+            "C1:x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x... ................",
+            {
+              "lane": "D1:o...o...o...o... o...o...o...o... o.o.o.o.o.o.o.o. o.o.o.o.o.o.o.o. xxxxxxxxxxxxxxxx xxxxxxxxxxxxxxxx XXXXXXXXXXXXXXXX XXXXXXXXXXXX....",
+              "velocity": 85
+            },
+            {
+              "lane": "F#1:..x...x...x...x.",
+              "velocity": 70
+            }
+          ]
+        },
+        "Outro": {
+          "name": "Drums outro",
+          "length": 32,
+          "grid": 0.25,
+          "gate": 0.5,
+          "velocity": 100,
+          "lanes": [
+            "C1:x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x... x...x...x...x... ................ ................",
+            {
+              "lane": "A#1:..x...x...x...x. ..x...x...x...x. ..x...x...x...x. ..x...x...x...x. ................ ................ ................ ................",
+              "velocity": 85
+            },
+            {
+              "lane": "F#1:o.o.o.o.o.o.o.o.",
+              "velocity": 65
             }
           ]
         }
@@ -117,7 +212,7 @@
     },
     {
       "name": "Pad",
-      "devices": ["Omnisphere"],
+      "devices": ["Omnisphere", "Compressor"],
       "patch": "Jupiter and JX Warm Pad",
       "mix": {
         "vol": "-8.5 dB",
@@ -135,7 +230,7 @@
         },
         "Breakdown": {
           "name": "Pad breakdown",
-          "length": 16,
+          "length": 32,
           "grid": 4,
           "gate": 1,
           "velocity": 100,
@@ -143,17 +238,43 @@
         },
         "Drop": {
           "name": "Pad drop",
-          "length": 16,
+          "length": 32,
           "grid": 4,
           "gate": 1,
           "velocity": 90,
           "lanes": ["A2+C3+E3+G3 | F2+A2+C3+E3 | E3+G3+C4 | B2+D3+G3"]
+        },
+        "Lift": {
+          "name": "Pad lift",
+          "length": 16,
+          "grid": 4,
+          "gate": 1,
+          "velocity": 80,
+          "lanes": ["A2+C3+E3+G3 | A2+C3+F3+A3 | G2+C3+E3+G3 | G2+B2+D3+G3"]
+        },
+        "Build": {
+          "name": "Pad build",
+          "length": 32,
+          "grid": 4,
+          "gate": 1,
+          "velocity": 90,
+          "lanes": ["A2+C3+E3+G3 | F2+A2+C3+E3 | E3+G3+C4 | B2+D3+G3"]
+        },
+        "Outro": {
+          "name": "Pad outro",
+          "length": 32,
+          "grid": 4,
+          "gate": 1,
+          "velocity": 75,
+          "lanes": [
+            "A2+C3+E3+G3 | A2+C3+F3+A3 | G2+C3+E3+G3 | G2+B2+D3+G3 | A2+C3+E3+G3 | A2+C3+F3+A3 | A2+C3+E3+G3 - "
+          ]
         }
       }
     },
     {
       "name": "Arp",
-      "devices": ["Omnisphere", "Auto Filter"],
+      "devices": ["Omnisphere", "Auto Filter", "Compressor"],
       "patch": "Chill Plucker",
       "mix": {
         "vol": "-13.5 dB",
@@ -173,7 +294,7 @@
         },
         "Breakdown": {
           "name": "Arp breakdown",
-          "length": 16,
+          "length": 32,
           "grid": 0.5,
           "gate": 0.9,
           "velocity": 100,
@@ -183,12 +304,42 @@
         },
         "Drop": {
           "name": "Arp drop",
-          "length": 16,
+          "length": 32,
           "grid": 0.25,
           "gate": 0.9,
           "velocity": 100,
           "lanes": [
             "A3 C4 E4 G4 E4 C4 A3 E4 A3 C4 E4 G4 E4 C4 A3 E4 | A3 C4 F4 A4 F4 C4 A3 F4 A3 C4 F4 A4 F4 C4 A3 F4 | G3 C4 E4 G4 E4 C4 G3 E4 G3 C4 E4 G4 E4 C4 G3 E4 | G3 B3 D4 G4 D4 B3 G3 D4 G3 B3 D4 G4 D4 B3 G3 D4"
+          ]
+        },
+        "Lift": {
+          "name": "Arp lift",
+          "length": 16,
+          "grid": 0.25,
+          "gate": 0.8,
+          "velocity": 78,
+          "lanes": [
+            "A3*100 C4 E4 G4 E4*100 C4 A3 E4 A3*100 C4 E4 G4 E4*100 C4 A3 E4 | A3*100 C4 F4 A4 F4*100 C4 A3 F4 A3*100 C4 F4 A4 F4*100 C4 A3 F4 | G3*100 C4 E4 G4 E4*100 C4 G3 E4 G3*100 C4 E4 G4 E4*100 C4 G3 E4 | G3*100 B3 D4 G4 D4*100 B3 G3 D4 G3*100 B3 D4 G4 D4*100 B3 G3 D4"
+          ]
+        },
+        "Build": {
+          "name": "Arp build",
+          "length": 32,
+          "grid": 0.25,
+          "gate": 0.9,
+          "velocity": 100,
+          "lanes": [
+            "A3 C4 E4 G4 E4 C4 A3 E4 A3 C4 E4 G4 E4 C4 A3 E4 | A3 C4 F4 A4 F4 C4 A3 F4 A3 C4 F4 A4 F4 C4 A3 F4 | G3 C4 E4 G4 E4 C4 G3 E4 G3 C4 E4 G4 E4 C4 G3 E4 | G3 B3 D4 G4 D4 B3 G3 D4 G3 B3 D4 G4 D4 B3 G3 D4"
+          ]
+        },
+        "Outro": {
+          "name": "Arp outro",
+          "length": 32,
+          "grid": 0.5,
+          "gate": 0.9,
+          "velocity": 100,
+          "lanes": [
+            "A3 E4 C4 E4 A3 E4 C4 E4 | A3 F4 C4 F4 A3 F4 C4 F4 | G3 E4 C4 E4 G3 E4 C4 E4 | G3 D4 B3 D4 G3 D4 B3 D4"
           ]
         }
       }
@@ -205,13 +356,88 @@
       "clips": {
         "Drop": {
           "name": "Lead drop",
-          "length": 16,
+          "length": 32,
           "grid": 0.5,
           "gate": 0.9,
           "velocity": 105,
           "lanes": [
-            "E4! - - - C4 - D4 E4 | F4! - - - E4 - C4 - | G4! - - - E4 - D4 C4 | D4! - - - B3 - - ."
+            "E4! - - - C4 - D4 E4 | F4! - - - E4 - C4 - | G4! - - - E4 - D4 C4 | D4! - - - B3 - - . | E4! - - - C4 - D4 E4 | F4! - - - A4 - G4 F4 | G4! - - - C5 - B4 G4 | A4! - - - - - . ."
           ]
+        },
+        "Lift": {
+          "name": "Lead lift",
+          "length": 16,
+          "grid": 0.5,
+          "gate": 0.9,
+          "velocity": 78,
+          "lanes": [
+            "A4 - - - . . E4 . | C5 - - - . . A4 . | G4 - - - E4 - D4 . | B3 - - - - - . ."
+          ]
+        },
+        "Breakdown": {
+          "name": "Lead breakdown",
+          "length": 32,
+          "grid": 1,
+          "gate": 1,
+          "velocity": 72,
+          "lanes": [
+            "E4 - - - | F4 - - - | G4 - - - | D4 - - - | E4 - - - | C4 - - - | G4 - - - | B3 - - -"
+          ]
+        }
+      }
+    },
+    {
+      "name": "FX",
+      "devices": ["Drum Rack"],
+      "mix": {
+        "vol": "-6.0 dB",
+        "pan": 0,
+        "sends": [0.25]
+      },
+      "clips": {
+        "Breakdown": {
+          "name": "FX breakdown",
+          "length": 32,
+          "grid": 32,
+          "gate": 0.5,
+          "velocity": 100,
+          "lanes": [
+            "C1:X",
+            {
+              "lane": "D#1:x",
+              "velocity": 90
+            }
+          ]
+        },
+        "Build": {
+          "name": "FX build",
+          "length": 32,
+          "grid": 1,
+          "gate": 0.5,
+          "velocity": 100,
+          "lanes": [
+            "C#1:...........x....................",
+            {
+              "lane": "D1:........................x.......",
+              "velocity": 110
+            }
+          ]
+        },
+        "Drop": {
+          "name": "FX drop",
+          "length": 32,
+          "grid": 32,
+          "gate": 0.5,
+          "velocity": 110,
+          "lanes": ["C1:X"]
+        },
+        "Outro": {
+          "name": "FX outro",
+          "length": 32,
+          "grid": 32,
+          "gate": 0.5,
+          "velocity": 100,
+          "lanes": ["C1:X"]
         }
       }
     }

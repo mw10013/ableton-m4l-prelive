@@ -682,6 +682,40 @@ export type ClipSetInput =
   | { readonly groove?: never; readonly color?: never; readonly color_index?: never; readonly end_marker?: never; readonly gain?: never; readonly is_playing?: never; readonly launch_mode?: never; readonly launch_quantization?: never; readonly legato?: never; readonly loop_end?: never; readonly loop_start?: never; readonly looping?: never; readonly muted?: never; readonly name?: never; readonly pitch_coarse?: never; readonly pitch_fine?: never; readonly position?: never; readonly ram_mode?: never; readonly signature_denominator?: never; readonly signature_numerator?: never; readonly start_marker?: never; readonly velocity_amount?: never; readonly warp_mode: typeof Int.Type; readonly warping?: never }
   | { readonly groove?: never; readonly color?: never; readonly color_index?: never; readonly end_marker?: never; readonly gain?: never; readonly is_playing?: never; readonly launch_mode?: never; readonly launch_quantization?: never; readonly legato?: never; readonly loop_end?: never; readonly loop_start?: never; readonly looping?: never; readonly muted?: never; readonly name?: never; readonly pitch_coarse?: never; readonly pitch_fine?: never; readonly position?: never; readonly ram_mode?: never; readonly signature_denominator?: never; readonly signature_numerator?: never; readonly start_marker?: never; readonly velocity_amount?: never; readonly warp_mode?: never; readonly warping: boolean }
 
+/**
+ * A routing channel to select, by the identifier of one of the matching
+ * available_*routing_channels. Live ignores an identifier not in that list
+ * without raising: compare the returned value with what you asked for.
+ */
+export const RoutingChannelInput = Schema.Struct({
+  identifier: Int
+})
+export interface RoutingChannelInput extends Schema.Struct.Type<typeof RoutingChannelInput.fields> {}
+
+/**
+ * A routing type to select, by the identifier of one of the matching
+ * available_*routing_types. Live ignores an identifier not in that list
+ * without raising: compare the returned value with what you asked for.
+ */
+export const RoutingTypeInput = Schema.Struct({
+  identifier: Int
+})
+export interface RoutingTypeInput extends Schema.Struct.Type<typeof RoutingTypeInput.fields> {}
+
+export const CompressorDeviceSetInput = Schema.Opaque<CompressorDeviceSetInput>()(Schema.Union([
+  Schema.Struct({
+    input_routing_channel: RoutingChannelInput,
+    input_routing_type: Schema.optionalKey(Schema.Never)
+  }),
+  Schema.Struct({
+    input_routing_channel: Schema.optionalKey(Schema.Never),
+    input_routing_type: RoutingTypeInput
+  })
+]))
+export type CompressorDeviceSetInput =
+  | { readonly input_routing_channel: RoutingChannelInput; readonly input_routing_type?: never }
+  | { readonly input_routing_channel?: never; readonly input_routing_type: RoutingTypeInput }
+
 export const NoteInput = Schema.Struct({
   note_id: Schema.optional(Schema.NullOr(Int)),
   pitch: Schema.optional(Schema.NullOr(Int)),
@@ -1691,6 +1725,8 @@ export type SongSetInput =
 
 /** The possible `__typename` values of each interface and union the operations select from. */
 export declare namespace Typename {
+  /** Every possible `__typename` of interface `Chain`. */
+  export type Chain = "DrumChain" | "GenericChain"
   /** Every possible `__typename` of interface `Device`. */
   export type Device =
     | "CompressorDevice" | "DriftDevice" | "DrumCellDevice" | "Eq8Device" | "GenericDevice" | "HybridReverbDevice"

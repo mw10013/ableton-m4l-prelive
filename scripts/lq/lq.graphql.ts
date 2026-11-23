@@ -117,6 +117,53 @@ export const LqDumpTrack = Schema.Struct({
 })
 export interface LqDumpTrack extends Schema.Struct.Type<typeof LqDumpTrack.fields> {}
 
+/**
+ * One of the routing types Live lists for a track's, a bus's or a
+ * Compressor's sidechain input or output, such as Ext. In or a track name.
+ */
+export const Available_input_routing_typesRoutingType = Schema.Struct({
+  display_name: Schema.String,
+  identifier: Shared.Int
+})
+export interface Available_input_routing_typesRoutingType extends Schema.Struct.Type<typeof Available_input_routing_typesRoutingType.fields> {}
+
+/**
+ * One of the channels Live lists for the selected routing type, such as
+ * Ch. 1 or All Channels.
+ */
+export const Available_input_routing_channelsRoutingChannel = Schema.Struct({
+  display_name: Schema.String,
+  identifier: Shared.Int
+})
+export interface Available_input_routing_channelsRoutingChannel extends Schema.Struct.Type<typeof Available_input_routing_channelsRoutingChannel.fields> {}
+
+/**
+ * One of the routing types Live lists for a track's, a bus's or a
+ * Compressor's sidechain input or output, such as Ext. In or a track name.
+ */
+export const Input_routing_typeRoutingType = Schema.Struct({
+  display_name: Schema.String
+})
+export interface Input_routing_typeRoutingType extends Schema.Struct.Type<typeof Input_routing_typeRoutingType.fields> {}
+
+/**
+ * One of the channels Live lists for the selected routing type, such as
+ * Ch. 1 or All Channels.
+ */
+export const Input_routing_channelRoutingChannel = Schema.Struct({
+  display_name: Schema.String
+})
+export interface Input_routing_channelRoutingChannel extends Schema.Struct.Type<typeof Input_routing_channelRoutingChannel.fields> {}
+
+/** `fragment LqCompressorRouting on CompressorDevice` */
+export const LqCompressorRouting = Schema.Struct({
+  available_input_routing_types: Schema.NullOr(Schema.Array(Available_input_routing_typesRoutingType)),
+  available_input_routing_channels: Schema.NullOr(Schema.Array(Available_input_routing_channelsRoutingChannel)),
+  input_routing_type: Schema.NullOr(Input_routing_typeRoutingType),
+  input_routing_channel: Schema.NullOr(Input_routing_channelRoutingChannel)
+})
+export interface LqCompressorRouting extends Schema.Struct.Type<typeof LqCompressorRouting.fields> {}
+
 export const ViewSongView = Schema.Struct({
   id: Shared.Int
 })
@@ -1049,5 +1096,321 @@ export declare namespace LqDump {
   export type Result = typeof LqDump.result.Type
 }
 
+export const CompressorDevice = Schema.Struct({
+  __typename: Schema.Literal("CompressorDevice"),
+  ...LqCompressorRouting.fields
+})
+export interface CompressorDevice extends Schema.Struct.Type<typeof CompressorDevice.fields> {}
+
+export const LqCompressorDeviceDeviceOther = Schema.Struct({
+  __typename: GraphQL.otherTypename<Shared.Typename.Device>()(["CompressorDevice"])
+})
+export interface LqCompressorDeviceDeviceOther extends Schema.Struct.Type<typeof LqCompressorDeviceDeviceOther.fields> {}
+
+/** `query LqCompressor` */
+export const LqCompressor = GraphQL.query("LqCompressor", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" }
+    ],
+    selections: [
+      { name: "device", body: ["(id:$", "id", "){__typename...on CompressorDevice{...LqCompressorRouting}}"] }
+    ],
+    fragments: [
+      { name: "LqCompressorRouting", body: ["on CompressorDevice{available_input_routing_types{display_name identifier}available_input_routing_channels{display_name identifier}input_routing_type{display_name}input_routing_channel{display_name}}"] }
+    ]
+  },
+  variables: {
+    id: Shared.Int
+  },
+  result: Schema.Struct({
+    /**
+     * The device with this LOM id, as its subclass, or null if the object is not
+     * a device.
+     */
+    device: Schema.NullOr(Schema.Union([
+      CompressorDevice,
+      LqCompressorDeviceDeviceOther
+    ]))
+  })
+})
+export declare namespace LqCompressor {
+  export type Variables = typeof LqCompressor.variables.Type
+  export type Result = typeof LqCompressor.result.Type
+}
+
+/** `mutation LqSetCompressor` */
+export const LqSetCompressor = GraphQL.mutation("LqSetCompressor", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" },
+      { name: "properties", body: "[CompressorDeviceSetInput!]!" }
+    ],
+    selections: [
+      { name: "compressor_device_set", body: ["(id:$", "id", " properties:$", "properties", "){...LqCompressorRouting}"] }
+    ],
+    fragments: [
+      { name: "LqCompressorRouting", body: ["on CompressorDevice{available_input_routing_types{display_name identifier}available_input_routing_channels{display_name identifier}input_routing_type{display_name}input_routing_channel{display_name}}"] }
+    ]
+  },
+  variables: {
+    id: Shared.Int,
+    properties: Schema.Array(Shared.CompressorDeviceSetInput)
+  },
+  result: Schema.Struct({
+    compressor_device_set: Schema.NullOr(LqCompressorRouting)
+  })
+})
+export declare namespace LqSetCompressor {
+  export type Variables = typeof LqSetCompressor.variables.Type
+  export type Result = typeof LqSetCompressor.result.Type
+}
+
+export const ChainsDevicesDevice = Schema.Struct({
+  __typename: GraphQL.otherTypename<Shared.Typename.Device>()([]),
+  id: Shared.Int,
+  class_name: Schema.NullOr(Schema.String)
+})
+export interface ChainsDevicesDevice extends Schema.Struct.Type<typeof ChainsDevicesDevice.fields> {}
+
+export const ChainsDrumChain = Schema.Struct({
+  __typename: Schema.Literal("DrumChain"),
+  id: Shared.Int,
+  name: Schema.NullOr(Schema.String),
+  in_note: Schema.NullOr(Shared.Int),
+  devices: Schema.NullOr(Schema.Array(ChainsDevicesDevice))
+})
+export interface ChainsDrumChain extends Schema.Struct.Type<typeof ChainsDrumChain.fields> {}
+
+export const ChainOther = Schema.Struct({
+  __typename: GraphQL.otherTypename<Shared.Typename.Chain>()(["DrumChain"]),
+  id: Shared.Int,
+  name: Schema.NullOr(Schema.String),
+  devices: Schema.NullOr(Schema.Array(ChainsDevicesDevice))
+})
+export interface ChainOther extends Schema.Struct.Type<typeof ChainOther.fields> {}
+
+export const DeviceRackDevice = Schema.Struct({
+  __typename: Schema.Literal("RackDevice"),
+  chains: Schema.NullOr(Schema.Array(Schema.Union([
+    ChainsDrumChain,
+    ChainOther
+  ])))
+})
+export interface DeviceRackDevice extends Schema.Struct.Type<typeof DeviceRackDevice.fields> {}
+
+export const LqRackDeviceDeviceOther = Schema.Struct({
+  __typename: GraphQL.otherTypename<Shared.Typename.Device>()(["RackDevice"])
+})
+export interface LqRackDeviceDeviceOther extends Schema.Struct.Type<typeof LqRackDeviceDeviceOther.fields> {}
+
+/** `query LqRack` */
+export const LqRack = GraphQL.query("LqRack", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" }
+    ],
+    selections: [
+      { name: "device", body: ["(id:$", "id", "){__typename...on RackDevice{chains{__typename id name...on DrumChain{in_note}devices{__typename id class_name}}}}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int
+  },
+  result: Schema.Struct({
+    /**
+     * The device with this LOM id, as its subclass, or null if the object is not
+     * a device.
+     */
+    device: Schema.NullOr(Schema.Union([
+      DeviceRackDevice,
+      LqRackDeviceDeviceOther
+    ]))
+  })
+})
+export declare namespace LqRack {
+  export type Variables = typeof LqRack.variables.Type
+  export type Result = typeof LqRack.result.Type
+}
+
+export const ChainsChain = Schema.Struct({
+  __typename: GraphQL.otherTypename<Shared.Typename.Chain>()([]),
+  id: Shared.Int
+})
+export interface ChainsChain extends Schema.Struct.Type<typeof ChainsChain.fields> {}
+
+export const Rack_device_insert_chainRackDevice = Schema.Struct({
+  chains: Schema.NullOr(Schema.Array(ChainsChain))
+})
+export interface Rack_device_insert_chainRackDevice extends Schema.Struct.Type<typeof Rack_device_insert_chainRackDevice.fields> {}
+
+/** `mutation LqInsertChain` */
+export const LqInsertChain = GraphQL.mutation("LqInsertChain", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" }
+    ],
+    selections: [
+      { name: "rack_device_insert_chain", body: ["(id:$", "id", "){chains{__typename id}}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int
+  },
+  result: Schema.Struct({
+    rack_device_insert_chain: Schema.NullOr(Rack_device_insert_chainRackDevice)
+  })
+})
+export declare namespace LqInsertChain {
+  export type Variables = typeof LqInsertChain.variables.Type
+  export type Result = typeof LqInsertChain.result.Type
+}
+
+/** `mutation LqNameChain` */
+export const LqNameChain = GraphQL.mutation("LqNameChain", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" },
+      { name: "name", body: "String!" }
+    ],
+    selections: [
+      { name: "chain_set", body: ["(id:$", "id", " properties:[{name:$", "name", "}]){__typename id}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int,
+    name: Schema.String
+  },
+  result: Schema.Struct({
+    chain_set: Schema.NullOr(ChainsChain)
+  })
+})
+export declare namespace LqNameChain {
+  export type Variables = typeof LqNameChain.variables.Type
+  export type Result = typeof LqNameChain.result.Type
+}
+
+export const Drum_chain_setDrumChain = Schema.Struct({
+  in_note: Schema.NullOr(Shared.Int)
+})
+export interface Drum_chain_setDrumChain extends Schema.Struct.Type<typeof Drum_chain_setDrumChain.fields> {}
+
+/** `mutation LqChainNote` */
+export const LqChainNote = GraphQL.mutation("LqChainNote", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" },
+      { name: "note", body: "Int!" }
+    ],
+    selections: [
+      { name: "drum_chain_set", body: ["(id:$", "id", " properties:[{in_note:$", "note", "}]){in_note}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int,
+    note: Shared.Int
+  },
+  result: Schema.Struct({
+    drum_chain_set: Schema.NullOr(Drum_chain_setDrumChain)
+  })
+})
+export declare namespace LqChainNote {
+  export type Variables = typeof LqChainNote.variables.Type
+  export type Result = typeof LqChainNote.result.Type
+}
+
+export const Chain_insert_deviceChain = Schema.Struct({
+  __typename: GraphQL.otherTypename<Shared.Typename.Chain>()([]),
+  devices: Schema.NullOr(Schema.Array(ChainsDevicesDevice))
+})
+export interface Chain_insert_deviceChain extends Schema.Struct.Type<typeof Chain_insert_deviceChain.fields> {}
+
+/** `mutation LqChainDevice` */
+export const LqChainDevice = GraphQL.mutation("LqChainDevice", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" },
+      { name: "name", body: "String!" }
+    ],
+    selections: [
+      { name: "chain_insert_device", body: ["(id:$", "id", " device_name:$", "name", "){__typename devices{__typename id class_name}}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int,
+    name: Schema.String
+  },
+  result: Schema.Struct({
+    chain_insert_device: Schema.NullOr(Chain_insert_deviceChain)
+  })
+})
+export declare namespace LqChainDevice {
+  export type Variables = typeof LqChainDevice.variables.Type
+  export type Result = typeof LqChainDevice.result.Type
+}
+
+export const Simpler_device_replace_sampleSimplerDevice = Schema.Struct({
+  id: Shared.Int
+})
+export interface Simpler_device_replace_sampleSimplerDevice extends Schema.Struct.Type<typeof Simpler_device_replace_sampleSimplerDevice.fields> {}
+
+/** `mutation LqReplaceSample` */
+export const LqReplaceSample = GraphQL.mutation("LqReplaceSample", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" },
+      { name: "path", body: "String!" }
+    ],
+    selections: [
+      { name: "simpler_device_replace_sample", body: ["(id:$", "id", " file_path:$", "path", "){id}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int,
+    path: Schema.String
+  },
+  result: Schema.Struct({
+    simpler_device_replace_sample: Schema.NullOr(Simpler_device_replace_sampleSimplerDevice)
+  })
+})
+export declare namespace LqReplaceSample {
+  export type Variables = typeof LqReplaceSample.variables.Type
+  export type Result = typeof LqReplaceSample.result.Type
+}
+
+export const Simpler_device_setSimplerDevice = Schema.Struct({
+  playback_mode: Schema.NullOr(Shared.Int)
+})
+export interface Simpler_device_setSimplerDevice extends Schema.Struct.Type<typeof Simpler_device_setSimplerDevice.fields> {}
+
+/** `mutation LqOneShot` */
+export const LqOneShot = GraphQL.mutation("LqOneShot", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" }
+    ],
+    selections: [
+      { name: "simpler_device_set", body: ["(id:$", "id", " properties:[{playback_mode:1}]){playback_mode}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int
+  },
+  result: Schema.Struct({
+    simpler_device_set: Schema.NullOr(Simpler_device_setSimplerDevice)
+  })
+})
+export declare namespace LqOneShot {
+  export type Variables = typeof LqOneShot.variables.Type
+  export type Result = typeof LqOneShot.result.Type
+}
+
 /** Every operation in lq.graphql. */
-export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState, LqDeleteDevice, LqClipNotes, LqModifyNotes, LqDump)
+export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor, LqSongTime, LqSongSet, LqParamState, LqDeleteDevice, LqClipNotes, LqModifyNotes, LqDump, LqCompressor, LqSetCompressor, LqRack, LqInsertChain, LqNameChain, LqChainNote, LqChainDevice, LqReplaceSample, LqOneShot)
