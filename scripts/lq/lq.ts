@@ -22,11 +22,10 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as ChildProcess from "effect/process/ChildProcess";
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import { LqGraphQLGroup, type LqShow } from "./lq.graphql.ts";
 import { NotationError, type Note, parseLane } from "./notation.ts";
+import * as Screen from "./screen.ts";
 
 class LqError extends Data.TaggedError("LqError")<{
   readonly message: string;
@@ -496,14 +495,142 @@ const stopCommand = Command.make("stop", {}, () =>
 /** LiveQL cannot save; this clicks File > Save Live Set through Accessibility. */
 const saveCommand = Command.make("save", {}, () =>
   Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const script = `Application("System Events").processes.byName("Live").menuBars[0].menuBarItems.byName("File").menus[0].menuItems.byName("Save Live Set").click(); "saved"`;
-    yield* Console.log(
-      yield* spawner.string(
-        ChildProcess.make("osascript", ["-l", "JavaScript", "-e", script]),
-      ),
-    );
+    yield* Screen.menu("File>Save Live Set");
+    yield* Console.log("saved");
   }),
+).pipe(Command.withDescription("File > Save Live Set"));
+
+const menuCommand = Command.make(
+  "menu",
+  { path: Argument.String("menu>item") },
+  ({ path }) =>
+    Effect.gen(function* () {
+      yield* Screen.menu(path);
+      yield* Console.log(path);
+    }),
+).pipe(
+  Command.withDescription('Click a Live menu item: menu "File>Save Live Set"'),
+);
+
+const windowLine = (w: Screen.LiveWindow) =>
+  `${w.name} ${String(w.width)}x${String(w.height)} at ${String(w.x)},${String(w.y)}`;
+
+const windowsCommand = Command.make("windows", {}, () =>
+  Effect.gen(function* () {
+    for (const w of yield* Screen.windows) yield* Console.log(windowLine(w));
+  }),
+).pipe(Command.withDescription("Live's windows, with their size in points"));
+
+const getWindow = Effect.fnUntraced(function* (ref: string) {
+  const all = yield* Screen.windows;
+  const window = Screen.findWindow(all, ref);
+  if (window === undefined)
+    return yield* fail(
+      `no window ${ref}; windows: ${all.map((w) => w.name).join(", ")}`,
+    );
+  return window;
+});
+
+const windowArgument = Argument.String("window").pipe(
+  Argument.withDescription("Part of a window's name; empty is the Set"),
+  Argument.withDefault(""),
+);
+
+/** A PNG of one window, at one pixel per point so its coordinates are `click` coordinates. */
+const shotCommand = Command.make(
+  "shot",
+  {
+    window: windowArgument,
+    out: Flag.String("out").pipe(Flag.withAlias("o"), Flag.optional),
+  },
+  ({ window: ref, out }) =>
+    Effect.gen(function* () {
+      const window = yield* getWindow(ref);
+      const slug = window.name.replaceAll(/[^A-Za-z0-9]+/gu, "-");
+      const path = Option.getOrElse(out, () => `/tmp/lq-${slug}.png`);
+      yield* Screen.capture(window, path);
+      yield* Console.log(`${path} ${windowLine(window)}`);
+    }),
+).pipe(Command.withDescription("Capture a Live window as a PNG"));
+
+const clickCommand = Command.make(
+  "click",
+  {
+    window: Argument.String("window"),
+    x: Argument.Finite("x"),
+    y: Argument.Finite("y"),
+    double: Flag.Boolean("double").pipe(Flag.withDefault(false)),
+  },
+  ({ window: ref, x, y, double }) =>
+    Effect.gen(function* () {
+      const window = yield* getWindow(ref);
+      yield* Screen.click(window, x, y, double);
+      yield* Console.log(`clicked ${window.name} ${String(x)},${String(y)}`);
+    }),
+).pipe(
+  Command.withDescription(
+    'Click inside a window, in the points of its shot; "" is the Set',
+  ),
+);
+
+const keysCommand = Command.make(
+  "keys",
+  { keys: Argument.String("keys").pipe(Argument.variadic({ min: 1 })) },
+  ({ keys }) =>
+    Effect.gen(function* () {
+      yield* Screen.keys(keys);
+      yield* Console.log(keys.join(" "));
+    }),
+).pipe(
+  Command.withDescription(
+    "Bring Live forward and press keys: keys cmd+f Reverb arrow-down return",
+  ),
+);
+
+const editorCommand = Command.make(
+  "editor",
+  {
+    track: Argument.String("track"),
+    close: Flag.Boolean("close").pipe(Flag.withDefault(false)),
+  },
+  ({ track: ref, close }) =>
+    Effect.gen(function* () {
+      const device = yield* findDevice(
+        yield* findTrack(yield* show, ref),
+        Option.none(),
+      );
+      yield* (yield* Lq).LqEditor({ id: device.id, open: !close });
+      yield* Console.log(
+        `${device.name ?? "device"} editor ${close ? "closed" : "open"}`,
+      );
+    }),
+).pipe(Command.withDescription("Open or close a plug-in's editor window"));
+
+/**
+ * Loads anything Live's browser can find onto a track, plug-ins included: selects the track,
+ * then searches the browser and loads the first result.
+ */
+const loadCommand = Command.make(
+  "load",
+  { track: Argument.String("track"), name: Argument.String("name") },
+  ({ track: ref, name }) =>
+    Effect.gen(function* () {
+      const set = yield* show;
+      const track = yield* findTrack(set, ref);
+      const view = set.view?.id;
+      if (view === undefined) return yield* fail("no song view");
+      yield* (yield* Lq).LqSelectTrack({ view, track: track.id });
+      yield* Screen.keys(["cmd+f", name]);
+      yield* Effect.sleep("1 second");
+      yield* Screen.keys(["arrow-down", "return"]);
+      yield* Effect.sleep("2 seconds");
+      const after = yield* findTrack(yield* show, ref);
+      yield* Console.log(trackLine(after, ref));
+    }),
+).pipe(
+  Command.withDescription(
+    "Load the browser's first match for a name onto a track, plug-ins included",
+  ),
 );
 
 /**
@@ -593,7 +720,14 @@ Command.make("lq").pipe(
     playCommand,
     stopCommand,
     saveCommand,
+    menuCommand,
     arrangeCommand,
+    loadCommand,
+    editorCommand,
+    windowsCommand,
+    shotCommand,
+    clickCommand,
+    keysCommand,
     gqlCommand,
   ]),
   Command.run({ version: "0.0.0" }),

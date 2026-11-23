@@ -207,3 +207,15 @@ mutation LqDeleteTrackClip($track: Int!, $clip: Int!) {
     id
   }
 }
+
+mutation LqSelectTrack($view: Int!, $track: Int!) {
+  song_view_set(id: $view, properties: [{ selected_track: $track }]) {
+    id
+  }
+}
+
+mutation LqEditor($id: Int!, $open: Boolean!) {
+  plugin_device_set(id: $id, properties: [{ is_editor_open: $open }]) {
+    is_editor_open
+  }
+}

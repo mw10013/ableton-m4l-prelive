@@ -713,5 +713,60 @@ export declare namespace LqDeleteTrackClip {
   export type Result = typeof LqDeleteTrackClip.result.Type
 }
 
+/** `mutation LqSelectTrack` */
+export const LqSelectTrack = GraphQL.mutation("LqSelectTrack", {
+  document: {
+    variables: [
+      { name: "view", body: "Int!" },
+      { name: "track", body: "Int!" }
+    ],
+    selections: [
+      { name: "song_view_set", body: ["(id:$", "view", " properties:[{selected_track:$", "track", "}]){id}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    view: Shared.Int,
+    track: Shared.Int
+  },
+  result: Schema.Struct({
+    song_view_set: Schema.NullOr(SongView)
+  })
+})
+export declare namespace LqSelectTrack {
+  export type Variables = typeof LqSelectTrack.variables.Type
+  export type Result = typeof LqSelectTrack.result.Type
+}
+
+export const PluginDevice = Schema.Struct({
+  is_editor_open: Schema.NullOr(Schema.Boolean)
+})
+export interface PluginDevice extends Schema.Struct.Type<typeof PluginDevice.fields> {}
+
+/** `mutation LqEditor` */
+export const LqEditor = GraphQL.mutation("LqEditor", {
+  document: {
+    variables: [
+      { name: "id", body: "Int!" },
+      { name: "open", body: "Boolean!" }
+    ],
+    selections: [
+      { name: "plugin_device_set", body: ["(id:$", "id", " properties:[{is_editor_open:$", "open", "}]){is_editor_open}"] }
+    ],
+    fragments: []
+  },
+  variables: {
+    id: Shared.Int,
+    open: Schema.Boolean
+  },
+  result: Schema.Struct({
+    plugin_device_set: Schema.NullOr(PluginDevice)
+  })
+})
+export declare namespace LqEditor {
+  export type Variables = typeof LqEditor.variables.Type
+  export type Result = typeof LqEditor.result.Type
+}
+
 /** Every operation in lq.graphql. */
-export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip)
+export const LqGraphQLGroup = GraphQLGroup.make(LqShow, LqDeviceParams, LqParamText, LqSetParam, LqSetTempo, LqCreateMidiTrack, LqRenameTrack, LqInsertDevice, LqCreateClip, LqDeleteClip, LqWriteClip, LqFireSlot, LqStopTrack, LqCreateScene, LqRenameScene, LqFireScene, LqPlay, LqStop, LqToArrangement, LqDeleteTrackClip, LqSelectTrack, LqEditor)

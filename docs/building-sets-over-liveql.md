@@ -28,15 +28,18 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 
 ## Driving Live outside LiveQL
 
-- Accessibility is on. JXA can click Live's menus:
-  `Application("System Events").processes.byName("Live").menuBars[0].menuBarItems.byName("File").menus[0].menuItems.byName("Save Live Set").click()`
-  saves the Set.
+- Accessibility is on. JXA clicks Live's menus (`lq menu "File>Save Live Set"`, `lq save`).
 - Switching Sets while the current one has unsaved changes brings up a save prompt. LiveQL's `test/live/open.js`
   clicks Don't Save by position, but for projects we care about, a person answers it.
-- Keystrokes reach Live's main window. Live's browser search loads a plug-in onto the selected track: select the
-  track with `song_view_set(selected_track:)`, then Cmd-F, type the name, Down, Return. That is how Omnisphere got in.
-- Screen capture fails for the terminal (`screencapture`: could not create image from display), so the agent works
-  blind on anything LiveQL can't read. Granting the terminal Screen Recording permission would change that.
+- Live's browser search loads anything it finds onto the selected track, plug-ins included: select the track with
+  `song_view_set(selected_track:)`, then Cmd-F, type the name, Down, Return. `lq load <track> <name>` does that.
+- macOS credits the agent's shell to T3 Code (Nightly), which has Accessibility and Screen Recording. Capture
+  still fails inside Claude Code's Bash sandbox (`could not create image from display`); run `lq shot` and the
+  other screen commands with the sandbox off.
+- `lq shot [window]` saves a PNG of one window scaled to points, so its pixel coordinates are what `lq click`
+  takes. `lq keys` types with `cliclick`, one character per command, because Omnisphere drops fast typing.
+- Bringing Live forward moves focus off a plug-in window, so the screen commands only activate Live when it is not
+  already in front.
 
 ## Listening
 
@@ -65,11 +68,14 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 - `track_insert_device` cannot insert plug-ins. The browser-search keystrokes above can.
 - Live loaded Omnisphere as an `AuPluginDevice` and opened its editor. `plugin_device_set(is_editor_open: false)`
   closes it.
-- The LOM sees almost nothing: `presets` is `["Default"]` and `parameters` is only `Device On`. Omnisphere keeps
-  its patches in its own library, and Live exposes plug-in parameters only after they are configured.
-- Untested ways in: a person picks patches once and saves each as an Instrument Rack preset with macros mapped to
-  the parameters that matter, which LiveQL can then load by name and turn through macros; or Live's
-  `-_PluginAutoPopulateThreshold` option in `Options.txt`, which needs a Live restart.
+- The LOM sees almost nothing: `presets` is `["Default"]` and `parameters` is `Device On` plus whatever Live has
+  configured. Omnisphere keeps its patches in its own library.
+- The screen does the rest. `lq editor Omni` opens the editor (it may open on the About page; click the
+  Spectrasonics logo for the main page). In the patch browser, the search box is at about 165,125 and the first
+  result at 130,511: `lq click Omnisphere/Omni 165 125`, `lq keys "warm pad" return`, `lq click Omnisphere/Omni 130
+  511`, then `lq shot omni` to read the loaded patch. The patch is stored in the Live Set; nothing is saved into
+  Omnisphere.
+- Untested: Live's `-_PluginAutoPopulateThreshold` option in `Options.txt` would expose more parameters to LiveQL.
 
 ## Building a Drum Rack
 
@@ -100,6 +106,10 @@ with `vp run liveql:codegen`. Tracks are named or numbered, and `Space` finds `A
 | `arrange Intro:2 Drop:4`                                                        | Rebuilds the Arrangement from scenes. Rerunning converges                |
 | `tempo`, `master`, `play`, `stop`, `save`                                       | `save` clicks File > Save Live Set                                       |
 | `gql '<document>'`                                                              | The escape hatch                                                         |
+| `load <track> <name>`                                                           | Loads the browser's first match onto a track, plug-ins included          |
+| `editor <track> [--close]`                                                      | Opens or closes a plug-in's editor                                       |
+| `windows`, `shot [window] [-o png]`                                             | Lists Live's windows; captures one at one pixel per point                |
+| `click <window> x y [--double]`, `keys cmd+f text return`, `menu "File>Save"`   | Drives Live and plug-in windows. `""` as the window is the Set           |
 
 Lanes (`scripts/lq/notation.ts`): sequence tokens are a note (`A1`, Ableton octaves with C3 = 60), a chord
 (`Am7@2`, `C@3^1` for the first inversion), `+` to stack, `.` rest, `-` hold, and a `!` or `?` suffix for an
@@ -108,7 +118,7 @@ accent or a soft step. A step lane is `C1:x..oX.-.` (hit, rest, soft, accent, ho
 ## Melodic House, as built
 
 122 BPM, A minor, chords Am, F, C, G a bar each. Scenes: 0 Groove, 1 Intro, 2 Breakdown, 3 Drop. The Arrangement
-is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars. The Omni track holds Omnisphere on its Default patch,
+is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars. The Omni track holds Omnisphere on Bending Trance Lead,
 with a lead in the Drop. Slot 0 is the first sketch:
 
 | Track            | Device                                                                                | Notes                                                                                         |
@@ -124,4 +134,4 @@ with a lead in the Drop. Slot 0 is the first sketch:
 1. A song spec file that `lq` applies whole, so a Set rebuilds from one file.
 2. Generators over the notation: chord progressions in a key, arps from chords.
 3. Try the automation-recording idea for filter sweeps into the Drop.
-4. An Omnisphere sound palette: Instrument Rack presets with macros.
+4. Record the master to a file and measure levels, so the agent can catch clipping and silent tracks.
