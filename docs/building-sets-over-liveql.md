@@ -43,6 +43,9 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
   small Swift helper (`scripts/lq/ax.swift`, compiled on first use into `node_modules/.cache/lq/`) that takes 0.4 s
   where JXA through System Events takes 15 s. Plug-in editors draw their own UI, so Omnisphere shows only its
   window buttons; it needs `shot`.
+- With Live in the background (screen awake): `ax tree` of the main window, `shot` of any window, Omnisphere's
+  included, and LiveQL all work without bringing Live forward. Plug-in windows drop out of the Accessibility tree,
+  and `click` and `keys` bring Live forward, because macOS sends input to the front app.
 - While the screen is locked or asleep, Live cannot come forward and its tree shrinks to one stub window named
   `Live`. LiveQL keeps working.
 - `shot --crop x,y,w,h` keeps part of a window, which costs fewer tokens to look at.

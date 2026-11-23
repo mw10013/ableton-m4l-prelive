@@ -112,9 +112,10 @@ export const capture = Effect.fnUntraced(function* (
       "-c",
       String(height),
       String(width),
+      // sips centers the crop when an offset is 0, so the smallest offset is 1.
       "--cropOffset",
-      String(y),
-      String(x),
+      String(Math.max(1, y)),
+      String(Math.max(1, x)),
       path,
     ]);
   }
