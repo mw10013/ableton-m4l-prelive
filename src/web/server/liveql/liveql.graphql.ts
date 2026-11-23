@@ -694,3 +694,12 @@ export const NoteInput = Schema.Struct({
   release_velocity: Schema.optional(Schema.NullOr(Float))
 })
 export interface NoteInput extends Schema.Struct.Type<typeof NoteInput.fields> {}
+
+/** The possible `__typename` values of each interface and union the operations select from. */
+export declare namespace Typename {
+  /** Every possible `__typename` of interface `Device`. */
+  export type Device =
+    | "CompressorDevice" | "DriftDevice" | "DrumCellDevice" | "Eq8Device" | "GenericDevice" | "HybridReverbDevice"
+    | "LooperDevice" | "MaxDevice" | "MeldDevice" | "PluginDevice" | "RackDevice" | "RoarDevice" | "ShifterDevice"
+    | "SimplerDevice" | "SpectralResonatorDevice" | "WavetableDevice"
+}

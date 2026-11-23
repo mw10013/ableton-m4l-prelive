@@ -28,11 +28,24 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 
 ## Driving Live outside LiveQL
 
-- Accessibility is on. JXA can click Live's menus:
-  `Application("System Events").processes.byName("Live").menuBars[0].menuBarItems.byName("File").menus[0].menuItems.byName("Save Live Set").click()`
-  saves the Set.
+- Accessibility is on. JXA clicks Live's menus (`lq menu "File>Save Live Set"`, `lq save`).
 - Switching Sets while the current one has unsaved changes brings up a save prompt. LiveQL's `test/live/open.js`
   clicks Don't Save by position, but for projects we care about, a person answers it.
+- Live's browser search loads anything it finds onto the selected track, plug-ins included: select the track with
+  `song_view_set(selected_track:)`, then Cmd-F, type the name, Down, Return. `lq load <track> <name>` does that.
+- macOS credits the agent's shell to T3 Code (Nightly), which has Accessibility and Screen Recording. Capture
+  still fails inside Claude Code's Bash sandbox (`could not create image from display`); run `lq shot` and the
+  other screen commands with the sandbox off.
+- `lq shot [window]` saves a PNG of one window scaled to points, so its pixel coordinates are what `lq click`
+  takes. `lq keys` types with `cliclick`, one character per command, because Omnisphere drops fast typing.
+- Bringing Live forward moves focus off a plug-in window, so the screen commands only activate Live when it is not
+  already in front.
+
+## Listening
+
+- The agent cannot hear Live. Its checks are structural: note counts, clips in the right slots, readback values.
+- The master track has no `mute` (it reads null), but its volume is a parameter: `lq master 0` silences Live while
+  the agent works, `lq master 0.85` is back to 0 dB.
 
 ## LiveQL behavior worth knowing
 
@@ -40,11 +53,29 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 - Every create returns ids in its readback (new track, clip slots, devices, chains), so a script can chain steps
   without searching.
 - Parameter ids differ on every device, even two Drifts. Read `parameters { id name min max }` and set by name.
-  Values are mostly 0–1 knob positions, not units. `display_value` is untested.
+  Values are mostly 0–1 knob positions, not units. `str_for_value(value:)` turns one into Live's text with units
+  (`1.10 kHz`, `63.6 ms`, `-26.6 dB`), so `lq tweak` prints both.
 - Volume and sends are `DeviceParameter`s under `track.mixer_device` (`volume`, `sends`).
 - `song_set(tempo)` sets the tempo.
 - Live adds the letter prefix to a return track's name itself: setting `Space` reads back `A-Space`.
 - `track_insert_device` drops an unknown name without an error. Check the returned `devices`.
+
+- `track_duplicate_clip_to_arrangement` copies a Session clip into the Arrangement. Session clips override the
+  Arrangement until `song_set(back_to_arranger: false)`.
+
+## Plug-ins: Omnisphere
+
+- `track_insert_device` cannot insert plug-ins. The browser-search keystrokes above can.
+- Live loaded Omnisphere as an `AuPluginDevice` and opened its editor. `plugin_device_set(is_editor_open: false)`
+  closes it.
+- The LOM sees almost nothing: `presets` is `["Default"]` and `parameters` is `Device On` plus whatever Live has
+  configured. Omnisphere keeps its patches in its own library.
+- The screen does the rest. `lq editor Omni` opens the editor (it may open on the About page; click the
+  Spectrasonics logo for the main page). In the patch browser, the search box is at about 165,125 and the first
+  result at 130,511: `lq click Omnisphere/Omni 165 125`, `lq keys "warm pad" return`, `lq click Omnisphere/Omni 130
+  511`, then `lq shot omni` to read the loaded patch. The patch is stored in the Live Set; nothing is saved into
+  Omnisphere.
+- Untested: Live's `-_PluginAutoPopulateThreshold` option in `Options.txt` would expose more parameters to LiveQL.
 
 ## Building a Drum Rack
 
@@ -58,9 +89,37 @@ Core Library one-shots live under
 `/Applications/Ableton Live 12 Suite.app/Contents/App-Resources/Core Library/Samples/One Shots/Drums/`
 (`Kick/`, `Clap/`, `Hihat/` and so on).
 
+## The `lq` CLI
+
+`vpx scripts/lq/lq.ts <command>` (`--help` lists them). Its operations are in `scripts/lq/lq.graphql`, generated
+with `vp run liveql:codegen`. Tracks are named or numbered, and `Space` finds `A-Space`.
+
+| Command                                                                         | Does                                                                     |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `show`                                                                          | The whole Set, one line per track: volume, sends, devices, clips by slot |
+| `track <name> -d Drift k=v...`                                                  | Makes sure a MIDI track exists with that device, then sets parameters    |
+| `params <track> [-d dev] [-f text]`                                             | A device's parameters as `name=value [min..max]` or `{items}`            |
+| `tweak <track> "LP Freq=0.4"...`                                                | Sets parameters by name and prints the result with units                 |
+| `mix <track> vol=0.7 pan=0 A=0.4`                                               | Volume, pan and sends by letter                                          |
+| `clip <track> <slot> <lane>... [-l beats -g grid --gate -v vel -n name --fire]` | Replaces a slot's clip                                                   |
+| `scene <i> [-n name] [--fire]`                                                  | Names or fires a scene, creating scenes up to its index                  |
+| `arrange Intro:2 Drop:4`                                                        | Rebuilds the Arrangement from scenes. Rerunning converges                |
+| `tempo`, `master`, `play`, `stop`, `save`                                       | `save` clicks File > Save Live Set                                       |
+| `gql '<document>'`                                                              | The escape hatch                                                         |
+| `load <track> <name>`                                                           | Loads the browser's first match onto a track, plug-ins included          |
+| `editor <track> [--close]`                                                      | Opens or closes a plug-in's editor                                       |
+| `windows`, `shot [window] [-o png]`                                             | Lists Live's windows; captures one at one pixel per point                |
+| `click <window> x y [--double]`, `keys cmd+f text return`, `menu "File>Save"`   | Drives Live and plug-in windows. `""` as the window is the Set           |
+
+Lanes (`scripts/lq/notation.ts`): sequence tokens are a note (`A1`, Ableton octaves with C3 = 60), a chord
+(`Am7@2`, `C@3^1` for the first inversion), `+` to stack, `.` rest, `-` hold, and a `!` or `?` suffix for an
+accent or a soft step. A step lane is `C1:x..oX.-.` (hit, rest, soft, accent, hold). A lane repeats to the clip length.
+
 ## Melodic House, as built
 
-122 BPM, A minor, one 4-bar Session clip per track, with chords Am, F, C, G a bar each.
+122 BPM, A minor, chords Am, F, C, G a bar each. Scenes: 0 Groove, 1 Intro, 2 Breakdown, 3 Drop. The Arrangement
+is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars. The Omni track holds Omnisphere on Bending Trance Lead,
+with a lead in the Drop. Slot 0 is the first sketch:
 
 | Track            | Device                                                                                | Notes                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -72,9 +131,7 @@ Core Library one-shots live under
 
 ## Next
 
-1. An Effect CLI under `scripts/` that builds a Set from a song spec: tempo, tracks by name, instrument and
-   parameters by name, clips with notes per scene. Rerunning it converges on the spec. New operations go in
-   `src/web/server/liveql/liveSet.graphql`, then `vp run liveql:codegen`.
-2. Pure note generators: chord progression in a key, arp, offbeat bass, step strings for drums.
-3. Scenes (intro, breakdown, drop), then `track_duplicate_clip_to_arrangement` into the Arrangement.
-4. Try the automation-recording idea for filter sweeps.
+1. A song spec file that `lq` applies whole, so a Set rebuilds from one file.
+2. Generators over the notation: chord progressions in a key, arps from chords.
+3. Try the automation-recording idea for filter sweeps into the Drop.
+4. Record the master to a file and measure levels, so the agent can catch clipping and silent tracks.
