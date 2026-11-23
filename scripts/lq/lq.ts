@@ -279,6 +279,139 @@ const tweakCommand = Command.make(
   ),
 );
 
+/** The first entry whose name contains `text`, ignoring case. */
+const named = <A extends { readonly display_name: string }>(
+  items: readonly A[] | null | undefined,
+  text: string,
+) =>
+  Option.fromNullishOr(
+    items?.find((i) =>
+      i.display_name.toLowerCase().includes(text.toLowerCase()),
+    ),
+  );
+
+const sidechainCommand = Command.make(
+  "sidechain",
+  {
+    track: trackArg,
+    source: Argument.String("source").pipe(
+      Argument.withDescription("Track that drives it, as Drums"),
+    ),
+    channel: Flag.String("channel").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription('Tap inside the source, as "Kick | Pre FX"'),
+      Flag.optional,
+    ),
+    device: deviceFlag,
+  },
+  ({ track, source, channel, device }) =>
+    Effect.gen(function* () {
+      const lq = yield* Lq;
+      const d = yield* findDevice(
+        yield* findTrack(yield* show, track),
+        Option.orElse(device, () => Option.some("Compressor")),
+      );
+      const current = (yield* lq.LqCompressor({ id: d.id })).device;
+      if (current === null || !("input_routing_type" in current))
+        return yield* fail(`${d.name ?? "device"} is not a Compressor`);
+      const type = named(current.available_input_routing_types, source);
+      if (Option.isNone(type))
+        return yield* fail(
+          `no source ${source}: ${current.available_input_routing_types?.map((t) => t.display_name).join(", ") ?? ""}`,
+        );
+      let routed = (yield* lq.LqSetCompressor({
+        id: d.id,
+        properties: [
+          { input_routing_type: { identifier: type.value.identifier } },
+        ],
+      })).compressor_device_set;
+      if (Option.isSome(channel)) {
+        const tap = named(
+          routed?.available_input_routing_channels,
+          channel.value,
+        );
+        if (Option.isNone(tap))
+          return yield* fail(
+            `no channel ${channel.value}: ${routed?.available_input_routing_channels?.map((c) => c.display_name).join(", ") ?? ""}`,
+          );
+        routed = (yield* lq.LqSetCompressor({
+          id: d.id,
+          properties: [
+            { input_routing_channel: { identifier: tap.value.identifier } },
+          ],
+        })).compressor_device_set;
+      }
+      const on = yield* setParams(d.id, ["S/C On=On"]);
+      yield* Console.log(
+        `${routed?.input_routing_type?.display_name ?? "?"} | ${routed?.input_routing_channel?.display_name ?? "?"}; ${on.join("; ")}`,
+      );
+    }),
+).pipe(
+  Command.withDescription(
+    'Drive a Compressor from another track: sidechain Pad Drums -c "Kick | Pre FX"',
+  ),
+);
+
+const padCommand = Command.make(
+  "pad",
+  {
+    track: trackArg,
+    note: Argument.Int("note").pipe(
+      Argument.withDescription("MIDI note the pad plays on, as 38"),
+    ),
+    sample: Argument.String("sample").pipe(
+      Argument.withDescription("Audio file for its Simpler"),
+    ),
+    name: Flag.String("name").pipe(Flag.withAlias("n"), Flag.optional),
+    device: deviceFlag,
+  },
+  ({ track, note, sample, name, device }) =>
+    Effect.gen(function* () {
+      const lq = yield* Lq;
+      const rack = yield* findDevice(
+        yield* findTrack(yield* show, track),
+        Option.orElse(device, () => Option.some("Drum Rack")),
+      );
+      const chains = Effect.gen(function* () {
+        const r = (yield* lq.LqRack({ id: rack.id })).device;
+        return r !== null && "chains" in r ? (r.chains ?? []) : [];
+      });
+      const onNote = (cs: Effect.Success<typeof chains>) =>
+        cs.find((c) => "in_note" in c && c.in_note === note);
+      let chain = onNote(yield* chains);
+      if (chain === undefined) {
+        const before = new Set((yield* chains).map((c) => c.id));
+        yield* lq.LqInsertChain({ id: rack.id });
+        const added = (yield* chains).find((c) => !before.has(c.id));
+        if (added === undefined) return yield* fail("Live added no chain");
+        yield* lq.LqChainNote({ id: added.id, note });
+        chain = added;
+      }
+      const label = Option.getOrElse(name, () =>
+        (sample.split("/").at(-1) ?? sample).replace(/\.\w+$/u, ""),
+      );
+      yield* lq.LqNameChain({ id: chain.id, name: label });
+      let simpler = chain.devices?.find(
+        (d) => d.class_name === "OriginalSimpler",
+      );
+      if (simpler === undefined) {
+        const devices =
+          (yield* lq.LqChainDevice({ id: chain.id, name: "Simpler" }))
+            .chain_insert_device?.devices ?? [];
+        simpler = devices.find((d) => d.class_name === "OriginalSimpler");
+        if (simpler === undefined) return yield* fail("Live added no Simpler");
+      }
+      yield* lq.LqReplaceSample({ id: simpler.id, path: sample });
+      // One-Shot plays the whole sample, however short the note.
+      yield* lq.LqOneShot({ id: simpler.id });
+      yield* Console.log(`${label} on ${String(note)}`);
+    }),
+).pipe(
+  Command.withDescription(
+    "Put a one-shot sample on a Drum Rack pad, adding the chain and Simpler if missing: pad Drums 38 snare.wav",
+  ),
+);
+
 /** The number a text starts with, as -6.0 in "-6.0 dB". */
 const leadingNumber = (text: string) =>
   Number(/^\s*(?<n>[-+]?\d+(?:\.\d+)?)/u.exec(text)?.groups?.n ?? Number.NaN);
@@ -1767,6 +1900,8 @@ Command.make("lq").pipe(
     showCommand,
     paramsCommand,
     tweakCommand,
+    sidechainCommand,
+    padCommand,
     mixCommand,
     trackCommand,
     clipCommand,

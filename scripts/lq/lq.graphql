@@ -329,3 +329,93 @@ query LqDump {
     }
   }
 }
+
+fragment LqCompressorRouting on CompressorDevice {
+  available_input_routing_types {
+    display_name
+    identifier
+  }
+  available_input_routing_channels {
+    display_name
+    identifier
+  }
+  input_routing_type {
+    display_name
+  }
+  input_routing_channel {
+    display_name
+  }
+}
+
+query LqCompressor($id: Int!) {
+  device(id: $id) {
+    ... on CompressorDevice {
+      ...LqCompressorRouting
+    }
+  }
+}
+
+mutation LqSetCompressor($id: Int!, $properties: [CompressorDeviceSetInput!]!) {
+  compressor_device_set(id: $id, properties: $properties) {
+    ...LqCompressorRouting
+  }
+}
+
+query LqRack($id: Int!) {
+  device(id: $id) {
+    ... on RackDevice {
+      chains {
+        id
+        name
+        ... on DrumChain {
+          in_note
+        }
+        devices {
+          id
+          class_name
+        }
+      }
+    }
+  }
+}
+
+mutation LqInsertChain($id: Int!) {
+  rack_device_insert_chain(id: $id) {
+    chains {
+      id
+    }
+  }
+}
+
+mutation LqNameChain($id: Int!, $name: String!) {
+  chain_set(id: $id, properties: [{ name: $name }]) {
+    id
+  }
+}
+
+mutation LqChainNote($id: Int!, $note: Int!) {
+  drum_chain_set(id: $id, properties: [{ in_note: $note }]) {
+    in_note
+  }
+}
+
+mutation LqChainDevice($id: Int!, $name: String!) {
+  chain_insert_device(id: $id, device_name: $name) {
+    devices {
+      id
+      class_name
+    }
+  }
+}
+
+mutation LqReplaceSample($id: Int!, $path: String!) {
+  simpler_device_replace_sample(id: $id, file_path: $path) {
+    id
+  }
+}
+
+mutation LqOneShot($id: Int!) {
+  simpler_device_set(id: $id, properties: [{ playback_mode: 1 }]) {
+    playback_mode
+  }
+}

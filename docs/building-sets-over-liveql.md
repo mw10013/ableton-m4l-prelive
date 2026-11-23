@@ -120,7 +120,7 @@ What we learned building `projects/Melodic House Project` by sending GraphQL to 
 ## Recording automation
 
 The LOM cannot write Arrangement automation, but Live records parameter moves made through it.
-`lq sweep Arp "LP Freq" 0.15 0.58 17-25 --curve 2 --before 0.58`:
+`lq sweep Arp Frequency 0.15 0.62 25-41 -d "Auto Filter" --curve 3 --before 0.58`:
 
 1. Sets the parameter to `--before`, puts `start_time` one bar before the ramp, turns on `record_mode` and plays.
    `start_playing` begins at `start_time`, not at `current_song_time`.
@@ -139,7 +139,11 @@ What we learned:
 - Setting an automated parameter while stopped overrides its automation until `re_enable_automation`.
 - Arrangement Record also records every armed track, over its clips. A stray keystroke had armed Drums, so a sweep
   replaced bar 16 of the drums with an empty recording and cut the Drop's first downbeat. `sweep` now refuses to run
-  while any track is armed (`arm` or `implicit_arm`).
+  while any track is armed (`arm` or `implicit_arm`). A MIDI track that `lq track` creates comes armed, so
+  disarm it (`track_set(properties: [{ arm: false }])`) before a sweep.
+- Nothing clears an Arrangement envelope, so moving sections means recording over the old automation: a constant
+  where the old ramp was, then the new ramp. One `--curve 3` ramp over 16 bars stays low through a Breakdown and
+  opens fast in the Build.
 
 ## Listening by measurement
 
@@ -219,6 +223,18 @@ Arrangement; the Arp's automation, which lives on the track, came through every 
 
 Not covered: device parameters, a Drum Rack's chains and samples, plug-in patches and automation.
 
+## Sidechain pumping
+
+A Compressor's sidechain is routable over LiveQL: `compressor_device_set` takes `input_routing_type` (a track) and
+then `input_routing_channel`, whose list appears only after the type is set. A Drum Rack source lists every chain's
+Pre FX, Post FX and Post Mixer taps, so `Drum Rack | Kick | Pre FX` ducks on the kick alone, whatever the clap and
+hats do and wherever the Drums fader sits. `S/C On` is an ordinary parameter.
+
+`lq sidechain Pad Drums -c "Kick | Pre FX"` does all three. Melodic House runs Peak, Threshold −24 dB, Ratio
+10:1 (Arp 6.7:1), Attack 0.1 ms, Release 108 ms on Bass, 198 ms on Pad and 160 ms on Arp. Folding each stem's
+level over the beat proved it: the Pad sits about 10 dB down right after each kick and recovers by the next one in
+the Groove and Drop, and stays flat in the Breakdown, which has no kick. The Arp and Bass dip about the same.
+
 ## Building a Drum Rack
 
 1. `track_insert_device(device_name: "Drum Rack")`.
@@ -226,6 +242,9 @@ Not covered: device parameters, a Drum Rack's chains and samples, plug-in patche
 3. `chain_set` sets the chain's `name`. `drum_chain_set` sets its `in_note`. They are different mutations.
 4. `chain_insert_device(device_name: "Simpler")`.
 5. `simpler_device_replace_sample(file_path:)` loads a file, including into an empty Simpler.
+6. `simpler_device_set(playback_mode: 1)` makes it One-Shot, so a riser plays out however short its note.
+
+`lq pad Drums 38 <file> -n Snare` does all of it, reusing the chain already on that note.
 
 Core Library one-shots live under
 `/Applications/Ableton Live 12 Suite.app/Contents/App-Resources/Core Library/Samples/One Shots/Drums/`
@@ -242,6 +261,8 @@ with `vp run liveql:codegen`. Tracks are named or numbered, and `Space` finds `A
 | `track <name> -d Drift k=v...`                                                  | Makes sure a MIDI track exists with that device, then sets parameters    |
 | `params <track> [-d dev] [-f text]`                                             | A device's parameters as `name=value [min..max]` or `{items}`            |
 | `tweak <track> "LP Freq=0.4"...`                                                | Sets parameters by name and prints the result with units                 |
+| `sidechain <track> <source> [-c tap -d dev]`                                    | Drives a Compressor from another track, or a chain inside it             |
+| `pad <track> <note> <file> [-n name]`                                           | Puts a one-shot sample on a Drum Rack pad, adding the chain if missing   |
 | `mix <track> vol=-8db pan=0 A=0.4`                                              | Volume, pan and sends by letter, as knob positions or decibels           |
 | `clip <track> <slot> <lane>... [-l beats -g grid --gate -v vel -n name --fire]` | Replaces a slot's clip                                                   |
 | `scene <i> [-n name] [--fire]`                                                  | Names or fires a scene, creating scenes up to its index                  |
@@ -266,22 +287,44 @@ accent or a soft step, and `*96` for an exact velocity. A step lane is `C1:x..oX
 
 ## Melodic House, as built
 
-122 BPM, A minor, chords Am, F, C, G a bar each. Scenes: 0 Groove, 1 Intro, 2 Breakdown, 3 Drop. The Arrangement
-is `arrange Intro:2 Groove:2 Breakdown:2 Drop:4`, 40 bars, and `song.json` beside the Set specs all of it. Every instrument but the drums is Omnisphere, chosen by
-name without hearing it. Main ends in a Limiter (True Peak, ceiling −1 dB).
+122 BPM, A minor, chords Am, F, C, G a bar each. Scenes: 0 Groove, 1 Intro, 2 Breakdown, 3 Drop, 4 Build, 5 Lift,
+6 Outro. The Arrangement is `arrange Intro:2 Groove:2 Lift:2 Breakdown:1 Build:1 Drop:2 Outro:1`, 64 bars (2:06),
+and `song.json` beside the Set specs all of it. Breakdown, Build, Drop and Outro clips are 8 bars, so their phrases
+don't repeat every 4. Every instrument but the drums is Omnisphere, chosen by name without hearing it. Bass, Pad and
+Arp end in a Compressor keyed from the kick (see Sidechain pumping). Main ends in a Limiter (True Peak, ceiling
+−1 dB).
 
-| Track            | Device                                                                                | Notes                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Bass             | Omnisphere: MTAUR - Ostinato Bass, GLIDE off, fader −10 dB                            | Offbeat eighths on the roots, MIDI 57, 53, 60, 55: an octave up, against a wobble at MIDI 45  |
-| Drums            | Drum Rack: Kick 909 1 (36), Clap 909 (39), Hihat Closed 909 (42), Hihat Open 909 (46) | Kick every beat, clap on 2 and 4, open hat on offbeats, soft closed hats on the 16ths between |
-| Pad              | Omnisphere: Jupiter and JX Warm Pad                                                   | Am7, Fmaj7, C, G held a bar each; wider voicings in the Breakdown                             |
-| Arp              | Omnisphere: Chill Plucker, then Auto Filter (Frequency automated)                     | 16ths through the chord tones an octave up; 8ths in the Breakdown                             |
-| Omni             | Omnisphere: Giant Trance Lead 1, GLIDE off                                            | Lead melody in the Drop                                                                       |
-| A-Space (return) | Delay, Reverb                                                                         | Sends: Pad 0.45, Arp 0.55, Omni 0.35, Drums 0.08                                              |
+| Bars  | Section   | What happens                                                                                   |
+| ----- | --------- | ---------------------------------------------------------------------------------------------- |
+| 1–8   | Intro     | Kick, hats and bass                                                                            |
+| 9–16  | Groove    | Full groove, pumping                                                                           |
+| 17–24 | Lift      | Busier hats, a snare fill every 4 bars, the lead's first phrase played soft                    |
+| 25–32 | Breakdown | Crash and downsweep, no drums or bass, the lead's melody slow; the Arp's filter closes         |
+| 33–40 | Build     | Snare from quarters to 16ths, kick out in bar 40, whoosh from bar 35 and a riser into the drop |
+| 41–56 | Drop      | Crash, the full lead (a phrase and its answer over 8 bars), a snare fill into each half's end  |
+| 57–64 | Outro     | Crash, kick out after bar 62, the Pad holds the last chord                                     |
+
+| Track            | Device                                                                                                         | Notes                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Bass             | Omnisphere: MTAUR - Ostinato Bass, GLIDE off, fader −10 dB                                                     | Offbeat eighths on the roots, MIDI 57, 53, 60, 55: an octave up, against a wobble at MIDI 45  |
+| Drums            | Drum Rack: Kick 909 1 (36), Snare 909 Hard 1 (38), Clap 909 (39), Hihat Closed 909 (42), Hihat Open 909 (46)   | Kick every beat, clap on 2 and 4, open hat on offbeats, soft closed hats on the 16ths between |
+| Pad              | Omnisphere: Jupiter and JX Warm Pad                                                                            | Am7, Fmaj7, C, G held a bar each; wider voicings in the Breakdown                             |
+| Arp              | Omnisphere: Chill Plucker, then Auto Filter (Frequency automated)                                              | 16ths through the chord tones an octave up; 8ths in the Breakdown and Outro                   |
+| Omni             | Omnisphere: Giant Trance Lead 1, GLIDE off                                                                     | Soft in the Lift, slow in the Breakdown, full in the Drop                                     |
+| FX               | Drum Rack, one-shot: Crash 909 (36), Riser Whoosh Up (37), Riser White Noise (38), Sweep White Noise Fall (39) | Fader −6 dB, send 0.25                                                                        |
+| A-Space (return) | Delay, Reverb                                                                                                  | Sends: Pad 0.45, Arp 0.55, Omni 0.35, FX 0.25, Drums 0.08                                     |
+
+The Arp's Frequency is 0.58, drops to 0.15 at bar 25 and opens on a cubic curve to 0.62 at bar 41.
+
+Measured from a stem export (LUFS / true peak dBFS): the mix runs Intro −18.2, Groove −15.4, Lift −15.7,
+Breakdown −17.5, Build −16.3, Drop −13.5 / −1.0, Outro −20.0. Pumping costs the Pad about 4 LU against the
+unducked Drop before. Drums climb from −23 dB RMS in bar 33 to −20 in bar 39 and fall to −24 in bar 40, when the
+kick stops; the FX track rises from bar 35 and hits the crash at bar 41.
 
 ## Next
 
-1. Extend the song spec to device parameters and Drum Rack samples, so a Set rebuilds from the Seed.
+1. Extend the song spec to device parameters, sidechain routing and Drum Rack samples, so a Set rebuilds from the
+   Seed. `lq pad` and `lq sidechain` are the pieces `apply` would call.
 2. Generators over the notation: chord progressions in a key, arps from chords.
 3. Several ramps in one recording pass, since each pass runs in real time. Clip envelopes are no way around it:
    creating them and inserting steps is Python-only, like Arrangement envelopes.
